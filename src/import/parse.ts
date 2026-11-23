@@ -59,27 +59,37 @@ function fencedBlocks(text: string): FencedBlock[] {
 const JSON_END = new Set(['}', ']', '"', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'e', 'l']);
 
 /**
- * A closed block's inside parses as JSON. A text that cannot start or end as a JSON value is not tried:
- * a failed parse throws, and the throw is the cost of a block.
+ * A closed block's inside could be JSON: it starts and ends as a JSON value can. Only such a block is
+ * parsed, since a failed parse throws, and the throw is the cost of a block.
  */
-function parsesAsJson(text: string, b: FencedBlock): boolean {
+function looksLikeJson(text: string, b: FencedBlock): boolean {
   if (b.to < 0) return false;
   const inside = text.slice(b.from, b.to);
   if (!/^\s*[[{"\-0-9tfn]/.test(inside)) return false;
   let end = inside.length - 1;
   while (end >= 0 && /\s/.test(inside[end])) end--;
-  if (end < 0 || !JSON_END.has(inside[end])) return false;
-  try { JSON.parse(inside); return true; } catch { return false; }
+  return end >= 0 && JSON_END.has(inside[end]);
 }
+
+function parsesInside(text: string, b: FencedBlock): boolean {
+  try { JSON.parse(text.slice(b.from, b.to)); return true; } catch { return false; }
+}
+
+/** A real reply holds a handful of code blocks: past this many tried, Atlas makes no guess. */
+export const MAX_JSON_TRIES = 20;
 
 /**
  * The one block of a text with more than one that parses as JSON, or null when none or several do. It
- * stops at the second one that parses.
+ * stops at the second one that parses, and after `MAX_JSON_TRIES` blocks that look like JSON have been
+ * tried: each failed parse throws, and a paste of many such blocks would hold up every keystroke.
  */
 function theOneParsing(text: string, blocks: FencedBlock[]): FencedBlock | null {
   let found: FencedBlock | null = null;
+  let tries = 0;
   for (const b of blocks) {
-    if (!parsesAsJson(text, b)) continue;
+    if (!looksLikeJson(text, b)) continue;
+    if (++tries > MAX_JSON_TRIES) return null;
+    if (!parsesInside(text, b)) continue;
     if (found) return null;
     found = b;
   }
@@ -124,7 +134,7 @@ export function holdsSeveralBlocks(text: string): boolean {
  */
 export function jsonFaultAdvice(text: string): string {
   return text.includes('```') || text.includes('~~~')
-    ? 'It holds code block marks (``` or ~~~) that Atlas could not read past. Paste only the JSON itself.'
+    ? 'It holds code block marks (``` or ~~~) that Atlas could not read past. Paste only the JSON.'
     : 'Check for a missing comma, quote, or bracket.';
 }
 

@@ -161,7 +161,7 @@ export class InviteModal extends BaseModal {
         this.renderMade(body, made, inviteFor, inviteFor === 'player' ? characterName : null);
       } catch (err) {
         this.dismissLocked = false;
-        errorBox.textContent = problemFor(err, { inline: true, doing: 'making the invite link' }).sentence;
+        errorBox.textContent = problemFor(err, { inline: true, doing: 'making the invite link', noPin: true }).sentence;
         errorBox.hidden = false;
         lock(false);
         makeBtn.textContent = 'Make the link';

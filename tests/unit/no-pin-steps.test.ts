@@ -3,6 +3,8 @@
  * account's list of worlds, a seat's check, the demo's download, a world file, and a download or a new key
  * read by a key that only reads send none (a prefixed key's reads go bare, and nothing goes beside a read
  * key: conv. 164, 193). Their refusal says OnlyWorlds did not allow the step, and that nothing changed.
+ * Each words the refusals it knows first, so one that reaches the sentence is unexpected: it asks for the
+ * details as feedback, and the toast carries them.
  * A step that may leave something behind when it fails (a download into a folder, whose half-made files
  * can stay; an account world's open, after its key is made; a new world made here before it goes online)
  * says only that OnlyWorlds did not allow it.
@@ -33,23 +35,28 @@ beforeEach(() => {
 describe('a refusal of a step that sends no PIN', () => {
   it('says OnlyWorlds did not allow the step, and names no PIN or seat secret', () => {
     expect(problemFor(forbidden(), { doing: 'reading the invitation', inline: true, noPin: true }).sentence)
-      .toBe('OnlyWorlds did not allow reading the invitation. Nothing changed.');
+      .toBe('OnlyWorlds did not allow reading the invitation. Nothing changed. If it keeps happening, tell us at onlyworlds.com/feedback.');
     expect(problemFor(untyped401(), { doing: 'downloading the shared world', noPin: true }).sentence)
-      .toBe('OnlyWorlds did not allow downloading the shared world. Nothing changed.');
+      .toBe('OnlyWorlds did not allow downloading the shared world. Nothing changed. If it keeps happening, send the details as feedback.');
   });
 
   it('a step that may have left something behind says only that OnlyWorlds did not allow it', () => {
     expect(problemFor(forbidden(), { doing: 'downloading the world', inline: true, noPin: 'may-have-left' }).sentence)
-      .toBe('OnlyWorlds did not allow downloading the world.');
+      .toBe('OnlyWorlds did not allow downloading the world. If it keeps happening, tell us at onlyworlds.com/feedback.');
     expect(problemFor(untyped401(), { doing: 'creating the world online', noPin: 'may-have-left' }).sentence)
-      .toBe('OnlyWorlds did not allow creating the world online.');
+      .toBe('OnlyWorlds did not allow creating the world online. If it keeps happening, send the details as feedback.');
     expect(resolveFixes(['open-settings'], { worldId: OWN.id, noPin: 'may-have-left' })).toEqual([]);
-    expect(accountErrorMessage(forbidden(), { noPin: 'may-have-left' })).toBe('OnlyWorlds did not allow talking to your OnlyWorlds account.');
+    expect(accountErrorMessage(forbidden(), { noPin: 'may-have-left' })).toBe('OnlyWorlds did not allow talking to your OnlyWorlds account. If it keeps happening, tell us at onlyworlds.com/feedback.');
   });
 
   it('a download into this browser keeps nothing when it fails; into a folder it may leave files', () => {
     expect(downloadNoPin('browser')).toBe(true);
     expect(downloadNoPin('folder')).toBe('may-have-left');
+  });
+
+  it('carries the details for the feedback it asks for; a step that sends a PIN does not', () => {
+    expect(problemFor(forbidden(), { doing: 'reading the invitation', noPin: true }).report).toBe(true);
+    expect(problemFor(forbidden(), { doing: 'saving', worldId: OWN.id }).report).toBe(false);
   });
 
   it('a step that sends one keeps its words', () => {
@@ -62,7 +69,7 @@ describe('a refusal of a step that sends no PIN', () => {
   });
 
   it('the account\'s list of worlds, by its account token alone', () => {
-    expect(accountErrorMessage(forbidden(), { noPin: true })).toBe('OnlyWorlds did not allow talking to your OnlyWorlds account. Nothing changed.');
+    expect(accountErrorMessage(forbidden(), { noPin: true })).toBe('OnlyWorlds did not allow talking to your OnlyWorlds account. Nothing changed. If it keeps happening, tell us at onlyworlds.com/feedback.');
   });
 });
 
@@ -93,6 +100,8 @@ describe('the census: each site whose step sends no PIN says so', () => {
     ['ui/open-world-file.ts', 'words.doing', /noPin: true/],
     ['ui/bring-down-again-modal.ts', "'downloading the world'", /noPin: !sendsPin\('GET', '\/world', w\.api\?\.api_key \?\? ''\)/],
     ['ui/world-key-modal.ts', "'checking the new key'", /noPin: readsOnlyByShape\(raw\)/],
+    // Every refusal is worded in makeInvite first; the sentence's fallback still names no PIN.
+    ['ui/invite-modal.ts', "'making the invite link'", /noPin: true/],
     ['sync/account-worlds.ts', 'accountErrorMessage(err, { noPin: true })', /noPin: true/],
     ['sync/account-worlds.ts', "accountErrorMessage(err, { noPin: 'may-have-left' })", /noPin: 'may-have-left'/],
   ];

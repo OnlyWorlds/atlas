@@ -79,21 +79,43 @@ describe('a seat\'s lost credential is its seat secret', () => {
 
 const SRC = join(__dirname, '..', '..', 'src');
 
-/** Every string literal in src, comments, console lines and the changelog left out, with where it is. */
+/**
+ * Every string literal of a source, comments left out, with its offset: one pass over the whole text, so
+ * a template that runs over several lines is one literal, and a comment's quote opens none. A quoted
+ * string ends at its line's end (JavaScript allows no other), so a quote inside a regex literal costs at
+ * most the rest of its line.
+ */
+function literalsOf(src: string): Array<{ at: number; lit: string }> {
+  const out: Array<{ at: number; lit: string }> = [];
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '/' && src[i + 1] === '/') { const e = src.indexOf('\n', i); i = e < 0 ? src.length : e; continue; }
+    if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? src.length : e + 2; continue; }
+    if (c === "'" || c === '"' || c === '`') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== c && (c === '`' || src[j] !== '\n')) j += src[j] === '\\' ? 2 : 1;
+      out.push({ at: i, lit: src.slice(i, j + 1) });
+      i = j + 1;
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+/** Every string literal in src, comments and the changelog left out, with where it is. */
 function literals(): Array<{ at: string; lit: string }> {
   const walk = (d: string): string[] => readdirSync(d).flatMap(n => {
     const p = join(d, n);
     return statSync(p).isDirectory() ? walk(p) : /\.ts$/.test(n) ? [p] : [];
   });
-  const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
   const out: Array<{ at: string; lit: string }> = [];
   for (const file of walk(SRC)) {
     const rel = relative(SRC, file).split(sep).join('/');
     if (rel === 'changelog/changelog.data.ts') continue;
-    readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
-      if (/^\s*(\/\/|\/\*|\*)/.test(line) || /console\./.test(line)) return;
-      for (const lit of line.match(STRINGS) ?? []) out.push({ at: `${rel}:${i + 1}`, lit });
-    });
+    const src = readFileSync(file, 'utf8');
+    for (const { at, lit } of literalsOf(src)) out.push({ at: `${rel}:${src.slice(0, at).split('\n').length}`, lit });
   }
   return out;
 }
@@ -114,5 +136,24 @@ describe('the census of the words', () => {
     expect(OLD_WORDS.test(`'${ACCOUNT_WALL}.'`)).toBe(false);
     expect(OLD_WORDS.test(`'${EITHER_WALL}.'`)).toBe(false);
     expect(OLD_WORDS.test("'this browser no longer has its seat secret, so it cannot sync.'")).toBe(false);
+  });
+
+  it('the scan reads a template over several lines, a toast beside a console line, and no comment', () => {
+    const plant = [
+      'const a = `OnlyWorlds refused too many',
+      '  different PINs for ${key}.`;',
+      "console.warn('x'); toasts.error('OnlyWorlds takes PINs again soon.');",
+      "// 'a comment that says different PINs'",
+      "/* `nor this one, PINs` */ const b = 'url // not a comment';",
+      "const r = /'/;",
+      "const c = 'after a regex';",
+    ].join('\n');
+    const lits = literalsOf(plant).map(l => l.lit);
+    expect(lits.filter(l => OLD_WORDS.test(l))).toEqual([
+      '`OnlyWorlds refused too many\n  different PINs for ${key}.`',
+      "'OnlyWorlds takes PINs again soon.'",
+    ]);
+    expect(lits).toContain("'url // not a comment'");
+    expect(lits).toContain("'after a regex'");
   });
 });

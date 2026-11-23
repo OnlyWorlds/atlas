@@ -24,9 +24,9 @@ describe('a link by id to an element of another type', () => {
   it('has a line in the review, which says the link is kept as written', () => {
     const issues = validatePayload(parsePayload(payload));
     const single = issues.find(i => i.path === 'Character[0].birthplace');
-    expect(single?.issue).toBe(`"${GUILD}" is a Collective, and Birthplace takes a Location. The link is kept as written.`);
+    expect(single?.issue).toBe(`"${GUILD}" is a Collective, and "birthplace" takes a Location; the link is kept as written`);
     const listed = issues.find(i => i.path === 'Character[0].friends[0]');
-    expect(listed?.issue).toBe(`"${GUILD}" is a Collective, and Friends takes a Character. The link is kept as written.`);
+    expect(listed?.issue).toBe(`"${GUILD}" is a Collective, and "friends" takes a Character; the link is kept as written`);
     // An id of the type the field takes has no line.
     expect(issues.find(i => i.path === 'Character[0].friends[1]')).toBeUndefined();
   });
@@ -35,7 +35,7 @@ describe('a link by id to an element of another type', () => {
     const world = [{ id: GUILD, type: 'collective', name: 'The Guild' }] as unknown as Element[];
     const issues = validatePayload(parsePayload({ Character: [{ name: 'Cy', birthplace: GUILD }] }), world);
     expect(issues.find(i => i.path === 'Character[0].birthplace')?.issue)
-      .toBe(`"${GUILD}" is a Collective, and Birthplace takes a Location. The link is kept as written.`);
+      .toBe(`"${GUILD}" is a Collective, and "birthplace" takes a Location; the link is kept as written`);
   });
 
   it('an id neither the import nor the world holds has no line', () => {

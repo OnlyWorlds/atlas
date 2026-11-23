@@ -4,7 +4,7 @@
  * line, never a missing comma. The reader stays linear in the text's length.
  */
 import { describe, it, expect } from 'vitest';
-import { jsonTextOf, parsePayload } from '../../src/import/parse';
+import { jsonTextOf, MAX_JSON_TRIES, parsePayload } from '../../src/import/parse';
 import { jsonFaultLine } from '../../src/middle/import-room';
 
 const body = '{"Character": [{"name": "Aralia"}]}';
@@ -67,6 +67,30 @@ describe('more than one code block', () => {
   it('one block that does not parse, or one never closed, keeps its own words', () => {
     expect(faultOf('```json\n{"Character": [{"name": "A",}]}\n```')).toMatch(/^Not valid JSON near line 2, column \d+\. Check for a missing comma, quote, or bracket\.$/);
     expect(faultOf('```json\n' + body)).toContain('code block marks');
+    // One ask, one way: the same words as the several-blocks line.
+    expect(faultOf('```json\n' + body)).toMatch(/ Paste only the JSON\.$/);
+  });
+});
+
+describe('at most MAX_JSON_TRIES blocks that look like JSON are parsed', () => {
+  const broken = '```\n[1,]\n```\n';
+  it('the world after fewer broken blocks is still read', () => {
+    expect(MAX_JSON_TRIES).toBe(20);
+    expect(loads(broken.repeat(MAX_JSON_TRIES - 1) + '```json\n' + body + '\n```')).toBe(true);
+  });
+
+  it('past them Atlas makes no guess and says so in one line', () => {
+    expect(faultOf(broken.repeat(MAX_JSON_TRIES) + '```json\n' + body + '\n```')).toBe(SEVERAL);
+  });
+
+  // Each block starts and ends as JSON can and does not parse: each tried one throws (about 10
+  // microseconds), so 300,000 of them took 10 s on every keystroke before the cap.
+  it('a large paste of blocks that look like JSON and do not parse', () => {
+    const many = broken.repeat(300_000);
+    const t0 = performance.now();
+    expect(jsonTextOf(many)).toBe(many);
+    expect(faultOf(many)).toBe(SEVERAL);
+    expect(performance.now() - t0).toBeLessThan(1500);
   });
 });
 
