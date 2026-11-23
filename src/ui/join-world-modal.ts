@@ -52,7 +52,7 @@ export async function runPendingJoin(toasts: ToastManager): Promise<void> {
     preview = await previewJoin(code);
   } catch (err) {
     if (isRefusedCode(err)) toasts.error(JOIN_REFUSED_LINE, 12_000);
-    else showProblem(err, { doing: 'reading the link to the world', toasts });
+    else showProblem(err, { doing: 'reading the link to the world', toasts, noPin: true });
     return;
   }
   if (preview.reader === 'unknown') {
@@ -374,7 +374,7 @@ export class JoinWorldModal extends BaseModal {
               this.preview = await previewJoin(this.code);
             } catch (again) {
               if (isRefusedCode(again)) closeOnly(TABLE_GONE_LINE);
-              else say(problemFor(again, { inline: true, doing: 'reading the link to the world' }).sentence);
+              else say(problemFor(again, { inline: true, doing: 'reading the link to the world', noPin: true }).sentence);
               return;
             }
             if (!this.preview.table) { closeOnly(TABLE_GONE_LINE); return; }
@@ -385,7 +385,7 @@ export class JoinWorldModal extends BaseModal {
             // The code is spent or gone: nothing here can open it any more.
             closeOnly(table ? TABLE_GONE_LINE : redeemRefusedSentence(this.preview));
           } else {
-            say(problemFor(err, { inline: true, doing: 'joining the world', oneLine: true }).sentence);
+            say(problemFor(err, { inline: true, doing: 'joining the world', oneLine: true, noPin: true }).sentence);
           }
           return;
         }
@@ -416,7 +416,8 @@ export class JoinWorldModal extends BaseModal {
             openBtn.hidden = true;
             removeHeldBtn.hidden = false;
           } else {
-            say(problemFor(err, { inline: true, doing: 'checking the seat on OnlyWorlds', ...(held.kind === 'agent' ? { who: 'seat' as const } : {}) }).sentence);
+            // Both checks are reads by a prefixed or a read key: no PIN or seat secret goes with them.
+            say(problemFor(err, { inline: true, doing: 'checking the seat on OnlyWorlds', noPin: true }).sentence);
             openBtn.textContent = 'Retry';
           }
           return;
@@ -495,8 +496,10 @@ export class JoinWorldModal extends BaseModal {
         console.warn('[join-world] open failed:', err);
         progressBox.hidden = true;
         // The seat is held: Open again retries without spending a new code.
-        // A join downloads on a seat: what it sends as API-Pin is the seat's secret, never the World PIN.
-        say(problemFor(err, { inline: true, doing: 'downloading the world', where, who: 'seat' }).sentence);
+        // A join's download sends no API-Pin: an agent's seat key reads bare (the link asks no /me beside a
+        // seat), a player's read key never takes one. Into this browser a failure keeps nothing; a folder's
+        // half-made files can stay, so that line keeps its own words.
+        say(problemFor(err, { inline: true, doing: 'downloading the world', where, who: 'seat', noPin: where === 'browser' }).sentence);
         openBtn.textContent = 'Retry';
       }
     };

@@ -10,6 +10,7 @@ import { askBrowserToKeepWorlds } from '../setup/world-parent';
 import type { ToastManager } from './toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 import { problemFor } from '../core/problems';
+import { sendsPin } from '../sync/ow-v2-client-adapter';
 import { bringDownAgain } from '../setup/bring-down-again';
 import { homeHash, navigate } from '../core/router';
 import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
@@ -67,7 +68,8 @@ export class BringDownAgainModal extends BaseModal {
       } catch (err) {
         console.warn('[bring-down-again] failed:', err);
         this.dismissLocked = false;
-        progress.textContent = problemFor(err, { doing: 'downloading the world', where: 'browser', inline: true, worldId: w.id }).sentence;
+        // Its reads go bare unless the key is a legacy ten-digit one; a failure keeps nothing in this browser.
+        progress.textContent = problemFor(err, { doing: 'downloading the world', where: 'browser', inline: true, worldId: w.id, noPin: !sendsPin('GET', '/world', w.api?.api_key ?? '') }).sentence;
         cancel.disabled = false;
         cancel.textContent = 'Close';
         go.hidden = true;

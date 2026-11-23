@@ -90,7 +90,8 @@ export function refreshAccountWorlds(force = false): void {
       patchSlice('accountWorlds', {
         ...getState().accountWorlds,
         status: 'error',
-        error: accountErrorMessage(err), errorKind: isAccountAuthError(err) ? 'auth' : 'other',
+        // The list is account calls alone: no PIN goes with them.
+        error: accountErrorMessage(err, { noPin: true }), errorKind: isAccountAuthError(err) ? 'auth' : 'other',
         // A bad token's rows are meaningless; an offline blip keeps old rows.
         rows: isAccountAuthError(err) ? [] : getState().accountWorlds.rows,
       });

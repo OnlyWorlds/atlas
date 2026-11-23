@@ -129,9 +129,10 @@ export class ViewWorldModal extends BaseModal {
         navigate(homeHash(result.entry.id));
       } catch (err) {
         // A refused key, an unknown world or no connection arrives worded
-        // (keyCheckError); the rest is worded here.
+        // (keyCheckError); the rest is worded here. A read key sends no PIN;
+        // into this browser a failure keeps nothing.
         console.warn('[view-world] view failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where, noPin: where === 'browser' }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;

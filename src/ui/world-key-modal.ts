@@ -15,6 +15,7 @@ import type { ToastManager } from './toast-manager';
 import { PlainError } from '../core/plain-error';
 import { getState } from '../core/state';
 import { worldPin } from '../core/seat';
+import { readsOnlyByShape } from '../core/key-scope';
 import type { WorldRegistryEntry } from '../core/types';
 import { checkNewKey, keepPinProvedBy, putKeyInPlace } from '../sync/world-key';
 
@@ -97,7 +98,8 @@ export class NewKeyModal extends BaseModal {
         : `${this.world.name} has a new key. Sync is on again.`);
     } catch (err) {
       if (err instanceof PlainError) say(err.message);
-      else showProblem(err, { doing: 'checking the new key', worldId: this.world.id, toasts: this.toasts });
+      // A key that only reads is checked with no PIN beside it (conv. 193).
+      else showProblem(err, { doing: 'checking the new key', worldId: this.world.id, toasts: this.toasts, noPin: readsOnlyByShape(raw) });
     } finally {
       this.busy = false;
       this.dismissLocked = false;
