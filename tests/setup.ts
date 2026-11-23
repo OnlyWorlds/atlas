@@ -2,8 +2,9 @@
  * Vitest global setup.
  *
  * Folder-first atlas: world data lives on disk (File System Access API in the
- * browser, mocked in-memory for tests). IDB is retained only for the
- * FileSystemDirectoryHandle vault, so fake-indexeddb stays loaded as a polyfill.
+ * browser, mocked in-memory for tests). IDB holds the FileSystemDirectoryHandle
+ * vault and the registry's landed copy (every registry save writes one), so
+ * fake-indexeddb stays loaded as a polyfill.
  *
  * MSW server is started here; test files register handlers per scenario.
  */

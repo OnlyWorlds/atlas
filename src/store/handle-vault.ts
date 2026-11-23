@@ -6,7 +6,9 @@
  * id chosen at world creation) so registry entries can re-link to their folder
  * on next session.
  *
- * The vault is the ONLY use of IndexedDB in atlas. World data lives in the folder.
+ * The vault is one of Atlas's two IndexedDB databases; the other is the
+ * registry's landed copy (`src/registry/registry-copy.ts`). World data lives
+ * in the folder.
  */
 
 import { HANDLE_VAULT_DB, HANDLE_VAULT_STORE } from '../core/constants';

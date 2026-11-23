@@ -74,7 +74,7 @@ export const KNOWLEDGE_DRAFT_STASH_PREFIX = 'atlas_knowledge_draft_';
 /** This browser profile's id, written into a folder's writer lock (conv. 13). Read once per page. */
 export const BROWSER_ID_STORAGE_KEY = 'atlas_browser_id';
 
-// IDB schema (handle-vault only — no world data in IDB)
+// IDB schema: the handle vault and the registry's landed copy (no world data in IDB)
 export const HANDLE_VAULT_DB = 'atlas-handles';
 export const HANDLE_VAULT_STORE = 'handles';
 /**
