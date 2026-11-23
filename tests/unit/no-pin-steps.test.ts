@@ -3,15 +3,16 @@
  * account's list of worlds, a seat's check, the demo's download, a world file, and a download or a new key
  * read by a key that only reads send none (a prefixed key's reads go bare, and nothing goes beside a read
  * key: conv. 164, 193). Their refusal says OnlyWorlds did not allow the step, and that nothing changed.
- * A download into a folder is left out: a failure there can leave the half-made folder behind, so
- * "Nothing changed" would not be true of it.
+ * A step that may leave something behind when it fails (a download into a folder, whose half-made files
+ * can stay; an account world's open, after its key is made; a new world made here before it goes online)
+ * says only that OnlyWorlds did not allow it.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
-import { problemFor } from '../../src/core/problems';
+import { downloadNoPin, problemFor } from '../../src/core/problems';
 import { OwV2Error } from '../../src/sync/ow-v2-client-adapter';
 import { resolveFixes } from '../../src/ui/problem-fixes';
 import { accountErrorMessage } from '../../src/sync/account-client';
@@ -35,6 +36,20 @@ describe('a refusal of a step that sends no PIN', () => {
       .toBe('OnlyWorlds did not allow reading the invitation. Nothing changed.');
     expect(problemFor(untyped401(), { doing: 'downloading the shared world', noPin: true }).sentence)
       .toBe('OnlyWorlds did not allow downloading the shared world. Nothing changed.');
+  });
+
+  it('a step that may have left something behind says only that OnlyWorlds did not allow it', () => {
+    expect(problemFor(forbidden(), { doing: 'downloading the world', inline: true, noPin: 'may-have-left' }).sentence)
+      .toBe('OnlyWorlds did not allow downloading the world.');
+    expect(problemFor(untyped401(), { doing: 'creating the world online', noPin: 'may-have-left' }).sentence)
+      .toBe('OnlyWorlds did not allow creating the world online.');
+    expect(resolveFixes(['open-settings'], { worldId: OWN.id, noPin: 'may-have-left' })).toEqual([]);
+    expect(accountErrorMessage(forbidden(), { noPin: 'may-have-left' })).toBe('OnlyWorlds did not allow talking to your OnlyWorlds account.');
+  });
+
+  it('a download into this browser keeps nothing when it fails; into a folder it may leave files', () => {
+    expect(downloadNoPin('browser')).toBe(true);
+    expect(downloadNoPin('folder')).toBe('may-have-left');
   });
 
   it('a step that sends one keeps its words', () => {
@@ -69,14 +84,16 @@ describe('the census: each site whose step sends no PIN says so', () => {
     ['ui/join-world-modal.ts', "'reading the link to the world'", /noPin: true/],
     ['ui/join-world-modal.ts', "'joining the world'", /noPin: true/],
     ['ui/join-world-modal.ts', "'checking the seat on OnlyWorlds'", /noPin: true/],
-    ['ui/join-world-modal.ts', "'downloading the world'", /noPin: where === 'browser'/],
-    ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: where === 'browser'/],
-    ['ui/link-world-modal.ts', "'downloading the world'", /noPin: where === 'browser' && readsOnlyByShape\(apiKey\)/],
+    ['ui/join-world-modal.ts', "'downloading the world'", /noPin: downloadNoPin\(where\)/],
+    ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: downloadNoPin\(where\)/],
+    ['ui/link-world-modal.ts', "'downloading the world'", /noPin: readsOnlyByShape\(apiKey\) \? downloadNoPin\(where\) : undefined/],
+    ['ui/new-api-world-modal.ts', "'creating the world online'", /noPin: 'may-have-left'/],
     ['ui/open-world-file.ts', 'DEMO_WORDS.doing', /noPin: true/],
     ['ui/open-world-file.ts', 'words.doing', /noPin: true/],
     ['ui/bring-down-again-modal.ts', "'downloading the world'", /noPin: !sendsPin\('GET', '\/world', w\.api\?\.api_key \?\? ''\)/],
     ['ui/world-key-modal.ts', "'checking the new key'", /noPin: readsOnlyByShape\(raw\)/],
     ['sync/account-worlds.ts', 'accountErrorMessage(err, { noPin: true })', /noPin: true/],
+    ['sync/account-worlds.ts', "accountErrorMessage(err, { noPin: 'may-have-left' })", /noPin: 'may-have-left'/],
   ];
   for (const [file, doing, says] of SITES) {
     it(`${file}, ${doing}`, () => {

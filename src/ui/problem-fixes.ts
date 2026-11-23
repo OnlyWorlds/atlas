@@ -30,7 +30,7 @@ export interface FixContext {
   /** Whose credential the step sent: a seat's problem offers no Open settings (its secret is not kept there). */
   who?: PinWho;
   /** The step sent no PIN: its problem offers no Open settings (no PIN there is the step's). */
-  noPin?: boolean;
+  noPin?: boolean | 'may-have-left';
 }
 
 /** The open world's mode for the details block. Never its name. */
@@ -122,7 +122,7 @@ export function showProblem(err: unknown, opts: FixContext & ProblemOpts & { doi
     where: opts.where ?? whereFor(opts.worldId),
     ...(opts.worldId ? { worldId: opts.worldId } : {}),
     ...(opts.who ? { who: opts.who } : {}),
-    ...(opts.noPin ? { noPin: true } : {}),
+    ...(opts.noPin ? { noPin: opts.noPin } : {}),
   });
   markProblemShown(err);
   if (problem.quiet) return problem;

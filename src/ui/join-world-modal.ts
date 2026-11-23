@@ -18,7 +18,7 @@ import { showProblem } from './problem-fixes';
 import { getState, patchSlice } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { enqueueActivationTask } from '../core/activation-chain';
-import { problemFor } from '../core/problems';
+import { downloadNoPin, problemFor } from '../core/problems';
 import { takePendingJoin } from '../core/join-capture';
 import { diskApiBlock } from '../core/seat';
 import { getActiveStore } from '../core/active-store';
@@ -497,9 +497,8 @@ export class JoinWorldModal extends BaseModal {
         progressBox.hidden = true;
         // The seat is held: Open again retries without spending a new code.
         // A join's download sends no API-Pin: an agent's seat key reads bare (the link asks no /me beside a
-        // seat), a player's read key never takes one. Into this browser a failure keeps nothing; a folder's
-        // half-made files can stay, so that line keeps its own words.
-        say(problemFor(err, { inline: true, doing: 'downloading the world', where, who: 'seat', noPin: where === 'browser' }).sentence);
+        // seat), a player's read key never takes one.
+        say(problemFor(err, { inline: true, doing: 'downloading the world', where, noPin: downloadNoPin(where) }).sentence);
         openBtn.textContent = 'Retry';
       }
     };

@@ -368,7 +368,9 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
       toasts.error(`${row.name} is no longer available on your account`);
       refreshAccountWorlds(true);
     } else {
-      toasts.error(accountErrorMessage(err));
+      // The open's refusals that reach here sent no PIN (its `/me` is worded by the link), and a key may
+      // have been made before it failed.
+      toasts.error(accountErrorMessage(err, { noPin: 'may-have-left' }));
     }
     return false;
   } finally {
