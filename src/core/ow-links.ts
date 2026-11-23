@@ -213,6 +213,8 @@ function trimmedEnd(s: string, closers: string): number {
 export interface LooseAddressRun {
   start: number;
   end: number;
+  /** Index just past the run before a sentence's closing punctuation was left off; `end` when none was. */
+  rawEnd: number;
   /** The id-forms, lowercase. */
   ids: string[];
   /** The same id-forms as the text spells them, so a reader can ask {@link namedId}. */
@@ -237,9 +239,35 @@ export function findLooseAddressRuns(text: string): LooseAddressRun[] {
     // A sentence's closing punctuation is the sentence's: it holds no id.
     const run = m[0].slice(0, trimmedEnd(m[0], RUN_CLOSERS));
     const idsAsWritten = [...run.matchAll(idRe)].map(x => x[0]);
-    out.push({ start: m.index, end: m.index + run.length, ids: idsAsWritten.map(x => x.toLowerCase()), idsAsWritten });
+    out.push({
+      start: m.index, end: m.index + run.length, rawEnd: m.index + m[0].length,
+      ids: idsAsWritten.map(x => x.toLowerCase()), idsAsWritten,
+    });
   }
   return out;
+}
+
+/** A run that is a prefix and nothing after it (a text about addresses): it holds no id. */
+const PREFIX_ALONE = /^(?:ow:\/\/|(?:https?:\/\/)?(?:www\.)?onlyworlds\.com\/w\/)$/i;
+
+/** Is `text[start, end)` an address prefix in any case with nothing after it? */
+export function isPrefixAlone(text: string, start: number, end: number): boolean {
+  return end - start <= OW_SITE_PREFIX.length && PREFIX_ALONE.test(text.slice(start, end));
+}
+
+/**
+ * The share scrub's reader for a world holding hand ids (an id that is no
+ * id-form, which the address rules never read): is `text[start, end)` exactly
+ * the text prefix, one of `typeWords` as written, a slash and an id? Gives the
+ * id as written, whatever its shape, to the run's last character; null for
+ * any other run.
+ */
+export function plainRunId(text: string, start: number, end: number, typeWords: ReadonlySet<string>): string | null {
+  if (!text.startsWith(OW_TEXT_PREFIX, start)) return null;
+  const typeAt = start + OW_TEXT_PREFIX.length;
+  const slash = text.indexOf('/', typeAt);
+  if (slash === -1 || slash + 1 >= end || !typeWords.has(text.slice(typeAt, slash))) return null;
+  return text.slice(slash + 1, end);
 }
 
 /** What a rewrite gives back for one address: a new id, a new lens, either or neither. */

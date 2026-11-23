@@ -22,7 +22,7 @@
  * schema). Unit-tested in tests/unit/share-payload.test.ts.
  */
 
-import type { Element, ElementType } from './types';
+import { ALL_ELEMENT_TYPES, type Element, type ElementType } from './types';
 import { SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SERVER_STAMP_FIELDS, isProfileField } from './constants';
 import { relationFieldsFor } from '../editor/field-schema';
 import {
@@ -33,7 +33,7 @@ import {
 import { knowledgeHeldBy } from './knowledge';
 import { handsOnAsProposed } from './review-mark';
 import { isHiddenMark } from './hidden-mark';
-import { findAddresses, findLooseAddressRuns, namedId } from './ow-links';
+import { findAddresses, findLooseAddressRuns, isPrefixAlone, namedId, plainRunId } from './ow-links';
 // Pure shape/geometry helpers (no DOM) — one resolver for zone shape across
 // canvas, builder, and payload; the tabs/right location is historical.
 import { getZoneShape } from '../tabs/right/zone-derived';
@@ -188,6 +188,32 @@ const NO_IDS: ReadonlySet<string> = new Set<string>();
 
 /** The rest of a link's href after the scrubbed span, to its `)` (sticky: read in place, never a copy). */
 const LINK_CLOSE = /[^\s()<>]*(?:\s*>)?(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\s*\)/y;
+/** The same in a world holding hand ids, where an id may hold a space: the rest of the line to its first `)`. */
+const LINK_CLOSE_WIDE = /[^\n)]*\)/y;
+
+/** An id in the form Atlas and onlyworlds.com make (8-4-4-4-12 hex, either case): the only form the address rules read. */
+const ID_FORM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The marks a loose run's end leaves to its sentence (`RUN_CLOSERS` in ow-links). */
+const ENDS_IN_CLOSER = /[.,;:!?'"\]>]$/;
+const TYPE_WORDS: ReadonlySet<string> = new Set<string>(ALL_ELEMENT_TYPES);
+
+/** 0: every id is an id-form. 1: the world holds a hand id. 2: one of them ends in a mark a run's end leaves off. */
+type HandIds = 0 | 1 | 2;
+/** Read once for each world handed in (`buildPagePayload` makes its map anew, and nothing writes to it after). */
+const HAND_IDS = new WeakMap<Map<string, Element>, HandIds>();
+
+function handIdsOf(byId: Map<string, Element>): HandIds {
+  const known = HAND_IDS.get(byId);
+  if (known !== undefined) return known;
+  let found: HandIds = 0;
+  for (const id of byId.keys()) {
+    if (ID_FORM.test(id)) continue;
+    found = 1;
+    if (ENDS_IN_CLOSER.test(id)) { found = 2; break; }
+  }
+  HAND_IDS.set(byId, found);
+  return found;
+}
 
 /**
  * Where a link's label opens, for the `](` at `open`: the `[` that matches
@@ -231,6 +257,9 @@ function labelStartBefore(md: string, open: number, floor: number): number {
  *      names none is compared lowercase. A link in capitals, an unknown type
  *      word, another query key, a glued address or a world's id is still seen,
  *      and an id in capitals is never read as its lowercase twin on the page.
+ * A world holding hand ids (an id that is no id-form: a folder made by hand)
+ * is read more strictly, since neither pass can say which part of a run is
+ * such an id: a run is kept only when it is plain (conv. 196).
  * Inside a markdown link `[label](…)` the whole link becomes its label (THE
  * LABEL LAW: never the element's name); a bare address or run becomes
  * nothing, so no name of an element left off the page ever ships.
@@ -250,17 +279,38 @@ export function scrubMarkdownForPayload(
   const includedLower = new Set<string>();
   for (const id of includedIds) includedLower.add(id.toLowerCase());
 
+  const handIds = handIdsOf(byId);
   const spans: Array<{ start: number; end: number }> = [];
+  /** The addresses kept that sit inside this world (`ow://<type>/<id>`, a moment and a lens at most), by where each starts. */
+  const keptInWorld = new Map<number, number>();
   for (const f of findAddresses(markdown)) {
-    if (onPage(f.idAsWritten, f.reading.id) && onPage(f.lensAsWritten, f.reading.lens)) continue;
+    if (onPage(f.idAsWritten, f.reading.id) && onPage(f.lensAsWritten, f.reading.lens)) {
+      if (f.reading.form === 'text' && f.reading.world === null) keptInWorld.set(f.start, f.end);
+      continue;
+    }
     spans.push({ start: f.start, end: f.end });
   }
   const looseOnPage = (asWritten: string): boolean => {
     const named = namedId({ idAsWritten: asWritten, id: asWritten.toLowerCase() }, has);
     return named !== null ? includedIds.has(named) : includedLower.has(asWritten.toLowerCase());
   };
+  // A world holding hand ids: a run is kept only when it is plain. Either the
+  // address rules read it whole as an address inside this world, or it is
+  // `ow://`, a type word, a slash and the id of an element on the page, to its
+  // last character. Nothing else can stand in a run that is kept, so no id of
+  // any shape rides in one.
+  const plain = (start: number, end: number): boolean => {
+    if (keptInWorld.get(start) === end) return true;
+    if (isPrefixAlone(markdown, start, end)) return true;
+    const id = plainRunId(markdown, start, end, TYPE_WORDS);
+    if (id === null) return false;
+    const named = namedId({ idAsWritten: id, id: id.toLowerCase() }, has);
+    return named !== null && includedIds.has(named);
+  };
   for (const run of findLooseAddressRuns(markdown)) {
-    if (run.idsAsWritten.every(looseOnPage)) continue;
+    const kept = run.idsAsWritten.every(looseOnPage)
+      && (handIds === 0 || (plain(run.start, run.end) && (handIds === 1 || run.rawEnd === run.end)));
+    if (kept) continue;
     spans.push({ start: run.start, end: run.end });
   }
   if (spans.length === 0) return markdown;
@@ -283,7 +333,11 @@ export function scrubMarkdownForPayload(
     const open = angle ? sp.start - 3 : (markdown.slice(sp.start - 2, sp.start) === '](' ? sp.start - 2 : -1);
     const labelStart = open !== -1 ? labelStartBefore(markdown, open, last) : -1;
     LINK_CLOSE.lastIndex = sp.end;
-    const close = labelStart !== -1 ? LINK_CLOSE.exec(markdown) : null;
+    let close = labelStart !== -1 ? LINK_CLOSE.exec(markdown) : null;
+    if (labelStart !== -1 && !close && handIds !== 0) {
+      LINK_CLOSE_WIDE.lastIndex = sp.end;
+      close = LINK_CLOSE_WIDE.exec(markdown);
+    }
     if (labelStart !== -1 && close) {
       out += markdown.slice(last, labelStart) + markdown.slice(labelStart + 1, open);
       last = sp.end + close[0].length;
