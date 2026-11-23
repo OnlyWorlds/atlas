@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'failed-pick-keeps-prior-world',
         title: 'A world that fails to open leaves the one you were on as it was',
-        body: 'Choosing another world empties the list at once, so the switch feels quick. When that world then failed to open, for example when the browser was not allowed its folder, the world you were on came back with an empty list until you opened it again. It now comes back whole, with the element you had selected.',
+        body: 'Choosing another world empties the list at once, so the switch feels quick. When that world then failed to open, for example when the browser was not allowed its folder, the world you were on came back with an empty list, and stayed so until the page was reloaded. It now comes back whole, with the element you had selected.',
         tags: ['fix'],
       },
       {

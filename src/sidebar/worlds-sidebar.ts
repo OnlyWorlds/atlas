@@ -782,6 +782,12 @@ export function stayedClosedHere(name: string): string {
 // ONE chain now covers activations AND link/download flows, so a mid-flight
 // initial download can't be closed by a world click racing beside it.
 
+/** What an open leaves for its caller's catch: the way back to the prior world, and a store it opened. */
+interface OpenExits {
+  giveBack?: () => Promise<void>;
+  opened?: FsFolderStore;
+}
+
 export async function activateWorld(
   worldId: string,
   toasts: ToastManager,
@@ -803,12 +809,13 @@ export async function activateWorld(
       }
     }, 15_000);
     // The open's own way back to the prior world, set once it has begun to leave it (1.125.9).
-    const exits: { giveBack?: () => Promise<void> } = {};
+    const exits: OpenExits = {};
     try {
       return await doActivateWorld(worldId, toasts, opts, gen, startHash, exits);
     } catch (err) {
       // Whatever escaped, the prior world is given back as a failed pick gives it (a no-op once the new
       // world's store is the active one).
+      if (exits.opened && exits.opened !== getActiveStore()) await exits.opened.close().catch(() => {});
       await exits.giveBack?.().catch(() => {});
       // An open never rejects (conv. 142): a toast's Open it, a
       // retry and a row click fire this and forget it, so whatever escapes the
@@ -834,7 +841,7 @@ async function doActivateWorld(
   opts: ActivateWorldOpts,
   gen: number,
   startHash: string,
-  exits: { giveBack?: () => Promise<void> } = {},
+  exits: OpenExits = {},
 ): Promise<boolean> {
   const { silent = false, quietRekey = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
@@ -902,14 +909,19 @@ async function doActivateWorld(
   const priorUi = { selectedElementId, knowledgeLens, mutedTypes, madeBy, hideRoom, proposedOnly };
   const priorStore = getActiveStore();
   const giveBack = async (): Promise<void> => {
-    if (preserveSelection) return;
-    // Only while nothing has taken the prior world's place: its store still the active one.
-    if (priorWorldId && priorWorldId !== worldId && getState().active?.worldId === priorWorldId
-      && priorStore && getActiveStore() === priorStore) {
+    // Only while nothing has taken the prior world's place: its store (or none) still the active one. Once
+    // the picked world's store is, a throw after it leaves the person in the picked world, address and all.
+    if (preserveSelection || getActiveStore() !== priorStore) return;
+    if (priorWorldId && priorWorldId !== worldId && getState().active?.worldId === priorWorldId && priorStore) {
       const parked = takeParkedStore(priorWorldId);
       if (parked && parked !== priorStore) parkStore(priorWorldId, parked);
-      // Its lock taken by another tab meanwhile: it stays parked, as a switch would leave it.
-      else if (parked && !(await priorStore.unpark())) parkStore(priorWorldId, priorStore);
+      // Its lock taken by another tab meanwhile (a parked lock is takeable at once): it stays parked and its
+      // list is not drawn again, so nothing shows the world as this tab's to edit.
+      else if (parked && !(await priorStore.unpark())) {
+        parkStore(priorWorldId, priorStore);
+        if (window.location.hash !== priorHash) navigate(priorHash);
+        return;
+      }
       patchSlice('ui', { ...getState().ui, ...priorUi });
       try {
         patchElementsFrom(priorStore, await priorStore.listElements());
@@ -1202,6 +1214,8 @@ async function doActivateWorld(
       return false;
     }
   }
+  // Open and holding the world's lock, not yet the active store: a throw from here closes it (activateWorld).
+  exits.opened = store;
   const meta = await store.readWorldMeta();
   // A view-only copy (conv. 177) is what its world.json says, whoever wrote
   // it: the registry's mirror follows the file before anything reads it, and
@@ -1277,6 +1291,7 @@ async function doActivateWorld(
     }
   }
   setActiveStore(store);
+  exits.opened = undefined;
 
   const nextRegistry = setActiveWorld(getState().registry, worldId);
   saveRegistry(nextRegistry);
