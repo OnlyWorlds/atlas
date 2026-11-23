@@ -316,7 +316,181 @@ export function leftOutOfPage(el: unknown): boolean {
 }
 
 export function buildPagePayload(page: Element, elements: Element[], charts: ChartConfig[] = []): PagePayload {
-  return buildPayloadFrom(page, elements.some(leftOutOfPage) ? elements.filter(e => !leftOutOfPage(e)) : elements, charts);
+  return buildPayloadFrom(page, handedOn(elements), charts);
+}
+
+/** The elements a published page may name: all but the left out (conv. 168, 170). */
+function handedOn(elements: Element[]): Element[] {
+  return elements.some(leftOutOfPage) ? elements.filter(e => !leftOutOfPage(e)) : elements;
+}
+
+// ---------------------------------------------------------------------------
+// What a page shares, read before Publish (1.125.13).
+// ---------------------------------------------------------------------------
+
+/** One block that sends something of an element: what it sends, and the block its press opens. */
+export interface SharePart {
+  kind: 'card' | 'map' | 'collection';
+  /** The page block that sends it; the press beside the part opens this block's editor. */
+  blockId: string;
+  /** Field NAMES (the room labels them), each one the payload's entry holds and this block sends. */
+  fields: string[];
+  /** This block sends the element's picture (the entry holds an `image_url`). */
+  picture: boolean;
+  /** A map part: the map's name as published, and this element's pins on it that show. */
+  mapTitle?: string;
+  pinIds?: string[];
+}
+
+/** One element whose payload entry sends a field or a picture. */
+export interface ShareRow {
+  elementId: string;
+  name: string;
+  type: string;
+  parts: SharePart[];
+  /** A field the entry sends that no block above sends (none expected; nothing sent goes unlisted). */
+  also: string[];
+}
+
+/** What else the payload carries, each only where its carrier is in the payload. */
+export interface ShareClauses {
+  /** A map block: its picture and its pins' and zones' names. */
+  maps: boolean;
+  /** A link field's names, in any entry (a card's ticked link, or a full pin's). */
+  links: boolean;
+  /** A link names an element not on the page (a token with no `ref`). */
+  linksOffPage: boolean;
+  /** A chart block: the names and dates of what it draws. */
+  charts: boolean;
+  /** Each circle block with entries: its knower's name as published, and how many entries. */
+  circles: Array<{ knower: string; entries: number }>;
+}
+
+export interface PageShares {
+  rows: ShareRow[];
+  /** Elements whose entry sends neither a field nor a picture, by name, in page order. */
+  nameOnly: string[];
+  clauses: ShareClauses;
+}
+
+/**
+ * What a page shares, from the payload `buildPagePayload` returned for it and
+ * the page's own blocks (`blocksOf`) beside it: what is sent is read from the
+ * payload, and which block sends it from the blocks (which card ticks what,
+ * which pins are Full, which collections hold whom). A part lists only fields
+ * the payload's entry holds. A field two blocks send is listed under both, so
+ * turning it off in one leaves it visibly under the other. `elements` is the
+ * world, read only to place pins on their elements as the payload does.
+ */
+export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], elements: Element[]): PageShares {
+  const byId = new Map(handedOn(elements).map(e => [e.id, e]));
+  const frozenMaps = new Map<string, PayloadMapBlock>();
+  for (const b of payload.blocks) if (b.kind === 'map') frozenMaps.set(b.id, b);
+
+  // Parts per element, walking the blocks in page order; the walk also fixes
+  // each element's first appearance, which orders the rows.
+  const order: string[] = [];
+  const seen = (id: string): void => { if (!order.includes(id)) order.push(id); };
+  const partsOf = new Map<string, SharePart[]>();
+  const add = (id: string, part: SharePart): void => {
+    if (part.fields.length === 0 && !part.picture) return; // a part appears only when it lists something
+    const list = partsOf.get(id) ?? [];
+    list.push(part);
+    partsOf.set(id, list);
+  };
+
+  for (const b of blocks) {
+    if (b.kind === 'element-card') {
+      seen(b.elementId);
+      const entry = payload.elements[b.elementId];
+      if (!entry) continue;
+      // A compact card sends no field of its own (the payload unions full cards only).
+      const fields = b.variant === 'full' ? b.fields.filter(f => f in entry.fields) : [];
+      add(b.elementId, {
+        kind: 'card', blockId: b.id, fields: [...new Set(fields)],
+        picture: b.showImage !== false && entry.image_url !== undefined,
+      });
+    } else if (b.kind === 'collection') {
+      for (const id of new Set(b.elementIds)) {
+        seen(id);
+        const entry = payload.elements[id];
+        if (entry) add(id, { kind: 'collection', blockId: b.id, fields: [], picture: entry.image_url !== undefined });
+      }
+    } else if (b.kind === 'map') {
+      const frozen = frozenMaps.get(b.id);
+      if (!frozen) continue; // the map does not show: its pins send nothing
+      const pinsByTarget = new Map<string, Array<{ pinId: string; target: Element }>>();
+      for (const fp of frozenPinTargets(b, byId)) {
+        seen(fp.target.id);
+        const list = pinsByTarget.get(fp.target.id) ?? [];
+        list.push(fp);
+        pinsByTarget.set(fp.target.id, list);
+      }
+      for (const [id, pins] of pinsByTarget) {
+        const entry = payload.elements[id];
+        if (!entry) continue;
+        // What this block's pins send, as the payload builds it: a pin its
+        // description, a Full pin every filled field.
+        const sent = new Set<string>(['description']);
+        for (const { pinId, target } of pins) {
+          if ((b.fullPinIds ?? []).includes(pinId)) for (const f of populatedFieldNames(target)) sent.add(f);
+        }
+        add(id, {
+          kind: 'map', blockId: b.id,
+          fields: Object.keys(entry.fields).filter(f => sent.has(f)),
+          picture: entry.image_url !== undefined,
+          mapTitle: frozen.title,
+          pinIds: pins.map(p => p.pinId),
+        });
+      }
+    }
+  }
+  for (const id of Object.keys(payload.elements)) seen(id);
+
+  const rows: ShareRow[] = [];
+  const nameOnly: string[] = [];
+  for (const id of order) {
+    const entry = payload.elements[id];
+    if (!entry) continue; // hidden, proposed or missing: no row, not counted
+    if (Object.keys(entry.fields).length === 0 && entry.image_url === undefined) {
+      nameOnly.push(entry.name);
+      continue;
+    }
+    const parts = partsOf.get(id) ?? [];
+    const listed = new Set(parts.flatMap(p => p.fields));
+    rows.push({
+      elementId: id, name: entry.name, type: entry.type, parts,
+      also: Object.keys(entry.fields).filter(f => !listed.has(f)),
+    });
+  }
+
+  let links = false;
+  let linksOffPage = false;
+  for (const entry of Object.values(payload.elements)) {
+    for (const [field, value] of Object.entries(entry.fields)) {
+      if (relationKindOf(entry.type, field) === null || !Array.isArray(value)) continue;
+      links = true;
+      if ((value as RelationToken[]).some(t => !t.ref)) linksOffPage = true;
+    }
+  }
+  return {
+    rows,
+    nameOnly,
+    clauses: {
+      maps: frozenMaps.size > 0,
+      links,
+      linksOffPage,
+      charts: payload.blocks.some(b => b.kind === 'chart'),
+      // A missing knower freezes with no entries, so "with entries" is "its knower resolves".
+      circles: payload.blocks.flatMap(b => b.kind === 'circle' && b.entries.length > 0
+        ? [{ knower: b.title, entries: b.entries.length }] : []),
+    },
+  };
+}
+
+/** `pageShares` for a page as the next Publish would send it: the payload built once, then read. */
+export function pageSharesOf(page: Element, elements: Element[], charts: ChartConfig[] = []): PageShares {
+  return pageShares(buildPagePayload(page, elements, charts), blocksOf(page), elements);
 }
 
 /**
