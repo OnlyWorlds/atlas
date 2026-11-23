@@ -1,7 +1,8 @@
 /**
  * The strand's pure core (`src/core/strand.ts`): the reading at the owner rung over this copy, checked
- * against the profile's own fixture (schema-dist `profiles/strand.fixture.json`, vendored); who may write
- * which box; each box's write plan.
+ * against the profile's own fixture (schema-dist `profiles/strand.fixture.json`, vendored whole from
+ * release v0.34.1-dist.145, the SDK 4.190.0 pin, whose slots say their `type`); who may write which box;
+ * each box's write plan.
  */
 import { describe, it, expect } from 'vitest';
 import { strandOf } from '@onlyworlds/sdk';
@@ -120,7 +121,7 @@ describe('what a box offers', () => {
 
 describe('the writes', () => {
   const byId = (els: Record<string, unknown>[]) => new Map(els.map(e => [e.id as string, e as unknown as Element]));
-  const filled = (n: string) => ({ ...EMPTY_STRAND, narrative: { id: n, name: '' } });
+  const filled = (n: string) => ({ ...EMPTY_STRAND, narrative: { id: n, name: '', type: 'narrative' as const } });
 
   it('an append never repeats an id the SDK reads as listed; an object entry gets the bare id beside it', () => {
     expect(appendId(['a'], 'a')).toBeNull();

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.8',
+    date: '2026-11-23',
+    theme: 'Settings opened in the first moments after a reload stays open',
+    entries: [
+      {
+        id: 'boot-leaves-you-where-you-went',
+        title: 'Settings opened in the first moments after a reload stays open',
+        body: 'Settings pressed after a reload, before the world in the address had finished opening, gave way to the world\'s Home a moment later. Settings now stays open when the world finishes opening.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.7',
     date: '2026-11-23',
     theme: 'The list of worlds survives a browser closed by force',

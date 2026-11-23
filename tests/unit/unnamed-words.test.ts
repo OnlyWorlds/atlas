@@ -913,7 +913,7 @@ describe('the strand', () => {
   const strand = (over: Partial<OwStrand>): OwStrand => ({ narrative: null, event: null, location: null, character: null, now: null, same: null, ...over });
 
   it('says a nameless slot in the strand\'s word, the capital only at a line\'s start', () => {
-    const s = strand({ narrative: { id: 'n', name: '' }, event: { id: 'e', name: ' ' } });
+    const s = strand({ narrative: { id: 'n', name: '', type: 'narrative' }, event: { id: 'e', name: ' ', type: 'event' } });
     expect(slotName('narrative', s)).toBe('the unnamed story');
     expect(slotName('event', s, true)).toBe('The unnamed event');
     expect(cardCopy('location', s).title).toBe('Where did the unnamed event happen?');
