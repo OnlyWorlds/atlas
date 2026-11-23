@@ -428,7 +428,7 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.click('[data-action="pick"]');
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
-  // 2. Wipe localStorage + IDB ONLY (keep OPFS — that's the disk). The
+  // 2. Wipe localStorage + IDB ONLY (keep OPFS, that's the disk). The
   // registry's landed copy goes too: it would bring the list back.
   await page.evaluate(async () => {
     localStorage.clear();
