@@ -84,6 +84,7 @@ function worldEntry(id: string, name: string) {
 
 type Parking = {
   parked: boolean;
+  closed: boolean;
   createElement: (t: string, d: object) => Promise<{ id: string }>;
   listElements: () => Promise<unknown[]>;
   writeStyles: (s: object) => Promise<void>;
@@ -207,15 +208,34 @@ describe('a failed pick leaves the prior world as it was', () => {
     expect(opened.filter((s) => s.handleName === 'k-w2').map((s) => s.closed)).toEqual([true]);
   });
 
-  it('the prior world taken by another tab meanwhile stays parked, its list not drawn as this tab\'s', async () => {
+  it('the prior world taken by another tab meanwhile is closed here and says so; a click opens it the ordinary way', async () => {
     const { store } = await openW1();
     failOpen.add('k-w2');
     flags.unparkRefused = true;
-    expect(await activateWorld('w2', toastStub)).toBe(false);
-    expect(window.location.hash).toBe('#/w/w1/writing');
-    expect(store.parked).toBe(true);
-    expect(takeParkedStore('w1')).toBe(store);
+    const said: string[] = [];
+    const toasts = { ...(toastStub as object), show: (line: string) => { said.push(line); } } as never;
+    expect(await activateWorld('w2', toasts)).toBe(false);
+    // Nothing here holds it open: no store an edit could write through into the other tab's files.
+    expect(getActiveStore()).toBeNull();
+    expect(getState().active).toBeNull();
+    expect(window.location.hash).toBe('#/');
     expect(getState().data.elements).toEqual([]);
+    expect(said).toContain('"World One" is open in another Atlas tab now, so it is closed here. Open it again to take it back.');
+    expect(store.parked).toBe(true);
+    // A click on it takes the ordinary path, not the already-open shortcut: the parked store is let go
+    // (the other tab still holds it) and a cold open meets the other tab's lock, so the take-over is asked.
+    lockHeld.add('k-w1');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(await activateWorld('w1', toastStub)).toBe(false);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(store.closed).toBe(true);
+    expect(takeParkedStore('w1')).toBeNull();
+    expect(getActiveStore()).toBeNull();
+    // Taken back: a fresh store, this tab's.
+    confirm.mockReturnValue(true);
+    expect(await activateWorld('w1', toastStub)).toBe(true);
+    expect(getState().active?.worldId).toBe('w1');
+    expect(getActiveStore()).not.toBe(store);
   });
 
   it('a change of mind: the prior world picked again while the failing pick runs', async () => {

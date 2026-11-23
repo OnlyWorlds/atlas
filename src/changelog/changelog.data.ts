@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.12',
+    date: '2026-11-23',
+    theme: 'A world another tab took is closed here',
+    entries: [
+      {
+        id: 'failed-pick-other-tab-took-prior',
+        title: 'When another tab takes the world you were on while a different world fails to open, Atlas closes it here and says so',
+        body: 'If you picked a world that failed to open, and meanwhile another Atlas tab opened the world you had been on, that world stayed on screen here with an empty list, and anything you made in it went into the other tab\'s files. Atlas now closes it in this tab, goes back to your list of worlds and says the world is open in another tab. Opening it again asks whether to take it over, as it does for any world open in another tab.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.11',
     date: '2026-11-23',
     theme: 'A key OnlyWorlds no longer takes says so',
