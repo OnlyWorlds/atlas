@@ -18,7 +18,7 @@ import { showProblem } from './problem-fixes';
 import { getState, patchSlice } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { enqueueActivationTask } from '../core/activation-chain';
-import { problemFor } from '../core/problems';
+import { CANCELLED_LEFT_LINE, leftSomethingBehind, problemFor } from '../core/problems';
 import { takePendingJoin } from '../core/join-capture';
 import { diskApiBlock } from '../core/seat';
 import { getActiveStore } from '../core/active-store';
@@ -490,7 +490,9 @@ export class JoinWorldModal extends BaseModal {
           this.settled = true;
           this.hide();
           const heldName = this.heldName();
-          this.toasts.info(heldName ? `Download cancelled. ${this.staysLine(heldName)}` : `Download cancelled. Nothing was kept. ${this.spareLine()}`, 12_000);
+          this.toasts.info(heldName ? `Download cancelled. ${this.staysLine(heldName)}`
+            : leftSomethingBehind(err) ? `${CANCELLED_LEFT_LINE} ${this.spareLine()}`
+            : `Download cancelled. Nothing was kept. ${this.spareLine()}`, 12_000);
           return;
         }
         console.warn('[join-world] open failed:', err);

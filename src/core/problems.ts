@@ -237,7 +237,7 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     }
     case 'server-refused':
-      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
+      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If it keeps happening, send the details as feedback.'}`;
     case 'host-refused':
       return `The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish ${doing}.${saved}${isHostBlocked(err) ? ` ${hostRefusalCause('then try again', opts.oneLine === true)}` : ''}`;
     case 'server':
@@ -330,10 +330,18 @@ export function markLeftBehind(err: unknown): void {
   if (err && typeof err === 'object') leftBehind.add(err);
 }
 
+/** The failed step left something on disk (`markLeftBehind`). */
+export function leftSomethingBehind(err: unknown): boolean {
+  return !!err && typeof err === 'object' && leftBehind.has(err);
+}
+
 /** A failed download's `noPin`: nothing kept, unless its folder could not be removed. */
 export function downloadNoPin(err: unknown): true | 'may-have-left' {
-  return err && typeof err === 'object' && leftBehind.has(err) ? 'may-have-left' : true;
+  return leftSomethingBehind(err) ? 'may-have-left' : true;
 }
+
+/** A cancelled download's line, by what it left. */
+export const CANCELLED_LEFT_LINE = 'Download cancelled. Part of it may still be in your OnlyWorlds folder, on no list.';
 
 export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
   const doing = opts.doing?.trim() || DEFAULT_DOING;

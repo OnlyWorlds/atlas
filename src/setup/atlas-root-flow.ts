@@ -1187,7 +1187,9 @@ export async function linkExistingApiWorldInRoot(
     // is not shown to be its own, and stays. A folder that stays rides on the error, so no line says
     // nothing changed.
     const removed = opened && await removeMadeFolder(rootHandle, subName);
-    await deleteHandle(handleKey).catch(() => {});
+    // The vault key too only when the folder was this call's: in a race on the name it can be the other
+    // tab's key, and removing it would cost that tab its world's folder after a reload.
+    if (opened) await deleteHandle(handleKey).catch(() => {});
     if (!removed) markLeftBehind(err);
     throw err;
   }

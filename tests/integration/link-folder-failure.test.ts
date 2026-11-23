@@ -26,7 +26,7 @@ vi.mock('../../src/store/handle-vault', () => ({
   loadHandle: async (key: string) => (key === 'home-root' ? home : null),
   ensureWritable: async () => true,
   queryWritable: async () => true,
-  deleteHandle: async () => {},
+  deleteHandle: vi.fn(async () => {}),
   listHandleKeys: async () => [],
 }));
 vi.mock('../../src/store/folder-store-fs', async () => {
@@ -55,7 +55,8 @@ vi.mock('../../src/sync/initial-download', async (importOriginal) => {
 
 import { linkExistingApiWorldInRoot } from '../../src/setup/atlas-root-flow';
 import { DownloadCancelledError } from '../../src/sync/initial-download';
-import { downloadNoPin } from '../../src/core/problems';
+import { downloadNoPin, leftSomethingBehind } from '../../src/core/problems';
+import { deleteHandle } from '../../src/store/handle-vault';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 
 const SERVER_WORLD = '068e5012-d77c-799d-8000-95548fbae700';
@@ -115,6 +116,16 @@ describe('a folder link that fails before its commit point', () => {
     // Not opened under this call's lock, so not shown to be its own: it stays, and the line may not say nothing changed.
     expect(home.children.size).toBe(1);
     expect(downloadNoPin(err)).toBe('may-have-left');
+    // Nor its vault key: in a race on the name it can be the other tab's.
+    expect(vi.mocked(deleteHandle)).not.toHaveBeenCalled();
+  });
+
+  it('a cancel whose folder cannot be removed is marked, so its line does not say nothing was kept', async () => {
+    failWith.download = new DownloadCancelledError();
+    vi.spyOn(home, 'removeEntry').mockRejectedValueOnce(new Error('a cloud sync app holds a file'));
+    const err = await link().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DownloadCancelledError);
+    expect(leftSomethingBehind(err)).toBe(true);
   });
 
   it('a folder that cannot be removed stays, and says so', async () => {

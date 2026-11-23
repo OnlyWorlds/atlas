@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'failed-folder-download-keeps-nothing',
         title: 'A world download into your OnlyWorlds folder that fails leaves no half-made folder',
-        body: 'When downloading a world into your OnlyWorlds folder failed for any reason but Cancel, such as a lost connection, the folder it had started stayed there, holding part of the world and on no list. It is now removed, as Cancel already did and as a download into this browser does, so a refused download of a shared world can say that nothing changed. Only a folder that download made and opened is removed; when it cannot be removed, such as while a cloud sync app holds a file in it, the line no longer says that nothing changed.',
+        body: 'When downloading a world into your OnlyWorlds folder failed for any reason but Cancel, such as a lost connection, the folder it had started stayed there, holding part of the world and on no list. It is now removed, as Cancel already did and as a download into this browser does, so a refused download of a shared world can say that nothing changed. Only a folder that download made and opened is removed; when it cannot be removed, such as while a cloud sync app holds a file in it, the line no longer says that nothing changed or that nothing was kept.',
         tags: ['fix'],
       },
     ],
