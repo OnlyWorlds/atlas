@@ -48,8 +48,9 @@ export function enqueueActivation<T>(fn: (gen: number) => Promise<T>, worldId?: 
 /**
  * True when an activation newer than `gen` asks for a world other than
  * `worldId` (1.125.8, conv. 195): the person picked another world while this
- * one opened, so the later pick wins and this open draws nothing. A newer ask
- * for the same world (a second click, the tour's resume) leaves it be.
+ * one opened. This open commits as it always did and skips its landing; the
+ * pick, queued behind it, opens next. A newer ask for the same world (a second
+ * click, the tour's resume) changes nothing.
  */
 export function newerOpenOfAnotherWorld(gen: number, worldId: string): boolean {
   return gen !== activationSeq && latestWorldId !== worldId;

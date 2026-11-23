@@ -37,13 +37,15 @@ import {
 } from '../../src/sync/account-worlds';
 import { AccountClient } from '../../src/sync/account-client';
 import { PinNeededError } from '../../src/setup/atlas-root-flow';
+import { activateWorld } from '../../src/sidebar/worlds-sidebar';
 import { SIGNED_IN_AGAIN_LINE } from '../../src/sync/token-revoke';
 import type { AccountWorldRow } from '../../src/core/types';
 import type { ToastManager } from '../../src/ui/toast-manager';
 
 // The link's own PIN rule runs for real (`linkPinRefusal`); the download is the link's own tests'
 // (link-browser.test.ts). Each call's options are kept, so the open's choices are read (1.125.0).
-const linked = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>>, failures: [] as unknown[] }));
+// `during` runs inside a link, before it answers (1.125.8: what a person does while the world downloads).
+const linked = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>>, failures: [] as unknown[], during: null as null | (() => void) }));
 vi.mock('../../src/setup/atlas-root-flow', async (orig) => {
   const real = await orig<typeof import('../../src/setup/atlas-root-flow')>();
   return {
@@ -52,6 +54,7 @@ vi.mock('../../src/setup/atlas-root-flow', async (orig) => {
       linked.calls.push(o as unknown as Record<string, unknown>);
       const refused = real.linkPinRefusal(o.apiKey, o.apiPin, !!o.readOnly, o.pinLater);
       if (refused) throw refused;
+      linked.during?.();
       return { entry: { id: 'local-owned', name: o.displayName ?? 'World' }, downloaded: 0, failures: linked.failures };
     }),
   };
@@ -634,5 +637,45 @@ describe('openAccountWorld: the owner\'s open asks no PIN; the world asks for it
       expect(linked.calls[linked.calls.length - 1]).toMatchObject({ apiPin: '4242' });
       expect(linked.calls[linked.calls.length - 1]!.pinLater).toBeUndefined();
     });
+  });
+
+  // Where the open ends (1.125.8, conv. 195): `local-owned` is the world the link brings down.
+  async function openWhile(during: () => void): Promise<void> {
+    await withBrowserStorage(async () => {
+      mount();
+      patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+      window.location.hash = '#/w/w1/writing';
+      linked.during = during;
+      try {
+        expect(await openAccountWorld(owned, makeToasts())).toBe(true);
+      } finally {
+        linked.during = null;
+      }
+    });
+  }
+  const onScreen = (worldId: string) => patchSlice('active', { worldId, meta: { id: worldId, name: worldId }, opened: true } as never);
+
+  it('nothing pressed while it downloads: the world\'s Home', async () => {
+    await openWhile(() => { onScreen('local-owned'); });
+    expect(window.location.hash).toBe('#/w/local-owned');
+    patchSlice('active', null);
+  });
+
+  it('a place the person moved to while it downloads stands, read onto the world', async () => {
+    await openWhile(() => { onScreen('local-owned'); window.location.hash = '#/w/w1/share'; });
+    expect(window.location.hash).toBe('#/w/local-owned/share');
+    patchSlice('active', null);
+  });
+
+  it('a world picked while it downloads, the downloaded one on screen: the place is read onto it', async () => {
+    let pick: Promise<boolean> = Promise.resolve(true);
+    await openWhile(() => {
+      onScreen('local-owned');
+      // A world this list does not hold: asked for, and it opens nothing.
+      pick = activateWorld('gone', makeToasts());
+    });
+    expect(await pick).toBe(false);
+    expect(window.location.hash).toBe('#/w/local-owned/writing');
+    patchSlice('active', null);
   });
 });

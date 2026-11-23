@@ -1225,15 +1225,6 @@ async function doActivateWorld(
   }
   // The tests' hold (DEV only): a press made while an open is under way.
   if (import.meta.env.DEV && openHoldSet()) await waitOpenHold();
-  // Another world picked while this one opened wins (conv. 195): this open
-  // draws nothing. Its store closes (its claim on the folder goes with it),
-  // the address goes back as a failed open's does, and the newer pick, queued
-  // behind this one, opens from there. A newer ask for this same world lets it be.
-  if (newerOpenOfAnotherWorld(gen, worldId)) {
-    await store.close().catch(() => {});
-    goBack();
-    return false;
-  }
   setActiveStore(store);
 
   const nextRegistry = setActiveWorld(getState().registry, worldId);
@@ -1305,7 +1296,11 @@ async function doActivateWorld(
   if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
   // The open lands where the person is now (conv. 195), never back where it
-  // started; a world picked meanwhile opens next and draws its own place.
+  // started. Another world picked while it opened (queued behind it on the
+  // chain, during the hold before the commit or the walk after it): this open
+  // has committed as it always did, and only its landing is skipped; the
+  // pick then runs as an ordinary pick from this world, from the person's
+  // place. A newer ask for this same world lands as usual.
   if (newerOpenOfAnotherWorld(gen, worldId)) return true;
   if (preserveSelection) drawAfterBootOpen(worldId);
   else landOpen(worldId, window.location.hash !== openedHash, null);

@@ -14,19 +14,21 @@
  * read onto the opened world by the room-stable rule (conv. 37): the room
  * kind at its landing level, Settings with its tab, an element or a map
  * place falling to home. A world the person picks meanwhile is the activation
- * chain's (`newerOpenOfAnotherWorld`): the later pick wins, and the earlier
- * open draws nothing.
+ * chain's (`newerOpenOfAnotherWorld`): the earlier open commits as it always
+ * did and skips only its landing, and the later pick opens from there.
  *
- * A flow that opens a world as one task on the chain (a download, a make, a
- * restore) reads `openStart` before it and ends with `endOpen`.
+ * A flow that opens a world as one task (a download, a make, a restore)
+ * reads `openStart` before it and ends with `endOpen`.
  *
- * Pure but for `window.location`; it imports only the router and the chain.
+ * Pure but for `window.location` and one read of the open world; it imports
+ * only the router, the chain and the state.
  */
 import {
   importHash, knowledgeHash, navigate, parseHash, settingsHash, shareHash,
   timelineHash, worldHash, writingHash, type Route,
 } from './router';
 import { currentActivationGen } from './activation-chain';
+import { getState } from './state';
 
 /**
  * The room-stable reading of a route on `worldId` (conv. 37): writing,
@@ -94,10 +96,18 @@ export function sinceOpenStart(start: OpenStart): 'picked' | 'moved' | null {
   return window.location.hash !== start.hash ? 'moved' : null;
 }
 
-/** Ends a task's open of `worldId` by what `sinceOpenStart` read: a later pick draws its own place; otherwise as `landOpen`. */
+/**
+ * Ends a task's open of `worldId` by what `sinceOpenStart` read. A world
+ * picked meanwhile that has taken the screen (the task's world is no longer
+ * the open one) draws its own place, so the task draws nothing. Otherwise the
+ * task's world is on screen: with a pick still queued behind the task, the
+ * person's place is read onto that world (a replace), so the pick starts from
+ * an address naming the world on screen and a pick that fails comes back to
+ * it; moved, the same; nothing pressed, its own `landing`.
+ */
 export function endOpen(worldId: string, since: 'picked' | 'moved' | null, landing: string): void {
-  if (since === 'picked') return;
-  landOpen(worldId, since === 'moved', landing);
+  if (since === 'picked' && getState().active?.worldId !== worldId) return;
+  landOpen(worldId, since !== null, landing);
 }
 
 /**
