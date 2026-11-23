@@ -124,6 +124,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 ## src/registry, src/demo, src/editor, src/layout
 
 - `src/registry/registry.ts`: the localStorage registry + helpers (two-tab merge, conv. 115; `rekeyRegistryEntry` moves the ids an entry carries, the retired cast's `favorites` among them).
+- `src/registry/registry-copy.ts`: the registry's landed copy (1.125.7, conv. 194): every save's string in its own IndexedDB, numbered by `saved_seq`; `restoreRegistryAtBoot` before `startApp` under the `atlas-registry-restore` and `atlas-live` Web Locks; `registryCopyLanded` for a removal that deletes a handle; stop, delete and resume for Forget this browser and the test harness. Unit `tests/unit/registry-copy.test.ts`.
 - `src/demo/hyperion-world.json`: the TOUR bundle, baked from demo key 0000000000 (its ids are the live demo world's). Re-bakes follow DESIGN_TOUR's trap list.
 - `src/demo/demo-page.json`: the example share page (`#/demo`).
 - `src/demo/demo-view.ts`: `mountDemo` / `unmountDemo` / `isDemoMounted`, the view-only example page. A demo origin never earns a guide note.

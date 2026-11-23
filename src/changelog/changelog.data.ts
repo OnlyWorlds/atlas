@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.7',
+    date: '2026-11-23',
+    theme: 'The list of worlds survives a browser closed by force',
+    entries: [
+      {
+        id: 'world-list-survives-a-kill',
+        title: 'A world made or changed just before the browser was closed by force is still on the list',
+        body: 'When the browser was killed or crashed within a few seconds of a change, Atlas could start without the world just made, or with the last change to the list gone. Atlas now keeps a second copy of the list of worlds in this browser and puts it back at the next start, so the world is listed under its own name, as you left it.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.6',
     date: '2026-11-23',
     theme: 'A refusal names only what was sent, and the Data room reads more replies',
