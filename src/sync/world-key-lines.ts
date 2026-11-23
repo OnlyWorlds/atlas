@@ -68,8 +68,8 @@ export type HeldKeyKind = 'account' | 'read' | 'seat';
  *
  * A key keel no longer knows means the world was deleted or the person removed (keel's `live_prefixed_key`),
  * so a new way in is offered only as "if". A world file restores into the row on its refused key: an
- * account world takes a new key in Settings, This world; a read or seat world cannot, and a new link then
- * meets it as already here, so its file is named as a copy that no longer syncs.
+ * account or read world takes a new key in Settings, This world; a seat world cannot, and a new link then
+ * meets it as already here, so a seat's file is named as the way that cannot sync again.
  */
 export function clearedKeyRefusalLine(err: unknown, kind: HeldKeyKind): string | null {
   const reason = keyRefusalOf(err);
@@ -85,8 +85,8 @@ export function clearedKeyRefusalLine(err: unknown, kind: HeldKeyKind): string |
     : kind === 'read'
       ? `${revoked ? 'To bring it back, remove' : 'If it is still shared with you, remove'} it from your list and open it again by a new link or key from whoever shared it.`
       : 'To bring it back, remove it from your list and open it again by a new link from whoever made the seat.';
-  const file = kind === 'account' ? ' A world file of it brings it back too.'
-    : ' Or open a world file of it instead: that brings it back as a copy that no longer syncs.';
+  const file = kind === 'seat' ? ' Or open a world file of it instead, though then it cannot sync again.'
+    : ' A world file of it brings it back too.';
   return `${what}, so Atlas could not download it again. Nothing changed.${why} ${way}${file}`;
 }
 

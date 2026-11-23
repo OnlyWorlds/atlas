@@ -69,8 +69,9 @@ describe('the lines', () => {
     // A key keel no longer knows: the world deleted or the person removed, so a new way in is only an "if".
     expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'account')).toMatch(/If you can still open it on onlyworlds\.com/);
     expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'read')).toMatch(/If it is still shared with you/);
-    // A read or seat world's file restores on the refused key, which nothing here can replace.
-    for (const k of ['read', 'seat'] as const) expect(clearedKeyRefusalLine(err(401, 'key_revoked'), k)).toMatch(/a copy that no longer syncs\.$/);
+    // A world file restores on the refused key: an account or read world takes a new key in Settings, a seat cannot.
+    expect(clearedKeyRefusalLine(err(401, 'key_revoked'), 'seat')).toMatch(/Or open a world file of it instead, though then it cannot sync again\.$/);
+    for (const k of ['account', 'read'] as const) expect(clearedKeyRefusalLine(err(401, 'key_revoked'), k)).toMatch(/A world file of it brings it back too\.$/);
     expect(clearedKeyRefusalLine(err(401, 'key_revoked'), 'seat')).toMatch(/^This seat's key was renewed or revoked/);
     expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'read')).toMatch(/deleted there, or you were removed from it/);
     // Not about the key: the caller's general line words it.
