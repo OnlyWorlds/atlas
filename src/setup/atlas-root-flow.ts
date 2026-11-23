@@ -41,7 +41,7 @@ import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-ut
 import { getActiveStore, patchElementsFrom, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
-import { initialDownloadAll, seedLinkedWorldMeta, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
+import { initialDownloadAll, seedLinkedWorldMeta, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { abandonLanding, downloadIntoMemory, landAndOpen } from './browser-first-download';
 import type { Landing } from '../store/land-behind';
 import { settleIfLandingFailed } from './landing-failed';
@@ -994,6 +994,22 @@ export function linkedWorldMeta(opts: {
   };
 }
 
+/**
+ * Remove a folder a failed download made under `root`, by its name and only while the entry there is the
+ * very handle made (`isSameEntry`): never a folder another tab or program put under that name since.
+ */
+export async function removeMadeFolder(
+  root: FileSystemDirectoryHandle, name: string, made: FileSystemDirectoryHandle,
+): Promise<void> {
+  try {
+    const there = await root.getDirectoryHandle(name);
+    if (!(await there.isSameEntry(made))) return;
+    await root.removeEntry(name, { recursive: true });
+  } catch (e) {
+    console.warn('[link-api] could not remove the folder a failed download made:', e); // raw-error-ok: a console record
+  }
+}
+
 export async function linkExistingApiWorldInRoot(
   opts: LinkExistingApiWorldOpts
 ): Promise<LinkExistingApiWorldResult> {
@@ -1142,18 +1158,16 @@ export async function linkExistingApiWorldInRoot(
     handleKey = `world-${localWorldUuid}-${n}`;
     if (n > 20) throw new Error('Could not find a free handle key for this world');
   }
-  await storeHandle(handleKey, worldHandle);
-
   // Open FolderStore + write meta with api credentials so reload-after-restart
   // can rebuild the engine from registry+world.json alone.
   const store = new FsFolderStore();
-  await store.open(worldHandle);
-
   // Initial download — all elements of all types stamped with
   // `server_updated_at`, fetched over the v2 dialect.
   const adapter = buildV2Adapter(apiKey, apiPin);
   let downloadResult;
   try {
+    await storeHandle(handleKey, worldHandle);
+    await store.open(worldHandle);
     await store.writeWorldMeta(linkedWorldMeta({
       serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
     }));
@@ -1165,15 +1179,11 @@ export async function linkExistingApiWorldInRoot(
     // here: left open, this page's own lock would hold the folder until the page closed, and opening
     // the folder again here would ask to take it over from another tab.
     await store.close().catch(() => {});
-    if (err instanceof DownloadCancelledError) {
-      // Cancel = nothing kept. The folder and its vault handle were created by
-      // THIS call a moment ago (the collision guard above never reuses an
-      // existing folder), so removing them touches nothing the user owned.
-      await rootHandle.removeEntry(subName, { recursive: true }).catch((e) => {
-        console.warn('[link-api] could not remove the cancelled folder:', e);
-      });
-      await deleteHandle(handleKey).catch(() => {});
-    }
+    // Any failure, Cancel or not, keeps nothing (as the browser's download does): the folder and its vault
+    // handle were made by THIS call a moment ago (the collision guard above never reuses an existing
+    // folder), and the folder is removed only while the entry under its name is still the one made here.
+    await removeMadeFolder(rootHandle, subName, worldHandle);
+    await deleteHandle(handleKey).catch(() => {});
     throw err;
   }
 

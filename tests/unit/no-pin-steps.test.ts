@@ -5,8 +5,8 @@
  * key: conv. 164, 193). Their refusal says OnlyWorlds did not allow the step, and that nothing changed.
  * Each words the refusals it knows first, so one that reaches the sentence is unexpected: it asks for the
  * details as feedback, and the toast carries them.
- * A step that may leave something behind when it fails (a download into a folder, whose half-made files
- * can stay; an account world's open, after its key is made; a new world made here before it goes online)
+ * A step that may leave something behind when it fails (a join's download, after its seat is held; an
+ * account world's open, after its key is made; a new world made here before it goes online)
  * says only that OnlyWorlds did not allow it.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
-import { downloadNoPin, problemFor } from '../../src/core/problems';
+import { problemFor } from '../../src/core/problems';
 import { OwV2Error } from '../../src/sync/ow-v2-client-adapter';
 import { resolveFixes } from '../../src/ui/problem-fixes';
 import { accountErrorMessage } from '../../src/sync/account-client';
@@ -47,11 +47,6 @@ describe('a refusal of a step that sends no PIN', () => {
       .toBe('OnlyWorlds did not allow creating the world online. If it keeps happening, send the details as feedback.');
     expect(resolveFixes(['open-settings'], { worldId: OWN.id, noPin: 'may-have-left' })).toEqual([]);
     expect(accountErrorMessage(forbidden(), { noPin: 'may-have-left' })).toBe('OnlyWorlds did not allow talking to your OnlyWorlds account. If it keeps happening, tell us at onlyworlds.com/feedback.');
-  });
-
-  it('a download into this browser keeps nothing when it fails; into a folder it may leave files', () => {
-    expect(downloadNoPin('browser')).toBe(true);
-    expect(downloadNoPin('folder')).toBe('may-have-left');
   });
 
   it('carries the details for the feedback it asks for; a step that sends a PIN does not', () => {
@@ -93,8 +88,9 @@ describe('the census: each site whose step sends no PIN says so', () => {
     ['ui/join-world-modal.ts', "'checking the seat on OnlyWorlds'", /noPin: true/],
     // The same click spent the code and holds the seat before the download: something stays, wherever it lands.
     ['ui/join-world-modal.ts', "'downloading the world'", /noPin: 'may-have-left'/],
-    ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: downloadNoPin\(where\)/],
-    ['ui/link-world-modal.ts', "'downloading the world'", /noPin: readsOnlyByShape\(apiKey\) \? downloadNoPin\(where\) : undefined/],
+    // A download keeps nothing when it fails, in a folder as in this browser.
+    ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: true/],
+    ['ui/link-world-modal.ts', "'downloading the world'", /noPin: readsOnlyByShape\(apiKey\) \? true : undefined/],
     ['ui/new-api-world-modal.ts', "'creating the world online'", /noPin: 'may-have-left'/],
     ['ui/open-world-file.ts', 'DEMO_WORDS.doing', /noPin: true/],
     ['ui/open-world-file.ts', 'words.doing', /noPin: true/],

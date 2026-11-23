@@ -95,6 +95,8 @@ describe('a folder link that fails before its commit point', () => {
     await expect(link()).rejects.toThrow();
     expect(opened.length).toBe(1);
     expect(opened[0].__debug_isOpen()).toBe(false);
+    // Nothing kept: the folder it made is gone, as a cancel's is (1.125.10).
+    expect([...home.children.keys()]).toEqual([]);
   });
 
   it('a world.json that cannot be written closes the store it opened', async () => {
@@ -102,6 +104,25 @@ describe('a folder link that fails before its commit point', () => {
     await expect(link()).rejects.toThrow('disk full');
     expect(opened.length).toBe(1);
     expect(opened[0].__debug_isOpen()).toBe(false);
+    expect([...home.children.keys()]).toEqual([]);
+  });
+
+  it('a store that will not open leaves no folder either', async () => {
+    vi.spyOn(MockFolderStore.prototype, 'open').mockRejectedValueOnce(new Error('the open failed'));
+    await expect(link()).rejects.toThrow('the open failed');
+    expect([...home.children.keys()]).toEqual([]);
+  });
+
+  it('a folder put under the same name since is not the one made, and stays', async () => {
+    failWith.download = new Error('boom');
+    // Stand in for another program replacing the folder mid-download: the made one swapped for a new one.
+    vi.spyOn(MockFolderStore.prototype, 'writeWorldMeta').mockImplementationOnce(async function () {
+      const [name] = [...home.children.keys()];
+      home.children.set(name, new FakeDirHandle(name));
+      return { id: '', name: '' };
+    });
+    await expect(link()).rejects.toThrow('boom');
+    expect(home.children.size).toBe(1);
   });
 
   it('a failed read of the world\'s settings is no failure: the link commits and its store stays open', async () => {

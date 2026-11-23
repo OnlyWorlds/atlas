@@ -303,17 +303,10 @@ export interface ProblemOpts {
    * The step sends no `API-Pin` at all (an invite's preview or redeem, an account call, a download by a key
    * that only reads, the demo's): a refusal names no World PIN or seat secret. `true` where nothing the
    * step made stays behind when it fails, so its line says nothing changed; `may-have-left` where
-   * something can (a folder's half-made download, a key just made, a world made here first).
+   * something can (a key just made, a seat held, a world made here first). A download keeps nothing
+   * when it fails, in a folder as in this browser (1.125.10).
    */
   noPin?: boolean | 'may-have-left';
-}
-
-/**
- * A download's `noPin`: into this browser a failure removes what it made; into a folder its half-made
- * files can stay.
- */
-export function downloadNoPin(where: string | undefined): true | 'may-have-left' {
-  return where === 'browser' ? true : 'may-have-left';
 }
 
 /** Whose credential this problem's step sent: as the caller said, else the given world's, else not known. */

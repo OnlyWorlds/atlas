@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.10',
+    date: '2026-11-23',
+    theme: 'A download into a folder that fails keeps nothing',
+    entries: [
+      {
+        id: 'failed-folder-download-keeps-nothing',
+        title: 'A world download into your OnlyWorlds folder that fails leaves no half-made folder',
+        body: 'When downloading a world into your OnlyWorlds folder failed for any reason but Cancel, such as a lost connection, the folder it had started stayed there, holding part of the world and on no list. It is now removed, as Cancel already did and as a download into this browser does, so a refused download of a shared world can say that nothing changed. Only the folder that download made is removed, never one put under the same name since.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.9',
     date: '2026-11-23',
     theme: 'A world that fails to open leaves the one you were on as it was',

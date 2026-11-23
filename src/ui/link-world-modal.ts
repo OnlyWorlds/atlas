@@ -26,7 +26,7 @@ import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { escapeAttr } from '../core/dom-utils';
-import { downloadNoPin, problemFor } from '../core/problems';
+import { problemFor } from '../core/problems';
 import { isSeatSecret } from '../core/seat';
 import { readsOnlyByShape } from '../core/key-scope';
 
@@ -211,7 +211,7 @@ export class LinkWorldModal extends BaseModal {
         // (keyCheckError); the rest is worded here.
         console.warn('[link-world] link failed:', err);
         // A key that only reads sends no PIN (conv. 193).
-        const sentence = problemFor(err, { inline: true, doing: 'downloading the world', where, who: isSeatSecret(apiPin) ? 'seat' : 'account', noPin: readsOnlyByShape(apiKey) ? downloadNoPin(where) : undefined }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the world', where, who: isSeatSecret(apiPin) ? 'seat' : 'account', noPin: readsOnlyByShape(apiKey) ? true : undefined }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;
