@@ -188,30 +188,32 @@ const NO_IDS: ReadonlySet<string> = new Set<string>();
 
 /** The rest of a link's href after the scrubbed span, to its `)` (sticky: read in place, never a copy). */
 const LINK_CLOSE = /[^\s()<>]*(?:\s*>)?(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\s*\)/y;
-/** The same in a world holding hand ids, where an id may hold a space: the rest of the line to its first `)`. */
-const LINK_CLOSE_WIDE = /[^\n)]*\)/y;
 
 /** An id in the form Atlas and onlyworlds.com make (8-4-4-4-12 hex, either case): the only form the address rules read. */
 const ID_FORM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** The marks a loose run's end leaves to its sentence (`RUN_CLOSERS` in ow-links). */
-const ENDS_IN_CLOSER = /[.,;:!?'"\]>]$/;
+/**
+ * An id whose end no run can find: it holds a character a loose run is cut at
+ * (white space, `)`), or ends in a mark a run's end leaves to its sentence
+ * (`RUN_CLOSERS` in ow-links).
+ */
+const NO_FINDABLE_END = /[\s)]|[.,;:!?'"\]>]$/;
 const TYPE_WORDS: ReadonlySet<string> = new Set<string>(ALL_ELEMENT_TYPES);
 
-/** 0: every id is an id-form. 1: the world holds a hand id. 2: one of them ends in a mark a run's end leaves off. */
+/** 0: every id is an id-form. 1: the world holds a hand id. 2: one of them has no end a run can find. */
 type HandIds = 0 | 1 | 2;
-/** Read once for each world handed in (`buildPagePayload` makes its map anew, and nothing writes to it after). */
+/** Read once for each map handed in (the payload builder makes its maps anew, and nothing writes to one after). */
 const HAND_IDS = new WeakMap<Map<string, Element>, HandIds>();
 
-function handIdsOf(byId: Map<string, Element>): HandIds {
-  const known = HAND_IDS.get(byId);
+function handIdsOf(held: Map<string, Element>): HandIds {
+  const known = HAND_IDS.get(held);
   if (known !== undefined) return known;
   let found: HandIds = 0;
-  for (const id of byId.keys()) {
+  for (const id of held.keys()) {
     if (ID_FORM.test(id)) continue;
     found = 1;
-    if (ENDS_IN_CLOSER.test(id)) { found = 2; break; }
+    if (NO_FINDABLE_END.test(id)) { found = 2; break; }
   }
-  HAND_IDS.set(byId, found);
+  HAND_IDS.set(held, found);
   return found;
 }
 
@@ -259,7 +261,11 @@ function labelStartBefore(md: string, open: number, floor: number): number {
  *      and an id in capitals is never read as its lowercase twin on the page.
  * A world holding hand ids (an id that is no id-form: a folder made by hand)
  * is read more strictly, since neither pass can say which part of a run is
- * such an id: a run is kept only when it is plain (conv. 196).
+ * such an id: a run is kept only when it is plain, and none is kept when a
+ * hand id has no end a run can find (conv. 196).
+ *
+ * `held` is every id the WORLD holds, a hidden or proposed element's too:
+ * the page leaves those out, and the scrub must still know each as an id.
  * Inside a markdown link `[label](…)` the whole link becomes its label (THE
  * LABEL LAW: never the element's name); a bare address or run becomes
  * nothing, so no name of an element left off the page ever ships.
@@ -267,10 +273,10 @@ function labelStartBefore(md: string, open: number, floor: number): number {
 export function scrubMarkdownForPayload(
   markdown: string,
   includedIds: ReadonlySet<string>,
-  byId: Map<string, Element>,
+  held: Map<string, Element>,
 ): string {
   if (typeof markdown !== 'string') return markdown;
-  const has = (id: string): boolean => byId.has(id);
+  const has = (id: string): boolean => held.has(id);
   const onPage = (asWritten: string | null, reading: string | null): boolean => {
     if (asWritten === null || reading === null) return true;
     const named = namedId({ idAsWritten: asWritten, id: reading }, has);
@@ -279,7 +285,7 @@ export function scrubMarkdownForPayload(
   const includedLower = new Set<string>();
   for (const id of includedIds) includedLower.add(id.toLowerCase());
 
-  const handIds = handIdsOf(byId);
+  const handIds = handIdsOf(held);
   const spans: Array<{ start: number; end: number }> = [];
   /** The addresses kept that sit inside this world (`ow://<type>/<id>`, a moment and a lens at most), by where each starts. */
   const keptInWorld = new Map<number, number>();
@@ -298,18 +304,21 @@ export function scrubMarkdownForPayload(
   // address rules read it whole as an address inside this world, or it is
   // `ow://`, a type word, a slash and the id of an element on the page, to its
   // last character. Nothing else can stand in a run that is kept, so no id of
-  // any shape rides in one.
+  // any shape rides in one. And a run ends at white space, a `)` or a
+  // sentence's closing mark: where a hand id holds one of the first two or
+  // ends in the third, a plain run could be the start of that id, so only a
+  // prefix with nothing after it is kept.
   const plain = (start: number, end: number): boolean => {
-    if (keptInWorld.get(start) === end) return true;
     if (isPrefixAlone(markdown, start, end)) return true;
+    if (handIds === 2) return false;
+    if (keptInWorld.get(start) === end) return true;
     const id = plainRunId(markdown, start, end, TYPE_WORDS);
     if (id === null) return false;
     const named = namedId({ idAsWritten: id, id: id.toLowerCase() }, has);
     return named !== null && includedIds.has(named);
   };
   for (const run of findLooseAddressRuns(markdown)) {
-    const kept = run.idsAsWritten.every(looseOnPage)
-      && (handIds === 0 || (plain(run.start, run.end) && (handIds === 1 || run.rawEnd === run.end)));
+    const kept = run.idsAsWritten.every(looseOnPage) && (handIds === 0 || plain(run.start, run.end));
     if (kept) continue;
     spans.push({ start: run.start, end: run.end });
   }
@@ -322,6 +331,19 @@ export function scrubMarkdownForPayload(
     else merged.push({ ...sp });
   }
 
+  // Where a hand id may hold a space, a link's href can go on past its run in
+  // ways LINK_CLOSE does not read: the link then closes at the first `)` of
+  // its line. The two finds only ever move forward, so the whole text is read
+  // once however many links it holds.
+  let nextClose = -2;
+  let nextBreak = -2;
+  const wideCloseLength = (from: number): number => {
+    if (nextClose !== -1 && nextClose < from) nextClose = markdown.indexOf(')', from);
+    if (nextBreak !== -1 && nextBreak < from) nextBreak = markdown.indexOf('\n', from);
+    if (nextClose === -1 || (nextBreak !== -1 && nextBreak < nextClose)) return -1;
+    return nextClose + 1 - from;
+  };
+
   let out = '';
   let last = 0;
   for (const sp of merged) {
@@ -333,14 +355,11 @@ export function scrubMarkdownForPayload(
     const open = angle ? sp.start - 3 : (markdown.slice(sp.start - 2, sp.start) === '](' ? sp.start - 2 : -1);
     const labelStart = open !== -1 ? labelStartBefore(markdown, open, last) : -1;
     LINK_CLOSE.lastIndex = sp.end;
-    let close = labelStart !== -1 ? LINK_CLOSE.exec(markdown) : null;
-    if (labelStart !== -1 && !close && handIds !== 0) {
-      LINK_CLOSE_WIDE.lastIndex = sp.end;
-      close = LINK_CLOSE_WIDE.exec(markdown);
-    }
-    if (labelStart !== -1 && close) {
+    const close = labelStart !== -1 ? LINK_CLOSE.exec(markdown) : null;
+    const closeLength = close ? close[0].length : (labelStart !== -1 && handIds === 2 ? wideCloseLength(sp.end) : -1);
+    if (labelStart !== -1 && closeLength !== -1) {
       out += markdown.slice(last, labelStart) + markdown.slice(labelStart + 1, open);
-      last = sp.end + close[0].length;
+      last = sp.end + closeLength;
       continue;
     }
     out += markdown.slice(last, sp.start);
@@ -397,7 +416,10 @@ export function leftOutOfPage(el: unknown): boolean {
 }
 
 export function buildPagePayload(page: Element, elements: Element[], charts: ChartConfig[] = []): PagePayload {
-  return buildPayloadFrom(page, handedOn(elements), charts);
+  const handed = handedOn(elements);
+  // The scrub asks the whole world which ids it holds: a hidden or proposed
+  // element is left out of every block, and its id must still be known as an id.
+  return buildPayloadFrom(page, handed, charts, handed === elements ? undefined : elements);
 }
 
 /** The elements a published page may name: all but the left out (conv. 168, 170). */
@@ -669,8 +691,10 @@ function proposedPageLine(page: Element, elements: Element[], charts: ChartConfi
     : `${leftOut.length} proposed and not yet reviewed (${names}) are left out of the published page until a keeper accepts them.`;
 }
 
-function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfig[]): PagePayload {
+function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfig[], world?: Element[]): PagePayload {
   const byId = new Map(elements.map(e => [e.id, e]));
+  /** Every id the world holds, the left out too: what the scrub reads an id against (conv. 196). */
+  const held = world ? new Map(world.map(e => [e.id, e])) : byId;
   const blocks = blocksOf(page);
 
   // Included set = card-bound elements + collection members that exist.
@@ -738,7 +762,7 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   const entries: Record<string, PayloadElementEntry> = Object.create(null);
   for (const id of includedIds) {
     entries[id] = projectElementEntry(
-      byId.get(id)!, byId, includedIds, chosenFields.get(id) ?? [], imageWanted.has(id));
+      byId.get(id)!, byId, includedIds, chosenFields.get(id) ?? [], imageWanted.has(id), held);
   }
 
   // Prose blocks ship markdown only — richtextJson is an editing concern
@@ -750,7 +774,7 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   // same way) — the published page never re-resolves.
   const payloadBlocks: PayloadBlock[] = blocks.map((b): PayloadBlock | null => {
     if (b.kind === 'prose') {
-      return { id: b.id, kind: 'prose', markdown: scrubMarkdownForPayload(b.markdown, includedIds, byId) };
+      return { id: b.id, kind: 'prose', markdown: scrubMarkdownForPayload(b.markdown, includedIds, held) };
     }
     if (b.kind === 'circle') {
       const frozen = freezeCircleBlock(b, elements, byId);
@@ -761,7 +785,7 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
         // absent: the viewer's parser drops a circle block without one.
         knowerId: includedIds.has(frozen.knowerId) ? frozen.knowerId : '',
         entries: frozen.entries.map(e => ({
-          ...e, markdown: scrubMarkdownForPayload(e.markdown, includedIds, byId),
+          ...e, markdown: scrubMarkdownForPayload(e.markdown, includedIds, held),
         })),
       };
     }
@@ -808,6 +832,8 @@ export function projectElementEntry(
   includedIds: ReadonlySet<string>,
   fieldNames: readonly string[],
   withImage: boolean,
+  /** Every id the world holds, for the scrub of a field's text; `byId` when the caller's map is the whole world. */
+  held: Map<string, Element> = byId,
 ): PayloadElementEntry {
   const rec = el as Record<string, unknown>;
   const entry: PayloadElementEntry = {
@@ -828,7 +854,7 @@ export function projectElementEntry(
       // Field text is public wire too. Scrub every ow:// link
       // to its label (empty included set: cards render fields as plain text,
       // so no link survives, disclosed or not).
-      entry.fields[field] = typeof raw === 'string' ? scrubMarkdownForPayload(raw, NO_IDS, byId) : raw;
+      entry.fields[field] = typeof raw === 'string' ? scrubMarkdownForPayload(raw, NO_IDS, held) : raw;
       continue;
     }
     const rawIds = kind === 'single' ? [raw] : (Array.isArray(raw) ? raw : []);

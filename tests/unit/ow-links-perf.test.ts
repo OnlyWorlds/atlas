@@ -80,6 +80,29 @@ describe('a 2 MB story is read in linear time', () => {
   }
 });
 
+// A world holding ids written by hand is scrubbed by other rules (conv. 196): a run is kept only when it
+// is plain, and where an id holds a space a link closes at the first `)` of its line. Neither may read
+// the rest of the text again for each link.
+describe('a 2 MB story in a world of hand ids is scrubbed in linear time', () => {
+  const world = (...ids: string[]) => new Map(ids.map(id => [id, { id, name: id, type: 'character' }])) as never;
+  const plainWorld = world('ada', 'hidden-one');
+  const spacedWorld = world('ada', 'ada wren');
+  const on = new Set(['ada']);
+  const HAND_SHAPES: Array<[string, (size: number) => string]> = [
+    ['links on and off the page', s => story(s, k => `Prose and [l](ow://character/${k % 2 ? 'ada' : 'hidden-one'}) more. `)],
+    ['links that never close, one line', s => '[x](ow://character/bad wren '.repeat(s / 28)],
+    ['links that never close, a line each', s => '[x](ow://character/bad wren\n'.repeat(s / 28)],
+    ['links with a space in the id', s => story(s, () => '[Ada Wren](ow://character/ada wren) and ')],
+    ['bare runs', s => story(s, () => 'ow://character/ada wren ')],
+  ];
+  for (const [label, make] of HAND_SHAPES) {
+    it(label, () => {
+      expectLinear('hand ids', make, t => scrubMarkdownForPayload(t, on, plainWorld));
+      expectLinear('an id with a space', make, t => scrubMarkdownForPayload(t, on, spacedWorld));
+    }, 180_000);
+  }
+});
+
 // One run of sentence punctuation that does not end the run: a trailing-punctuation trim must walk back
 // from the end, never try a pattern anchored at the end from each start.
 describe('a 2 MB run of punctuation is trimmed in linear time', () => {

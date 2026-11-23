@@ -213,8 +213,6 @@ function trimmedEnd(s: string, closers: string): number {
 export interface LooseAddressRun {
   start: number;
   end: number;
-  /** Index just past the run before a sentence's closing punctuation was left off; `end` when none was. */
-  rawEnd: number;
   /** The id-forms, lowercase. */
   ids: string[];
   /** The same id-forms as the text spells them, so a reader can ask {@link namedId}. */
@@ -239,10 +237,7 @@ export function findLooseAddressRuns(text: string): LooseAddressRun[] {
     // A sentence's closing punctuation is the sentence's: it holds no id.
     const run = m[0].slice(0, trimmedEnd(m[0], RUN_CLOSERS));
     const idsAsWritten = [...run.matchAll(idRe)].map(x => x[0]);
-    out.push({
-      start: m.index, end: m.index + run.length, rawEnd: m.index + m[0].length,
-      ids: idsAsWritten.map(x => x.toLowerCase()), idsAsWritten,
-    });
+    out.push({ start: m.index, end: m.index + run.length, ids: idsAsWritten.map(x => x.toLowerCase()), idsAsWritten });
   }
   return out;
 }
