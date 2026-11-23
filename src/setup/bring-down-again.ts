@@ -126,7 +126,9 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   } catch (err) {
     await abandonLanding(landing);
     // A refused key is refused again on every retry: its line says so, and the ways back.
-    const keyLine = clearedKeyRefusalLine(err, isSeatWorld(entry) ? 'seat' : readOnly ? 'read' : 'account');
+    // A read key Atlas minted from the account (a guest's, a member's with no PIN) came from onlyworlds.com, not a link.
+    const kind = isSeatWorld(entry) ? 'seat' : readOnly && !entry.api.key_mint ? 'read' : 'account';
+    const keyLine = clearedKeyRefusalLine(err, kind);
     return abandonBrowserMake(store, make, keyLine ? new PlainError(keyLine) : err, 'downloading the world');
   }
 

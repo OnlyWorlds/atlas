@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'refused-key-says-so',
         title: 'Downloading a cleared world again, or a shared world by its seat, says when OnlyWorlds no longer takes the key',
-        body: 'When OnlyWorlds refused the key of a world this browser had cleared, Download it again said it was not allowed and asked for feedback, though trying again could never help. It now says the key was revoked, or that OnlyWorlds no longer knows it, and the ways back: open a world file of it, or remove it from your list and open it again. A seat that OnlyWorlds stops taking while its world downloads now says so the way it does before a download, with Remove in place of Retry.',
+        body: 'When OnlyWorlds refused the key of a world this browser had cleared, Download it again said it was not allowed and asked for feedback, though trying again could never help. It now says the key was revoked, or that OnlyWorlds no longer knows it, and the ways back that fit the world: remove it from your list and open it again where it came from, or open a world file of it. A seat that OnlyWorlds stops taking while its world downloads now says so the way it does before a download, with Remove in place of Retry.',
         tags: ['fix'],
       },
     ],

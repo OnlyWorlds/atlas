@@ -62,9 +62,14 @@ export type HeldKeyKind = 'account' | 'read' | 'seat';
 
 /**
  * A cleared world's Download it again, refused for its key: what happened, then the ways back its row
- * offers (Open a world file; Remove from the list, then a new way in). Never Retry: the same key is
+ * offers (Remove from the list, then a new way in; Open a world file). Never Retry: the same key is
  * refused again. Null when the refusal is not about the key, for the caller's general line. The step
  * reads only, so a PIN refusal cannot reach here but for a legacy key, which the general line words.
+ *
+ * A key keel no longer knows means the world was deleted or the person removed (keel's `live_prefixed_key`),
+ * so a new way in is offered only as "if". A world file restores into the row on its refused key: an
+ * account world takes a new key in Settings, This world; a read or seat world cannot, and a new link then
+ * meets it as already here, so its file is named as a copy that no longer syncs.
  */
 export function clearedKeyRefusalLine(err: unknown, kind: HeldKeyKind): string | null {
   const reason = keyRefusalOf(err);
@@ -74,10 +79,15 @@ export function clearedKeyRefusalLine(err: unknown, kind: HeldKeyKind): string |
     ? (revoked ? 'This seat\'s key was renewed or revoked on onlyworlds.com' : 'OnlyWorlds no longer accepts this world\'s seat')
     : (revoked ? 'This world\'s key was revoked on onlyworlds.com' : 'OnlyWorlds no longer knows this world\'s key');
   const why = revoked ? '' : kind === 'seat' ? ' The owner may have removed it.' : ' The world was deleted there, or you were removed from it.';
-  const way = kind === 'seat' ? 'join it again by a new invite link'
-    : kind === 'read' ? 'open a new link to it'
-      : 'open it again from onlyworlds.com';
-  return `${what}, so Atlas could not download it again. Nothing changed.${why} To bring it back, open a world file of it, or remove it from your list and ${way}.`;
+  const way = kind === 'account'
+    ? (revoked ? 'To bring it back, remove it from your list and open it again from onlyworlds.com.'
+      : 'If you can still open it on onlyworlds.com, remove it from your list and open it again from there.')
+    : kind === 'read'
+      ? `${revoked ? 'To bring it back, remove' : 'If it is still shared with you, remove'} it from your list and open it again by a new link or key from whoever shared it.`
+      : 'To bring it back, remove it from your list and open it again by a new link from whoever made the seat.';
+  const file = kind === 'account' ? ' A world file of it brings it back too.'
+    : ' Or open a world file of it instead: that brings it back as a copy that no longer syncs.';
+  return `${what}, so Atlas could not download it again. Nothing changed.${why} ${way}${file}`;
 }
 
 /** Test connection's answer, said in Settings, This world, where the key goes in. */
