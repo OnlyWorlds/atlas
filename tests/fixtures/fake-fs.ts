@@ -112,10 +112,6 @@ export class FakeDirHandle {
     };
     detach(c);
   }
-  /** The same entry on disk: one fake object per entry, so identity. */
-  async isSameEntry(other: unknown): Promise<boolean> {
-    return other === this;
-  }
   /** The path from this directory to a descendant, or null (as OPFS `resolve()`). */
   async resolve(target: FakeDirHandle | FakeFileHandle): Promise<string[] | null> {
     for (const [name, child] of this.children) {

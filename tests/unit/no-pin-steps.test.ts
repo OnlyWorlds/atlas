@@ -88,9 +88,9 @@ describe('the census: each site whose step sends no PIN says so', () => {
     ['ui/join-world-modal.ts', "'checking the seat on OnlyWorlds'", /noPin: true/],
     // The same click spent the code and holds the seat before the download: something stays, wherever it lands.
     ['ui/join-world-modal.ts', "'downloading the world'", /noPin: 'may-have-left'/],
-    // A download keeps nothing when it fails, in a folder as in this browser.
-    ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: true/],
-    ['ui/link-world-modal.ts', "'downloading the world'", /noPin: readsOnlyByShape\(apiKey\) \? true : undefined/],
+    // A download keeps nothing when it fails, unless its folder could not be removed.
+    ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: downloadNoPin\(err\)/],
+    ['ui/link-world-modal.ts', "'downloading the world'", /noPin: readsOnlyByShape\(apiKey\) \? downloadNoPin\(err\) : undefined/],
     ['ui/new-api-world-modal.ts', "'creating the world online'", /noPin: 'may-have-left'/],
     ['ui/open-world-file.ts', 'DEMO_WORDS.doing', /noPin: true/],
     ['ui/open-world-file.ts', 'words.doing', /noPin: true/],

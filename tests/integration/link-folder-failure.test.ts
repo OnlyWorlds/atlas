@@ -55,6 +55,7 @@ vi.mock('../../src/sync/initial-download', async (importOriginal) => {
 
 import { linkExistingApiWorldInRoot } from '../../src/setup/atlas-root-flow';
 import { DownloadCancelledError } from '../../src/sync/initial-download';
+import { downloadNoPin } from '../../src/core/problems';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 
 const SERVER_WORLD = '068e5012-d77c-799d-8000-95548fbae700';
@@ -107,22 +108,29 @@ describe('a folder link that fails before its commit point', () => {
     expect([...home.children.keys()]).toEqual([]);
   });
 
-  it('a store that will not open leaves no folder either', async () => {
+  it('a store that will not open (another tab\'s lock after a race on the name) leaves the folder, and says so', async () => {
     vi.spyOn(MockFolderStore.prototype, 'open').mockRejectedValueOnce(new Error('the open failed'));
-    await expect(link()).rejects.toThrow('the open failed');
-    expect([...home.children.keys()]).toEqual([]);
+    const err = await link().catch((e: unknown) => e);
+    expect(String(err)).toContain('the open failed');
+    // Not opened under this call's lock, so not shown to be its own: it stays, and the line may not say nothing changed.
+    expect(home.children.size).toBe(1);
+    expect(downloadNoPin(err)).toBe('may-have-left');
   });
 
-  it('a folder put under the same name since is not the one made, and stays', async () => {
+  it('a folder that cannot be removed stays, and says so', async () => {
     failWith.download = new Error('boom');
-    // Stand in for another program replacing the folder mid-download: the made one swapped for a new one.
-    vi.spyOn(MockFolderStore.prototype, 'writeWorldMeta').mockImplementationOnce(async function () {
-      const [name] = [...home.children.keys()];
-      home.children.set(name, new FakeDirHandle(name));
-      return { id: '', name: '' };
-    });
-    await expect(link()).rejects.toThrow('boom');
+    vi.spyOn(home, 'removeEntry').mockRejectedValueOnce(new Error('a cloud sync app holds a file'));
+    const err = await link().catch((e: unknown) => e);
+    expect(String(err)).toContain('boom');
     expect(home.children.size).toBe(1);
+    expect(downloadNoPin(err)).toBe('may-have-left');
+  });
+
+  it('a failure whose folder is removed keeps nothing, and the line may say so', async () => {
+    failWith.download = new Error('boom');
+    const err = await link().catch((e: unknown) => e);
+    expect(home.children.size).toBe(0);
+    expect(downloadNoPin(err)).toBe(true);
   });
 
   it('a failed read of the world\'s settings is no failure: the link commits and its store stays open', async () => {

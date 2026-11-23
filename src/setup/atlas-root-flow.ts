@@ -51,7 +51,7 @@ import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/t
 import { atlasProducer, importedProducer } from '../core/provenance';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
-import { browserStorageFullSentence } from '../core/problems';
+import { browserStorageFullSentence, markLeftBehind } from '../core/problems';
 import { keyCheckError } from './key-check-errors';
 import { isPinRefusal, notePinState, recordPinState } from '../registry/pin-proof';
 
@@ -995,18 +995,17 @@ export function linkedWorldMeta(opts: {
 }
 
 /**
- * Remove a folder a failed download made under `root`, by its name and only while the entry there is the
- * very handle made (`isSameEntry`): never a folder another tab or program put under that name since.
+ * Remove a folder a failed download made under `root`, by its name: true once it is gone. The browser cannot
+ * tell this folder from one put under the same name since (`isSameEntry` compares paths), so the caller
+ * removes only a folder its own store opened under its own lock.
  */
-export async function removeMadeFolder(
-  root: FileSystemDirectoryHandle, name: string, made: FileSystemDirectoryHandle,
-): Promise<void> {
+export async function removeMadeFolder(root: FileSystemDirectoryHandle, name: string): Promise<boolean> {
   try {
-    const there = await root.getDirectoryHandle(name);
-    if (!(await there.isSameEntry(made))) return;
     await root.removeEntry(name, { recursive: true });
+    return true;
   } catch (e) {
     console.warn('[link-api] could not remove the folder a failed download made:', e); // raw-error-ok: a console record
+    return false;
   }
 }
 
@@ -1140,9 +1139,6 @@ export async function linkExistingApiWorldInRoot(
     if (n > 20) throw new PlainError('Your OnlyWorlds folder already holds many folders with this world\'s name. Move or remove old copies there, then try again.');
   }
 
-  // Create the subfolder under the root.
-  const worldHandle = await rootHandle.getDirectoryHandle(subName, { create: true });
-
   // A LINKED FOLDER CARRIES THE SERVER ID AS `id` (folder-format §4.1, ruled
   // 2026-09-04 v0.3.6 on the first two-producers comparison): this folder is
   // not a snapshot of the world, it IS the world on disk, so there is nothing
@@ -1158,6 +1154,10 @@ export async function linkExistingApiWorldInRoot(
     handleKey = `world-${localWorldUuid}-${n}`;
     if (n > 20) throw new Error('Could not find a free handle key for this world');
   }
+
+  // Create the subfolder under the root.
+  const worldHandle = await rootHandle.getDirectoryHandle(subName, { create: true });
+
   // Open FolderStore + write meta with api credentials so reload-after-restart
   // can rebuild the engine from registry+world.json alone.
   const store = new FsFolderStore();
@@ -1165,9 +1165,11 @@ export async function linkExistingApiWorldInRoot(
   // `server_updated_at`, fetched over the v2 dialect.
   const adapter = buildV2Adapter(apiKey, apiPin);
   let downloadResult;
+  let opened = false;
   try {
     await storeHandle(handleKey, worldHandle);
     await store.open(worldHandle);
+    opened = true;
     await store.writeWorldMeta(linkedWorldMeta({
       serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
     }));
@@ -1179,11 +1181,14 @@ export async function linkExistingApiWorldInRoot(
     // here: left open, this page's own lock would hold the folder until the page closed, and opening
     // the folder again here would ask to take it over from another tab.
     await store.close().catch(() => {});
-    // Any failure, Cancel or not, keeps nothing (as the browser's download does): the folder and its vault
-    // handle were made by THIS call a moment ago (the collision guard above never reuses an existing
-    // folder), and the folder is removed only while the entry under its name is still the one made here.
-    await removeMadeFolder(rootHandle, subName, worldHandle);
+    // Any failure, Cancel or not, keeps nothing (as the browser's download does) once this call holds the
+    // folder: made by THIS call a moment ago (the collision guard above never reuses an existing folder) and
+    // opened under its own lock. One its store could not open (another tab's lock after a race on the name)
+    // is not shown to be its own, and stays. A folder that stays rides on the error, so no line says
+    // nothing changed.
+    const removed = opened && await removeMadeFolder(rootHandle, subName);
     await deleteHandle(handleKey).catch(() => {});
+    if (!removed) markLeftBehind(err);
     throw err;
   }
 

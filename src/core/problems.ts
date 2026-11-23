@@ -304,7 +304,7 @@ export interface ProblemOpts {
    * that only reads, the demo's): a refusal names no World PIN or seat secret. `true` where nothing the
    * step made stays behind when it fails, so its line says nothing changed; `may-have-left` where
    * something can (a key just made, a seat held, a world made here first). A download keeps nothing
-   * when it fails, in a folder as in this browser (1.125.10).
+   * when it fails, in a folder as in this browser, unless its folder could not be removed (`downloadNoPin`).
    */
   noPin?: boolean | 'may-have-left';
 }
@@ -321,6 +321,18 @@ function activeWhere(): FilesWhere {
   const s = getState();
   const id = s.active?.worldId;
   return filesWhereOf(id ? s.registry.worlds.find(w => w.id === id) : undefined);
+}
+
+const leftBehind = new WeakSet<object>();
+
+/** A failed step left something on disk (a download's folder it could not remove). */
+export function markLeftBehind(err: unknown): void {
+  if (err && typeof err === 'object') leftBehind.add(err);
+}
+
+/** A failed download's `noPin`: nothing kept, unless its folder could not be removed. */
+export function downloadNoPin(err: unknown): true | 'may-have-left' {
+  return err && typeof err === 'object' && leftBehind.has(err) ? 'may-have-left' : true;
 }
 
 export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
