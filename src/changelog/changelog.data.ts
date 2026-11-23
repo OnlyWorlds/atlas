@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.9',
+    date: '2026-11-23',
+    theme: 'A world that fails to open leaves the one you were on as it was',
+    entries: [
+      {
+        id: 'failed-pick-keeps-prior-world',
+        title: 'A world that fails to open leaves the one you were on as it was',
+        body: 'Choosing another world empties the list at once, so the switch feels quick. When that world then failed to open, for example when the browser was not allowed its folder, the world you were on came back with an empty list, and stayed so until the page was reloaded. It now comes back whole, with the element you had selected.',
+        tags: ['fix'],
+      },
+      {
+        id: 'unexpected-refusal-next-step',
+        title: 'A refusal Atlas did not expect says what to do next, and the Data room says one thing one way',
+        body: 'When OnlyWorlds refuses a step that sends no PIN, such as opening an invite, the demo world or a shared world\'s download, for a reason Atlas does not know, the line now says what to do if it keeps happening: tell us, with the details where Atlas offers them. In the Data room, a reply with code block marks Atlas cannot read past is met with the same words as a reply of several code blocks, Paste only the JSON, and the review\'s line for a link by id to an element of another type names the field as its neighbours do and reads as one line. A reply of very many code blocks no longer holds up typing in the box.',
+        tags: ['sync', 'import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.8',
     date: '2026-11-23',
     theme: 'Settings opened in the first moments after a reload stays open',
@@ -89,7 +108,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'refusals-name-what-was-sent',
         title: 'A refusal names only the World PIN or seat secret that was sent, the review says three more cases, and a reply of several code blocks loads',
-        body: 'A refusal now names only what Atlas sent: World PINs or seat secrets when OnlyWorlds refuses too many wrong ones, and no PIN at all on a step that sends none, such as an invite, the demo world or a read key\'s download; the Pin and the seat secret are spelled one way throughout. In the Data room, the review says three more cases (a link by id to an element of another type, an unknown field\'s type, an element_type that names no type), and a reply in a ~~~ code block, or in several code blocks of which exactly one is JSON, loads.',
+        body: 'A refusal now names only what Atlas sent: World PINs or seat secrets when OnlyWorlds refuses too many wrong ones, and no PIN at all on a step that sends none, such as an invite, the demo world or a read key\'s download; the seat secret is spelled one way throughout, and the Pin one way in the review\'s note. In the Data room, the review says three more cases (a link by id to an element of another type, an unknown field\'s type, an element_type that names no type), and a reply in a ~~~ code block, or in several code blocks of which exactly one is JSON, loads.',
         tags: ['sync', 'import', 'fix'],
       },
     ],

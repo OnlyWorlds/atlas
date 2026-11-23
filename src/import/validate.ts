@@ -312,7 +312,8 @@ function otherTypeIdIssue(
     path,
     field,
     value,
-    issue: `"${value}" is ${aType(held)}, and ${fieldLabel(field)} takes ${aType(target)}. The link is kept as written.`,
+    // Its by-name neighbour's words (the key in quotes, no full stop), and what the import does with an id.
+    issue: `"${value}" is ${aType(held)}, and "${field}" takes ${aType(target)}; the link is kept as written`,
     expected: `Only ${cap(target)} names or ids in "${field}"`,
     suggestion: `"${value}" is ${aType(held)}: ${where}.`,
   };

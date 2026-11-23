@@ -189,8 +189,13 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       }
       // The step sent no `API-Pin` (an invite, an account call, a read key's or the demo's download): its
       // refusal is the step's, never a PIN's or a seat secret's. One that may have left something behind
-      // makes no claim about what changed.
-      if (opts.noPin) return opts.noPin === 'may-have-left' ? `OnlyWorlds did not allow ${doing}.` : `OnlyWorlds did not allow ${doing}. Nothing changed.`;
+      // makes no claim about what changed. Each such step words the refusals it knows first (an invite's
+      // used link, a revoked key, an expired sign-in), so one that reaches here is a refusal Atlas did not
+      // expect: its next step is the report, with the details (`report` below).
+      if (opts.noPin) {
+        const next = opts.inline ? 'If it keeps happening, tell us at onlyworlds.com/feedback.' : 'If it keeps happening, send the details as feedback.';
+        return `OnlyWorlds did not allow ${doing}.${opts.noPin === 'may-have-left' ? '' : ' Nothing changed.'} ${next}`;
+      }
       // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence. A seat
       // world sends its seat secret there, never the World PIN (R1), and has no PIN to put in again; not
       // known whose, the line names both.
@@ -341,7 +346,8 @@ export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
     fixes,
     raw: err,
     doing,
-    report: REPORTED.has(kind),
+    // A step that sends no PIN, refused in a way it did not word: the sentence asks for the details.
+    report: REPORTED.has(kind) || (kind === 'auth' && !!opts.noPin),
     quiet: kind === 'cancelled',
   };
 }

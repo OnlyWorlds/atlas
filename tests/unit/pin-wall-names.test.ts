@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import ts from 'typescript';
 import { OwApiError } from '@onlyworlds/sdk';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
@@ -79,21 +80,37 @@ describe('a seat\'s lost credential is its seat secret', () => {
 
 const SRC = join(__dirname, '..', '..', 'src');
 
-/** Every string literal in src, comments, console lines and the changelog left out, with where it is. */
+/**
+ * Every string literal of a source, with its offset, read by TypeScript's own parser: a template over
+ * several lines, one inside another's `${}`, and a literal beside a regex or a console call are each
+ * read as the language reads them, and a comment holds none. A template's parts are its own literals.
+ */
+function literalsOf(src: string): Array<{ at: number; lit: string }> {
+  const file = ts.createSourceFile('x.ts', src, ts.ScriptTarget.Latest, true);
+  const out: Array<{ at: number; lit: string }> = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node)
+      || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+      out.push({ at: node.getStart(file), lit: node.getText(file) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return out;
+}
+
+/** Every string literal in src, comments and the changelog left out, with where it is. */
 function literals(): Array<{ at: string; lit: string }> {
   const walk = (d: string): string[] => readdirSync(d).flatMap(n => {
     const p = join(d, n);
     return statSync(p).isDirectory() ? walk(p) : /\.ts$/.test(n) ? [p] : [];
   });
-  const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
   const out: Array<{ at: string; lit: string }> = [];
   for (const file of walk(SRC)) {
     const rel = relative(SRC, file).split(sep).join('/');
     if (rel === 'changelog/changelog.data.ts') continue;
-    readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
-      if (/^\s*(\/\/|\/\*|\*)/.test(line) || /console\./.test(line)) return;
-      for (const lit of line.match(STRINGS) ?? []) out.push({ at: `${rel}:${i + 1}`, lit });
-    });
+    const src = readFileSync(file, 'utf8');
+    for (const { at, lit } of literalsOf(src)) out.push({ at: `${rel}:${src.slice(0, at).split('\n').length}`, lit });
   }
   return out;
 }
@@ -114,5 +131,31 @@ describe('the census of the words', () => {
     expect(OLD_WORDS.test(`'${ACCOUNT_WALL}.'`)).toBe(false);
     expect(OLD_WORDS.test(`'${EITHER_WALL}.'`)).toBe(false);
     expect(OLD_WORDS.test("'this browser no longer has its seat secret, so it cannot sync.'")).toBe(false);
+  });
+
+  it('the scan reads what the language reads: templates over lines and inside templates, beside a regex, no comment', () => {
+    const plant = [
+      'const a = `OnlyWorlds refused too many',
+      '  different PINs for ${key}.`;',
+      "console.warn('x'); toasts.error('OnlyWorlds takes PINs again soon.');",
+      "// 'a comment that says different PINs'",
+      "/* `nor this one, PINs` */ const b = 'url // not a comment';",
+      "if (/^https:\\/\\//.test(u)) throw new PlainError('An address with PINs in it.');",
+      'const n = `outer ${n === 1 ? `one` : `many`} then the PINs part`;',
+      "const r = /'/; const c = 'after a regex';",
+      'const t = /`/;',
+      "const d = 'after a backtick regex, PINs';",
+    ].join('\n');
+    const lits = literalsOf(plant).map(l => l.lit);
+    expect(lits.filter(l => OLD_WORDS.test(l))).toEqual([
+      '`OnlyWorlds refused too many\n  different PINs for ${',
+      "'OnlyWorlds takes PINs again soon.'",
+      "'An address with PINs in it.'",
+      '} then the PINs part`',
+      "'after a backtick regex, PINs'",
+    ]);
+    expect(lits).toContain("'url // not a comment'");
+    expect(lits).toContain("'after a regex'");
+    expect(lits).toContain('`one`');
   });
 });
