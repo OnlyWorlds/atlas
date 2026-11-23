@@ -58,8 +58,14 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.125.9',
     date: '2026-11-23',
-    theme: 'An unexpected refusal says what to do next, and the Data room\'s words agree',
+    theme: 'A world that fails to open leaves the one you were on as it was',
     entries: [
+      {
+        id: 'failed-pick-keeps-prior-world',
+        title: 'A world that fails to open leaves the one you were on as it was',
+        body: 'Choosing another world empties the list at once, so the switch feels quick. When that world then failed to open, for example when the browser was not allowed its folder, the world you were on came back with an empty list until you opened it again. It now comes back whole, with the element you had selected.',
+        tags: ['fix'],
+      },
       {
         id: 'unexpected-refusal-next-step',
         title: 'A refusal Atlas did not expect says what to do next, and the Data room says one thing one way',

@@ -802,9 +802,14 @@ export async function activateWorld(
         toasts.info('This world is taking unusually long to open. A reload usually clears it.');
       }
     }, 15_000);
+    // The open's own way back to the prior world, set once it has begun to leave it (1.125.9).
+    const exits: { giveBack?: () => Promise<void> } = {};
     try {
-      return await doActivateWorld(worldId, toasts, opts, gen, startHash);
+      return await doActivateWorld(worldId, toasts, opts, gen, startHash, exits);
     } catch (err) {
+      // Whatever escaped, the prior world is given back as a failed pick gives it (a no-op once the new
+      // world's store is the active one).
+      await exits.giveBack?.().catch(() => {});
       // An open never rejects (conv. 142): a toast's Open it, a
       // retry and a row click fire this and forget it, so whatever escapes the
       // open's own catches is said here, as what it was doing, never as
@@ -829,6 +834,7 @@ async function doActivateWorld(
   opts: ActivateWorldOpts,
   gen: number,
   startHash: string,
+  exits: { giveBack?: () => Promise<void> } = {},
 ): Promise<boolean> {
   const { silent = false, quietRekey = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
@@ -887,6 +893,34 @@ async function doActivateWorld(
   // dropped its debounced prose). A no-op when nothing is pending.
   if (!preserveSelection) await flushBeforeLeavingWorld();
   const priorHash = window.location.hash;
+  // A failed pick gives the world the person was on back as it was (1.125.9). The switch below empties its
+  // list and selection at once, so every exit that leaves this world unopened runs this: the prior world
+  // read again from its own store (a store parked for the switch taken back first), its selection and
+  // lenses as they were, then its address.
+  const priorWorldId = getState().active?.worldId ?? null;
+  const { selectedElementId, knowledgeLens, mutedTypes, madeBy, hideRoom, proposedOnly } = getState().ui;
+  const priorUi = { selectedElementId, knowledgeLens, mutedTypes, madeBy, hideRoom, proposedOnly };
+  const priorStore = getActiveStore();
+  const giveBack = async (): Promise<void> => {
+    if (preserveSelection) return;
+    // Only while nothing has taken the prior world's place: its store still the active one.
+    if (priorWorldId && priorWorldId !== worldId && getState().active?.worldId === priorWorldId
+      && priorStore && getActiveStore() === priorStore) {
+      const parked = takeParkedStore(priorWorldId);
+      if (parked && parked !== priorStore) parkStore(priorWorldId, parked);
+      // Its lock taken by another tab meanwhile: it stays parked, as a switch would leave it.
+      else if (parked && !(await priorStore.unpark())) parkStore(priorWorldId, priorStore);
+      patchSlice('ui', { ...getState().ui, ...priorUi });
+      try {
+        patchElementsFrom(priorStore, await priorStore.listElements());
+        await loadWorldStyles(priorStore);
+      } catch (err) {
+        console.warn('[worlds-sidebar] the prior world could not be read again', err); // raw-error-ok: a console record
+      }
+    }
+    if (window.location.hash !== priorHash) navigate(priorHash);
+  };
+  exits.giveBack = giveBack;
   // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5).
   // Tabs whose mapId isn't in the active world's elements get
   // the stale visual treatment (darkened, click-to-close) in right-pane.ts.
@@ -960,7 +994,7 @@ async function doActivateWorld(
       // page that moves it, makes it, or checks it this moment has it. No
       // take-over is offered: a move cannot be taken over.
       else if (opts.sayLockHeld) toasts.show(stayedClosedWhileBusy(entry.name), 'info', 8000);
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      await giveBack();
       return false;
     }
   }
@@ -970,18 +1004,18 @@ async function doActivateWorld(
   } catch (err) {
     console.warn('[worlds-sidebar] could not reach the world', err);
     if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    await giveBack();
     return false;
   }
   if (resolved.kind === 'gone') {
     settleGoneBrowserWorld(entry, silent, toasts);
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    await giveBack();
     return false;
   }
   if (resolved.kind === 'landing' || resolved.kind === 'failed') {
     // Another tab still lands it, or this tab's landing failed and its cleanup runs (#865).
     if (!silent) toasts.info(resolved.kind === 'landing' ? LANDING_IN_ANOTHER_TAB('Open') : LANDING_FAILED_HERE);
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    await giveBack();
     return false;
   }
   if (isBrowserWorld(entry) && entry.cleared_at) {
@@ -1007,7 +1041,7 @@ async function doActivateWorld(
         hasFolderMode() ? { actions: [{ label: 'Open the folder', run: () => runAddWorldAction('open-folder', toasts) }] } : undefined,
       );
     }
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    await giveBack();
     return false;
   }
   // Browser storage needs no permission; only a folder on the drive asks.
@@ -1025,7 +1059,7 @@ async function doActivateWorld(
         retry: () => { void activateWorld(worldId, toasts); },
       });
     }
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    await giveBack();
     return false;
   }
 
@@ -1089,7 +1123,7 @@ async function doActivateWorld(
       } else if (!silent) {
         showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
       }
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      await giveBack();
       return false;
     }
     if (isFolderMissing(err)) {
@@ -1104,7 +1138,7 @@ async function doActivateWorld(
         saveRegistry(cleaned);
         patchSlice('registry', cleaned);
         if (!silent) toasts.info(`The folder of "${entry.name}" is gone, so Atlas took it off the list.`);
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        await giveBack();
         return false;
       }
       // The folder is there; something inside the open failed. Keep the entry
@@ -1114,14 +1148,14 @@ async function doActivateWorld(
       if (!silent) {
         toasts.error(`Could not open ${entry.name}. ${filesWhereOf(entry) === 'browser' ? 'Its storage' : 'The folder'} is still there, so nothing was removed. Try again, and check that no other Atlas tab has it open.`);
       }
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      await giveBack();
       return false;
     }
     // Another tab is moving this world to a folder: never offered for
     // take-over (1.17, contract §4.4), only said.
     if (err instanceof ELockHeld && err.moving) {
       if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      await giveBack();
       return false;
     }
     // Another tab holds a live folder lock. Dead-ending here left the user
@@ -1133,7 +1167,7 @@ async function doActivateWorld(
       // world they have left. The address goes back first, so the newer
       // activation reads the true prior address (and restores it if it fails).
       if (gen !== currentActivationGen()) {
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        await giveBack();
         return false;
       }
       const hb = Date.parse(err.lock.last_heartbeat);
@@ -1145,7 +1179,7 @@ async function doActivateWorld(
       );
       if (!take) {
         toasts.show(stayedClosedHere(entry.name), 'info', 8000);
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        await giveBack();
         return false;
       }
       store = new FsFolderStore({ forceTakeLock: true });
@@ -1154,7 +1188,7 @@ async function doActivateWorld(
       } catch (err2) {
         console.warn('[worlds-sidebar] open after take-over failed:', err2);
         showProblem(err2, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        await giveBack();
         return false;
       }
     } else {
@@ -1164,7 +1198,7 @@ async function doActivateWorld(
       else if (err instanceof ELockHeld && opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
       // A plain sentence ("Atlas could not open this world just now. Try again in a moment.") says itself, with its retry.
       else if (isPlainError(err) && opts.sayLockHeld) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      await giveBack();
       return false;
     }
   }
