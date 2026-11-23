@@ -106,7 +106,7 @@ describe('the boot\'s open, the person moved meanwhile', () => {
     expect(window.location.hash).toBe('#/import');
   });
 
-  it('another room of the same world: the address stays that room, and nothing fires on it', async () => {
+  it('another room of the same world: the address stays that room, announced once more', async () => {
     const boot = await heldBoot('#/w/w1');
     window.location.hash = '#/w/w1/knowledge';
     await tick();
@@ -116,7 +116,23 @@ describe('the boot\'s open, the person moved meanwhile', () => {
     expect(await boot.finish()).toBe(true);
     window.removeEventListener('hashchange', count);
     expect(window.location.hash).toBe('#/w/w1/knowledge');
-    expect(fired).toBe(0);
+    expect(fired).toBe(1);
+  });
+
+  // The re-resolve the landing fired: whatever closes on a hashchange (a narrow window's
+  // drawer, opened while no world was) reads the open world, on the person's own address.
+  it('Settings pressed: the address the person is at is announced once more, with no entry added', async () => {
+    const boot = await heldBoot('#/w/w1');
+    window.location.hash = '#/settings';
+    await tick();
+    const entries = history.length;
+    const seen: string[] = [];
+    const on = () => { seen.push(window.location.hash); };
+    window.addEventListener('hashchange', on);
+    expect(await boot.finish()).toBe(true);
+    window.removeEventListener('hashchange', on);
+    expect(seen).toEqual(['#/settings']);
+    expect(history.length).toBe(entries);
   });
 
   it('Back, to a place with no world: the address stays where Back led, with no entry added', async () => {

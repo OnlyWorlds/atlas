@@ -1315,7 +1315,12 @@ async function doActivateWorld(
   const here = parseHash(window.location.hash);
   const movedWithin = window.location.hash !== startHash
     && ((here.worldId === null && here.mode !== 'welcome') || here.worldId === worldId);
-  if (preserveSelection && !movedWithin) {
+  if (preserveSelection && movedWithin) {
+    // The person's own place stands; the re-resolve the landing fires still
+    // runs, on their address, with no navigation (a narrow window's drawer,
+    // opened while no world was open, closes on it).
+    navigate(window.location.hash);
+  } else if (preserveSelection) {
     // Boot path: URL was already correct (deep route, possibly with /element/<id>).
     // Fire hashchange so route-aware subscribers re-resolve against the now-
     // populated state. Non-boot already navigated synchronously above.
