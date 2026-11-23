@@ -41,7 +41,7 @@ import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 import { takeBackMintedKey } from '../sync/key-takeback';
-import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh, refusedEngineLine } from '../sync/sync-attach';
+import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh, refusedEngineLine } from '../sync/sync-attach';
 import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
 import { ToastManager } from '../ui/toast-manager';
@@ -756,6 +756,11 @@ export function stayedClosedHere(name: string): string {
   return `"${name}" stayed closed here. Another Atlas tab may still have it open. Close that tab and open the world again here, or open it again and choose to take it over.`;
 }
 
+/** Said when another tab took the world this tab was on while a different world failed to open here. */
+export function openElsewhereNow(name: string): string {
+  return `"${name}" was closed here: another Atlas tab may have it open now. Open it again to take it back.`;
+}
+
 /**
  * Activate (or re-activate) a world by id: recall its FS handle from the vault,
  * re-grant write permission, open the FolderStore, push state. Also primes the
@@ -915,11 +920,18 @@ async function doActivateWorld(
     if (priorWorldId && priorWorldId !== worldId && getState().active?.worldId === priorWorldId && priorStore) {
       const parked = takeParkedStore(priorWorldId);
       if (parked && parked !== priorStore) parkStore(priorWorldId, parked);
-      // Its lock taken by another tab meanwhile (a parked lock is takeable at once): it stays parked and its
-      // list is not drawn again, so nothing shows the world as this tab's to edit.
+      // Its lock taken meanwhile, most likely by another tab (a parked lock is takeable at once; a lock file
+      // that cannot be read refuses too): it is closed here, its sync detached and its address left, so no
+      // edit made here reaches the other tab's files (close removes only a lock that is its own); a click on
+      // it opens it the ordinary way, take-over question and all.
       else if (parked && !(await priorStore.unpark())) {
-        parkStore(priorWorldId, priorStore);
-        if (window.location.hash !== priorHash) navigate(priorHash);
+        if (getCurrentSyncWorldId() === priorWorldId) detachSyncEngine();
+        await priorStore.close().catch(() => {});
+        setActiveStore(null);
+        patchSlice('active', null);
+        const name = getState().registry.worlds.find(w => w.id === priorWorldId)?.name ?? 'The world you were on';
+        toasts.show(openElsewhereNow(name), 'info', 8000);
+        if (window.location.hash !== '#/') navigate('#/');
         return;
       }
       patchSlice('ui', { ...getState().ui, ...priorUi });
