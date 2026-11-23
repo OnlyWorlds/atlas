@@ -307,11 +307,12 @@ const relationKinds = new Map<string, Map<string, 'single' | 'multi'>>();
  * A field's link kind, by the name the file holds it under: a pin's and a
  * marker's link fields are `map_id` and `zone_id` on disk (`relationFieldsFor`),
  * and read by the schema's bare name they went out as raw ids (1.125.14).
+ * Both names are read: a file from another tool can hold the bare one.
  */
 function relationKindOf(elementType: string, fieldName: string): RelationKind {
   let kinds = relationKinds.get(elementType);
   if (!kinds) {
-    kinds = new Map(relationFieldsFor(elementType as ElementType).map(r => [r.diskField, r.kind]));
+    kinds = new Map(relationFieldsFor(elementType as ElementType).flatMap(r => [[r.schemaField, r.kind], [r.diskField, r.kind]]));
     relationKinds.set(elementType, kinds);
   }
   return kinds.get(fieldName) ?? null;

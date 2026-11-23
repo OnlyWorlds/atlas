@@ -286,6 +286,16 @@ describe('a card leaves the payload with its element', () => {
     expect(json).not.toContain('the vault');
   });
 
+  it("a pin from another tool's file, holding its links under the schema's bare names, names them the same way", () => {
+    const BARE = 'd5000000-0000-0000-0000-000000000005';
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'element-card', elementId: BARE, variant: 'full', fields: ['map', 'element_id'] },
+    ]), [...world(), el(BARE, 'bare pin', { map: MAP, element_id: ADA, x: 1, y: 1 }, 'pin')]);
+    expect(p.elements[BARE].fields.map).toEqual([{ text: 'the coast' }]);
+    expect(p.elements[BARE].fields.element_id).toEqual([{ text: 'Ada' }]);
+    expect(JSON.stringify(p)).not.toContain(MAP);
+  });
+
   it('a page with every kind of block: no id of the world is on the wire but an included element', () => {
     const elements = world();
     const p = buildPagePayload(page([
