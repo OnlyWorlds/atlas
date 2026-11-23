@@ -1940,7 +1940,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     btn.type = 'button';
     btn.className = 'atlas-btn-ghost atlas-share-shares-edit';
     btn.dataset.pressKey = `${row.elementId} ${part.kind} ${part.blockId}`;
-    const name = row.name; // its unnamed form when it has no name: a label reads "the card for The unnamed character"
+    // With no name of its own, the label says its type's form for that, as every room does.
+    const name = row.name;
     const which = nth ? ` (${nth.at} of ${nth.of})` : '';
     if (part.kind === 'card') {
       btn.textContent = 'Edit card';
