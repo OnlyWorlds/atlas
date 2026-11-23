@@ -787,6 +787,9 @@ export async function activateWorld(
   toasts: ToastManager,
   opts: ActivateWorldOpts = {}
 ): Promise<boolean> {
+  // Read as the open is asked for, before it waits its turn on the chain (the
+  // boot's open waits for the reconciliation): where the boot's open started.
+  const startHash = window.location.hash;
   return enqueueActivation(async (gen) => {
     if (gen !== currentActivationGen()) return false; // superseded while queued
     // Watchdog: an activation that WEDGES (observed 2026-07-10 on OPFS after
@@ -800,7 +803,7 @@ export async function activateWorld(
       }
     }, 15_000);
     try {
-      return await doActivateWorld(worldId, toasts, opts, gen);
+      return await doActivateWorld(worldId, toasts, opts, gen, startHash);
     } catch (err) {
       // An open never rejects (conv. 142): a toast's Open it, a
       // retry and a row click fire this and forget it, so whatever escapes the
@@ -825,6 +828,7 @@ async function doActivateWorld(
   toasts: ToastManager,
   opts: ActivateWorldOpts,
   gen: number,
+  startHash: string,
 ): Promise<boolean> {
   const { silent = false, quietRekey = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
@@ -1304,10 +1308,13 @@ async function doActivateWorld(
   // never blocks the switch-back.
   if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
-  if (preserveSelection) {
+  if (preserveSelection && window.location.hash === startHash) {
     // Boot path: URL was already correct (deep route, possibly with /element/<id>).
     // Fire hashchange so route-aware subscribers re-resolve against the now-
     // populated state. Non-boot already navigated synchronously above.
+    // Only while the address is the one the boot's open started from (1.125.8):
+    // moved meanwhile, the person is where they chose to be (Settings pressed in
+    // the first moments gave way to the world's Home), and it stays theirs.
     navigateAfterActivate(worldId);
   }
   return true;
