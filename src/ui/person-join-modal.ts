@@ -126,7 +126,7 @@ export class PersonJoinModal extends BaseModal {
         cancelBtn.textContent = 'Close';
         return;
       }
-      say(isAccountAuthError(err) ? accountErrorMessage(err) : problemFor(err, { inline: true, doing: 'joining the world' }).sentence);
+      say(isAccountAuthError(err) ? accountErrorMessage(err) : problemFor(err, { inline: true, doing: 'joining the world', noPin: true }).sentence);
       return;
     }
     this.dismissLocked = false;
@@ -177,7 +177,7 @@ export async function resumeJoinAfterSignIn(toasts: ToastManager): Promise<boole
     preview = await previewJoin(code);
   } catch (err) {
     if (isRefusedCode(err)) toasts.error(JOIN_REFUSED_LINE, 12_000);
-    else toasts.error(problemFor(err, { inline: true, doing: 'reading the invitation' }).sentence);
+    else toasts.error(problemFor(err, { inline: true, doing: 'reading the invitation', noPin: true }).sentence);
     return true;
   }
   new PersonJoinModal(toasts, code, preview).open();

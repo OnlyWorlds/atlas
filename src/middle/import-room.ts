@@ -26,7 +26,7 @@ import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
-import { jsonFaultAdvice, jsonTextOf, parsePayload } from '../import/parse';
+import { SEVERAL_BLOCKS_LINE, holdsSeveralBlocks, jsonFaultAdvice, jsonTextOf, parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
@@ -163,6 +163,16 @@ export function jsonErrorWhere(text: string, err: unknown): string {
   return ` near line ${line}, column ${column}`;
 }
 
+/**
+ * The line for text that is not valid JSON, after `lead` ("Not valid JSON"): where, then what to do. A
+ * reply of several code blocks with no one block of JSON says so alone, in one line. `text` is what was
+ * parsed (`jsonTextOf`'s answer); the blocks are counted in `pasted`, the reply as it came.
+ */
+export function jsonFaultLine(lead: string, text: string, err: unknown, pasted: string = text): string {
+  if (holdsSeveralBlocks(pasted)) return SEVERAL_BLOCKS_LINE;
+  return `${lead}${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`;
+}
+
 /** The clipboard refused a write (no focus, or the permission is off). */
 export const CLIPBOARD_BLOCKED = 'The browser did not let Atlas use the clipboard. Click in the page, then try again.';
 
@@ -188,7 +198,7 @@ export function importIssuesHtml(issues: ValidationIssue[]): string {
         ${shown.map(i => `<li><span class="atlas-import-issue-line">${escapeText(i.issue)}</span> <code class="atlas-import-issue-path">${escapeText(i.path)}</code></li>`).join('')}
         ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
       </ul>
-      <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. A link by name to an element of another type is removed too; a link by id is kept as written. A Pin's "element" is not read: the pin keeps the link in its "element_id", and a pin with only "element" comes in with no element. A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element. Paste the fix prompt to your AI to repair the source.</p>
+      <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an element with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. A link by name to an element of another type is removed too; a link by id is kept as written. A Pin's "element" is not read: the Pin keeps the link in its "element_id", and a Pin with only "element" comes in with no element. A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element. A Pin whose "element_type" names no element type is read as one with none. Paste the fix prompt to your AI to repair the source.</p>
     </div>
   `;
 }
@@ -346,7 +356,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     try {
       raw = JSON.parse(text);
     } catch (err) {
-      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
+      showError(jsonFaultLine(`${sourceLabel} isn't valid JSON`, text, err, pastedOrRead));
       return;
     }
     const result = parsePayload(raw);
@@ -414,7 +424,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       raw = JSON.parse(text);
     } catch (err) {
       pasteEl.classList.add('is-invalid');
-      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
+      setLive('invalid', jsonFaultLine('Not valid JSON', text, err, typed));
       return;
     }
     const result = parsePayload(raw);

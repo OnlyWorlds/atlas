@@ -36,7 +36,7 @@ describe('a review row', () => {
 });
 
 const NOTE_OTHER_TYPE = 'A link by name to an element of another type is removed too; a link by id is kept as written.';
-const NOTE_ELEMENT = 'A Pin\'s "element" is not read: the pin keeps the link in its "element_id", and a pin with only "element" comes in with no element.';
+const NOTE_ELEMENT = 'A Pin\'s "element" is not read: the Pin keeps the link in its "element_id", and a Pin with only "element" comes in with no element.';
 const NOTE_NO_TYPE = 'A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element.';
 
 describe('the note under the review', () => {

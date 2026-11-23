@@ -62,6 +62,16 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
   const nameExists = (t: ElementType, n: string): boolean => namesByType.get(t)?.has(normName(n)) ?? false;
   // The types a name was made as, so a Fix can steer to a link that holds instead of asking for a twin.
   const typesNamed = (n: string): ElementType[] => ALL_ELEMENT_TYPES.filter(t => nameExists(t, n));
+  // The type of each id the import or the world holds, so a link by id to another type is said (the import keeps it).
+  const typeById = new Map<string, ElementType>();
+  for (const e of existing) if (typeof e.id === 'string') typeById.set(e.id.toLowerCase(), e.type);
+  for (const [type, records] of parsed.byType) {
+    for (const r of records) if (typeof r.id === 'string' && r.id.trim()) typeById.set(r.id.trim().toLowerCase(), type);
+  }
+  const idOfOtherType = (v: string, t: ElementType | null): ElementType | null => {
+    const held = t ? typeById.get(v.trim().toLowerCase()) : undefined;
+    return held && held !== t ? held : null;
+  };
 
   for (const [type, records] of parsed.byType) {
     const known = knownFieldsFor(type);
@@ -97,6 +107,11 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
           const target = rel.target ?? polymorphicTarget(rec);
           const missing = (at: string, name: string, t: ElementType) =>
             missingRefIssue(at, k, name, t, typesNamed(name), relationFieldsFor(type), rel.target === null);
+          // Only a field of one type: a Pin's "element_id" takes its type from the element it names.
+          const otherId = (at: string, id: string) => {
+            const held = idOfOtherType(id, rel.target);
+            if (held && rel.target) issues.push(otherTypeIdIssue(at, k, id.trim(), held, rel.target, relationFieldsFor(type)));
+          };
           if (rel.kind === 'single') {
             if (v !== null && v !== '' && typeof v !== 'string') {
               issues.push(cardinalityIssue(path, k, v, 'A single element name or id (string)'));
@@ -105,6 +120,8 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
             } else if (typeof v === 'string' && v.trim() && !isUuid(v) && !target && rel.target === null) {
               // A link to any type found by name needs the type beside it; without one the import drops it.
               issues.push(untypedLinkIssue(path, k, v, rec[k.replace(/_id$/, '_type')], typesNamed(v)));
+            } else if (typeof v === 'string' && isUuid(v)) {
+              otherId(`${path}.${k}`, v);
             }
           } else {
             if (v !== undefined && v !== null && !Array.isArray(v)) {
@@ -113,6 +130,8 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
               v.forEach((item, j) => {
                 if (typeof item === 'string' && item.trim() && !isUuid(item) && target && !nameExists(target, item)) {
                   issues.push(missing(`${path}.${k}[${j}]`, item, target));
+                } else if (typeof item === 'string' && isUuid(item)) {
+                  otherId(`${path}.${k}[${j}]`, item);
                 }
               });
             }
@@ -280,6 +299,26 @@ function missingRefIssue(
 }
 
 /**
+ * A link by id to an element of another type than its field takes. The import keeps an id as written (it
+ * resolves only names by type), so the line says so; the Fix steers to this element's field that takes
+ * that type, as a name's does.
+ */
+function otherTypeIdIssue(
+  path: string, field: string, value: string, held: ElementType, target: ElementType, rels: RelationField[],
+): ValidationIssue {
+  const takers = rels.filter(r => r.target === held && r.schemaField !== field).map(r => `"${r.schemaField}"`);
+  const where = takers.length ? `link it in ${takers.join(' or ')} instead` : `remove it from "${field}"`;
+  return {
+    path,
+    field,
+    value,
+    issue: `"${value}" is ${aType(held)}, and ${fieldLabel(field)} takes ${aType(target)}. The link is kept as written.`,
+    expected: `Only ${cap(target)} names or ids in "${field}"`,
+    suggestion: `"${value}" is ${aType(held)}: ${where}.`,
+  };
+}
+
+/**
  * A link to any type (a Pin's "element_id") named with no type beside it, or with a type that is no
  * element type (onlyworlds.com's old exports wrote a number there): the import cannot find it.
  */
@@ -329,7 +368,7 @@ function unknownFieldIssue(path: string, field: string, value: unknown, type: El
     path: `${path}.${field}`,
     field,
     value,
-    issue: `Unknown field "${field}" for ${label}`,
+    issue: `Unknown field "${field}" for ${cap(label)}`,
     expected: 'A valid OnlyWorlds field name',
     suggestion: empty
       ? `Remove "${field}": it is empty, and ${cap(label)} has no such field${has}.`

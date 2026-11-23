@@ -65,8 +65,11 @@ export function isAccountAuthError(err: unknown): boolean {
     && (err.code === 'invalid_credentials' || err.code === 'key_revoked');
 }
 
-/** User-facing message for a failed account call, code-aware. */
-export function accountErrorMessage(err: unknown): string {
+/**
+ * User-facing message for a failed account call, code-aware. `noPin`: the caller's step sends no `API-Pin`,
+ * so a refusal names no PIN (`problemFor`'s option, as given).
+ */
+export function accountErrorMessage(err: unknown, opts: { noPin?: boolean | 'may-have-left' } = {}): string {
   // Atlas's own account calls throw OwV2Error; an SDK call (the world create
   // since 1.83.1) throws the SDK's OwApiError, read the same way.
   if (err instanceof OwV2Error || err instanceof OwApiError) {
@@ -76,7 +79,7 @@ export function accountErrorMessage(err: unknown): string {
   }
   // Anything else is worded, never read out: the fallback used to be
   // the server's or the browser's own text.
-  return problemFor(err, { inline: true, doing: 'talking to your OnlyWorlds account' }).sentence;
+  return problemFor(err, { inline: true, doing: 'talking to your OnlyWorlds account', ...(opts.noPin ? { noPin: opts.noPin } : {}) }).sentence;
 }
 
 export class AccountClient {

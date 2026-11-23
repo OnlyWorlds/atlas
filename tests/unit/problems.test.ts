@@ -272,7 +272,7 @@ describe('a 429 in words, by keel\'s param (1.124.35)', () => {
     // An account world: the World PIN (a seat's wall, and a world not known, in seat-credential-words).
     patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: 'local-own', name: 'Owned', state: 'api-linked', api: { world_id: 'w-own', api_key: 'ow_w_' + 'o'.repeat(32) } } as unknown as WorldRegistryEntry] });
     expect(problemFor(wall('900'), { doing: 'linking this world', worldId: 'local-own' }).sentence)
-      .toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish linking this world. Check the World PIN in Settings; try again in 15 minutes.");
+      .toBe("OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while, and Atlas could not finish linking this world. Check the World PIN in Settings; try again in 15 minutes.");
     patchSlice('registry', defaultRegistry());
   });
   it('any other 429 says the wait alone, never the PIN', () => {

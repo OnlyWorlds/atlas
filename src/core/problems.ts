@@ -187,6 +187,10 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       if (keyRefusalOf(err) === 'read_only_key' && err instanceof Error && /read-only/i.test(err.message)) {
         return `This world's key can only read, so Atlas could not finish ${doing}.${saved} Put in a write key in Settings, This world.`;
       }
+      // The step sent no `API-Pin` (an invite, an account call, a read key's or the demo's download): its
+      // refusal is the step's, never a PIN's or a seat secret's. One that may have left something behind
+      // makes no claim about what changed.
+      if (opts.noPin) return opts.noPin === 'may-have-left' ? `OnlyWorlds did not allow ${doing}.` : `OnlyWorlds did not allow ${doing}. Nothing changed.`;
       // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence. A seat
       // world sends its seat secret there, never the World PIN (R1), and has no PIN to put in again; not
       // known whose, the line names both.
@@ -217,7 +221,9 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         const who = pinWhoFor(opts);
         const lead = who === 'seat'
           ? "OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while"
-          : "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while";
+          : who === 'account'
+            ? "OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while"
+            : "OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while";
         const wall = `${lead}, and Atlas could not finish ${doing}.${saved}`;
         return who === 'seat' ? `${wall} Try again in ${when}.`
           : who === 'account' ? `${wall} Check the World PIN in Settings; try again in ${when}.`
@@ -288,6 +294,21 @@ export interface ProblemOpts {
   who?: PinWho;
   /** The world the step was for: its entry says whose credential it sent, when `who` is not given. */
   worldId?: string;
+  /**
+   * The step sends no `API-Pin` at all (an invite's preview or redeem, an account call, a download by a key
+   * that only reads, the demo's): a refusal names no World PIN or seat secret. `true` where nothing the
+   * step made stays behind when it fails, so its line says nothing changed; `may-have-left` where
+   * something can (a folder's half-made download, a key just made, a world made here first).
+   */
+  noPin?: boolean | 'may-have-left';
+}
+
+/**
+ * A download's `noPin`: into this browser a failure removes what it made; into a folder its half-made
+ * files can stay.
+ */
+export function downloadNoPin(where: string | undefined): true | 'may-have-left' {
+  return where === 'browser' ? true : 'may-have-left';
 }
 
 /** Whose credential this problem's step sent: as the caller said, else the given world's, else not known. */

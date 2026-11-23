@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.6',
+    date: '2026-11-23',
+    theme: 'A refusal names only what was sent, and the Data room reads more replies',
+    entries: [
+      {
+        id: 'refusals-name-what-was-sent',
+        title: 'A refusal names only the World PIN or seat secret that was sent, the review says three more cases, and a reply of several code blocks loads',
+        body: 'A refusal now names only what Atlas sent: World PINs or seat secrets when OnlyWorlds refuses too many wrong ones, and no PIN at all on a step that sends none, such as an invite, the demo world or a read key\'s download; the Pin and the seat secret are spelled one way throughout. In the Data room, the review says three more cases (a link by id to an element of another type, an unknown field\'s type, an element_type that names no type), and a reply in a ~~~ code block, or in several code blocks of which exactly one is JSON, loads.',
+        tags: ['sync', 'import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.5',
     date: '2026-11-22',
     theme: 'The World PIN or the seat secret by name, and the Data room\'s review in reading order',

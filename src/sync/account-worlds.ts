@@ -90,7 +90,8 @@ export function refreshAccountWorlds(force = false): void {
       patchSlice('accountWorlds', {
         ...getState().accountWorlds,
         status: 'error',
-        error: accountErrorMessage(err), errorKind: isAccountAuthError(err) ? 'auth' : 'other',
+        // The list is account calls alone: no PIN goes with them.
+        error: accountErrorMessage(err, { noPin: true }), errorKind: isAccountAuthError(err) ? 'auth' : 'other',
         // A bad token's rows are meaningless; an offline blip keeps old rows.
         rows: isAccountAuthError(err) ? [] : getState().accountWorlds.rows,
       });
@@ -367,7 +368,9 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
       toasts.error(`${row.name} is no longer available on your account`);
       refreshAccountWorlds(true);
     } else {
-      toasts.error(accountErrorMessage(err));
+      // The open's refusals that reach here sent no PIN (its `/me` is worded by the link), and a key may
+      // have been made before it failed.
+      toasts.error(accountErrorMessage(err, { noPin: 'may-have-left' }));
     }
     return false;
   } finally {

@@ -1,8 +1,8 @@
 /**
  * Every step that sends a world's `API-Pin` and words its refusal through `problemFor` or `showProblem`
  * says which world it was for (`worldId`) or whose credential it sent (`who`), so the line names the
- * World PIN or the seat secret. Only a step that cannot know it (an unhandled rejection, a step that sends
- * no PIN) is left to the line that names both.
+ * World PIN or the seat secret. Only a step that cannot know it (an unhandled rejection) is left to the
+ * line that names both; a step that sends no PIN names none (tests/unit/no-pin-steps.test.ts).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -85,7 +85,6 @@ describe('the census: each site that holds the world says it', () => {
     ['ui/conflict-review-modal.ts', 'resolving the conflict', /this\.problemWorld\(\)/],
     ['ui/make-online-modal.ts', 'creating the world online', /who: isSeatSecret\(pin\)/],
     ['ui/bring-down-again-modal.ts', 'downloading the world', /worldId: w\.id/],
-    ['ui/join-world-modal.ts', 'checking the seat on OnlyWorlds', /who: 'seat'/],
   ];
   for (const [file, doing, says] of SITES) {
     it(`${file}, ${doing}`, () => {

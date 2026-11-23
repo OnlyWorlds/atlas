@@ -123,7 +123,7 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
     // own catch: a failure there became "a problem it did not expect while
     // working in the background" (2026-10-14). Said here, as what it is.
     console.warn('[open-world-file] demo failed:', err);
-    if (!isCodeLoadError(err)) showProblem(err, { doing: DEMO_WORDS.doing, where: 'browser', toasts });
+    if (!isCodeLoadError(err)) showProblem(err, { doing: DEMO_WORDS.doing, where: 'browser', toasts, noPin: true });
   } finally {
     demoRunning = false;
   }
@@ -303,6 +303,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
     // A code file this tab could not load already has its reload banner
     // (conv. 121); as a problem it read "OnlyWorlds could not be reached".
     if (isCodeLoadError(err)) return;
-    showProblem(err, { doing: words.doing, where: 'browser', toasts });
+    // A world file makes no request, and the demo comes down by its read key, with no PIN, into memory.
+    showProblem(err, { doing: words.doing, where: 'browser', toasts, noPin: true });
   }
 }

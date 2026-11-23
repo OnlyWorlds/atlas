@@ -183,8 +183,9 @@ export class NewApiWorldModal extends BaseModal {
       } catch (err) {
         progressEl.hidden = true;
         console.warn('[new-api-world] create failed:', err);
-        // A new world on the account goes up with the World PIN, whatever world is open.
-        const sentence = problemFor(err, { inline: true, doing: 'creating the world online', where, oneLine: true, who: 'account' }).sentence;
+        // The create sends the World PIN in its body, never as API-Pin (a refused one is worded by
+        // createApiWorld), and the world may already be made here: a refusal names no PIN and no claim.
+        const sentence = problemFor(err, { inline: true, doing: 'creating the world online', where, oneLine: true, noPin: 'may-have-left' }).sentence;
         // Once the folder exists, say so: Create now retries only the online
         // step, under the same name (the name field stays locked).
         const reusable = !!reusableLocal();

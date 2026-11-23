@@ -20,7 +20,7 @@ import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { enqueueActivationTask } from '../core/activation-chain';
 import type { InitialDownloadProgress } from '../sync/initial-download';
-import { problemFor } from '../core/problems';
+import { downloadNoPin, problemFor } from '../core/problems';
 
 export class ViewWorldModal extends BaseModal {
   private toasts: ToastManager;
@@ -129,9 +129,9 @@ export class ViewWorldModal extends BaseModal {
         navigate(homeHash(result.entry.id));
       } catch (err) {
         // A refused key, an unknown world or no connection arrives worded
-        // (keyCheckError); the rest is worded here.
+        // (keyCheckError); the rest is worded here. A read key sends no PIN.
         console.warn('[view-world] view failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where, noPin: downloadNoPin(where) }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;

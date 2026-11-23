@@ -181,9 +181,10 @@ describe('a reply pasted with its code fence', () => {
     expect(performance.now() - t0).toBeLessThan(500);
   });
 
+  // Two blocks with one of JSON, and a ~~~ fence, load (tests/unit/import-code-blocks.test.ts).
   it('text Atlas could not read past names the code block, never a missing comma', () => {
     const body2 = '{"Character": [{"name": "Aralia"}]}';
-    for (const t of ['```json\n' + body2 + '\n```\nand\n```\nmore\n```', '~~~json\n' + body2 + '\n~~~', '```json\n' + body2]) {
+    for (const t of ['```json\n' + body2, '~~~json\n' + body2]) {
       const text = jsonTextOf(t);
       expect(() => JSON.parse(text)).toThrow();
       expect(jsonFaultAdvice(text)).toContain('code block marks');

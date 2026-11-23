@@ -29,6 +29,8 @@ export interface FixContext {
   dedupeKey?: string;
   /** Whose credential the step sent: a seat's problem offers no Open settings (its secret is not kept there). */
   who?: PinWho;
+  /** The step sent no PIN: its problem offers no Open settings (no PIN there is the step's). */
+  noPin?: boolean | 'may-have-left';
 }
 
 /** The open world's mode for the details block. Never its name. */
@@ -87,7 +89,7 @@ export function resolveFixes(ids: readonly FixId[], ctx: FixContext = {}): Toast
       case 'open-settings':
         // The PIN lives on the OnlyWorlds tab (where sync-toasts sends a missing PIN too). A seat's secret
         // does not: its sentence names no step there, so it offers none.
-        if (worldId && ctx.who !== 'seat' && !isSeatWorld(getState().registry.worlds.find(w => w.id === worldId))) {
+        if (worldId && ctx.who !== 'seat' && !ctx.noPin && !isSeatWorld(getState().registry.worlds.find(w => w.id === worldId))) {
           out.push({ label: 'Open settings', run: () => navigate(settingsHash(worldId, 'onlyworlds')) });
         }
         break;
@@ -120,6 +122,7 @@ export function showProblem(err: unknown, opts: FixContext & ProblemOpts & { doi
     where: opts.where ?? whereFor(opts.worldId),
     ...(opts.worldId ? { worldId: opts.worldId } : {}),
     ...(opts.who ? { who: opts.who } : {}),
+    ...(opts.noPin ? { noPin: opts.noPin } : {}),
   });
   markProblemShown(err);
   if (problem.quiet) return problem;
