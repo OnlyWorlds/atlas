@@ -582,6 +582,72 @@ describe('buildPagePayload', () => {
     expect(p2.blocks.find(b => (b as { kind: string }).kind === 'map')).toBeUndefined();
   });
 
+  it('a pin sends its element only when the pin itself shows on its map (1.125.13)', () => {
+    // Three ways a pin never draws: its map has no published image, its map is
+    // hidden, or the pin has no place. None of them may send the element's
+    // description (or, for a full pin, every filled field) with no pin to show it.
+    const MAP_NO_IMAGE = 'm3000000-0000-0000-0000-000000000003';
+    const MAP_HIDDEN = 'm4000000-0000-0000-0000-000000000004';
+    const MAP_OK = 'm5000000-0000-0000-0000-000000000005';
+    const A = 'aa000000-0000-0000-0000-00000000000a';
+    const B = 'bb000000-0000-0000-0000-00000000000b';
+    const C = 'cc000000-0000-0000-0000-00000000000c';
+    const D = 'dd000000-0000-0000-0000-00000000000d';
+    const PA = 'pa000000-0000-0000-0000-00000000000a';
+    const PB = 'pb000000-0000-0000-0000-00000000000b';
+    const PC = 'pc000000-0000-0000-0000-00000000000c';
+    const PD = 'pd000000-0000-0000-0000-00000000000d';
+    const elements: Element[] = [
+      { id: MAP_NO_IMAGE, type: 'map', name: 'Sketch', width: 100, height: 100 },
+      { id: MAP_HIDDEN, type: 'map', name: 'Secret', image_url: 'https://img.example/s.png', width: 100, height: 100, hidden: true },
+      { id: MAP_OK, type: 'map', name: 'Realm', image_url: 'https://img.example/r.png', width: 100, height: 100 },
+      { id: A, type: 'character', name: 'A', description: 'SECRET-A' },
+      { id: B, type: 'character', name: 'B', description: 'SECRET-B', x_mood: 'SECRET-B2' },
+      { id: C, type: 'character', name: 'C', description: 'SECRET-C' },
+      { id: D, type: 'character', name: 'D', description: 'Shown.' },
+      { id: PA, type: 'pin', map_id: MAP_NO_IMAGE, element_id: A, x: 10, y: 10 },
+      { id: PB, type: 'pin', map_id: MAP_HIDDEN, element_id: B, x: 10, y: 10 },
+      { id: PC, type: 'pin', map_id: MAP_OK, element_id: C },
+      { id: PD, type: 'pin', map_id: MAP_OK, element_id: D, x: 20, y: 20 },
+    ] as unknown as Element[];
+    const blocks = [
+      { id: 'b1', kind: 'map', mapId: MAP_NO_IMAGE, pinIds: [PA] },
+      { id: 'b2', kind: 'map', mapId: MAP_HIDDEN, pinIds: [PB], fullPinIds: [PB] },
+      { id: 'b3', kind: 'map', mapId: MAP_OK, pinIds: [PC, PD] },
+    ];
+    const page = makePage(blocks);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [MAP_NO_IMAGE, PA, MAP_HIDDEN, PB, MAP_OK, PC, PD];
+    const p = buildPagePayload(page, elements);
+    expect(Object.keys(p.elements)).toEqual([D]);
+    expect(p.elements[D].fields).toEqual({ description: 'Shown.' });
+    const json = JSON.stringify(p);
+    for (const secret of ['SECRET-A', 'SECRET-B', 'SECRET-C']) expect(json).not.toContain(secret);
+    // The map that shows still draws its one placed pin, with its ref.
+    expect(p.blocks).toHaveLength(1);
+    expect((p.blocks[0] as { pins: Array<{ ref?: string }> }).pins.map(pin => pin.ref)).toEqual([D]);
+  });
+
+  it('a pin moved to another map neither draws nor sends on its old map (1.125.13)', () => {
+    // The map editor lists only the pins whose map is this map, so a pin still
+    // in the include-list after it moved had no checkbox to turn it off.
+    const OLD = 'm6000000-0000-0000-0000-000000000006';
+    const NEW = 'm7000000-0000-0000-0000-000000000007';
+    const E = 'ee000000-0000-0000-0000-00000000000e';
+    const PE = 'pe000000-0000-0000-0000-00000000000e';
+    const elements: Element[] = [
+      { id: OLD, type: 'map', name: 'Old', image_url: 'https://img.example/o.png', width: 100, height: 100 },
+      { id: NEW, type: 'map', name: 'New', image_url: 'https://img.example/n.png', width: 100, height: 100 },
+      { id: E, type: 'character', name: 'E', description: 'SECRET-E', image_url: 'https://img.example/e.png' },
+      { id: PE, type: 'pin', map_id: NEW, element_id: E, x: 10, y: 10 },
+    ] as unknown as Element[];
+    const page = makePage([{ id: 'b1', kind: 'map', mapId: OLD, pinIds: [PE], fullPinIds: [PE] }]);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [OLD, PE];
+    const p = buildPagePayload(page, elements);
+    expect((p.blocks[0] as { pins: unknown[] }).pins).toEqual([]);
+    expect(p.elements).toEqual({});
+    expect(JSON.stringify(p)).not.toContain('SECRET-E');
+  });
+
   it('fullPinIds heals alongside pinIds on id-swap (opt-in follows its pin)', () => {
     const MAP = 'm1000000-0000-0000-0000-000000000001';
     const PIN1 = 'pin10000-0000-0000-0000-000000000001';
@@ -626,7 +692,7 @@ describe('freezeMapBlock — image URL scheme guard', () => {
   function mapWorld(imageUrl: string, dims: { width?: number; height?: number } = { width: 1000, height: 800 }): Map<string, Element> {
     const els: Element[] = [
       { id: MAP, type: 'map', name: 'Barovia', image_url: imageUrl, ...dims, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
-      { id: PIN, type: 'pin', name: 'Vallaki pin', x: 500, y: 400, element_id: VALLAKI, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
+      { id: PIN, type: 'pin', name: 'Vallaki pin', map_id: MAP, x: 500, y: 400, element_id: VALLAKI, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
       { id: VALLAKI, type: 'location', name: 'Vallaki', local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
     ];
     return new Map(els.map(e => [e.id, e]));

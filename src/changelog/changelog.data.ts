@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.13',
+    date: '2026-11-23',
+    theme: 'Before Publish, a page says what it shares',
+    entries: [
+      {
+        id: 'publish-says-what-it-shares',
+        title: 'Before you publish a page, it lists what it shares, and a pin the page does not draw sends nothing',
+        body: 'The Publish section now lists each element the page sends more than a name for, with the fields and picture each card, map pin or collection sends and a button to that block, so a description a new card shows by default, or every field of a Full pin, is in plain sight before Publish or Republish. A pin on a map that is not drawn (no published image, a hidden map, or no place on its map) no longer sends its element or its picture, and a pin moved to another map no longer draws on the map it left or sends anything through it.',
+        tags: ['pages', 'privacy', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.12',
     date: '2026-11-23',
     theme: 'A world another tab took is closed here',

@@ -38,7 +38,7 @@ import { findAddresses, findLooseAddressRuns, namedId } from './ow-links';
 import { getZoneShape } from '../tabs/right/zone-derived';
 import { freezeChartBlock, type PayloadChartBlock } from '../visualization/timeline/chart-freeze';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { capitalise, missingLabel, nameOrUnnamed, theUnnamed } from './type-words';
+import { capitalise, missingLabel, nameOrUnnamed, ownName, theUnnamed } from './type-words';
 
 // ---------------------------------------------------------------------------
 // Payload types (the §5 wire shape).
@@ -316,7 +316,188 @@ export function leftOutOfPage(el: unknown): boolean {
 }
 
 export function buildPagePayload(page: Element, elements: Element[], charts: ChartConfig[] = []): PagePayload {
-  return buildPayloadFrom(page, elements.some(leftOutOfPage) ? elements.filter(e => !leftOutOfPage(e)) : elements, charts);
+  return buildPayloadFrom(page, handedOn(elements), charts);
+}
+
+/** The elements a published page may name: all but the left out (conv. 168, 170). */
+function handedOn(elements: Element[]): Element[] {
+  return elements.some(leftOutOfPage) ? elements.filter(e => !leftOutOfPage(e)) : elements;
+}
+
+// ---------------------------------------------------------------------------
+// What a page shares, read before Publish (1.125.13).
+// ---------------------------------------------------------------------------
+
+/** One block that sends something of an element: what it sends, and the block its press opens. */
+export interface SharePart {
+  kind: 'card' | 'map' | 'collection';
+  /** The page block that sends it; the press beside the part opens this block's editor. */
+  blockId: string;
+  /** Field NAMES (the room labels them), each one the payload's entry holds and this block sends. */
+  fields: string[];
+  /** This block sends the element's picture (the entry holds an `image_url`). */
+  picture: boolean;
+  /** A map part: the map's name as published, and this element's pins on it that show. */
+  mapTitle?: string;
+  pinIds?: string[];
+  /** A map part: those of `pinIds` that are Full (each sends every filled field). */
+  fullPinIds?: string[];
+}
+
+/** One element whose payload entry sends a field or a picture. */
+export interface ShareRow {
+  elementId: string;
+  name: string;
+  type: string;
+  /** The element has no name of its own (`name` is then its unnamed form). */
+  unnamed: boolean;
+  parts: SharePart[];
+  /** A field the entry sends that no block above sends (none expected; nothing sent goes unlisted). */
+  also: string[];
+}
+
+/** What else the payload carries, each only where its carrier is in the payload. */
+export interface ShareClauses {
+  /** A map block: its picture and its pins' and zones' names. */
+  maps: boolean;
+  /** A link field's names, in any entry (a card's ticked link, or a full pin's). */
+  links: boolean;
+  /** A link names an element not on the page (a token with no `ref`). */
+  linksOffPage: boolean;
+  /** A chart block that draws something: the names and dates of what it draws. */
+  charts: boolean;
+  /** Each circle block with entries: its knower's name as published, and how many entries. */
+  circles: Array<{ knower: string; entries: number }>;
+}
+
+export interface PageShares {
+  rows: ShareRow[];
+  /** Elements whose entry sends neither a field nor a picture, by name, in page order. */
+  nameOnly: string[];
+  clauses: ShareClauses;
+}
+
+/**
+ * What a page shares, from the payload `buildPagePayload` returned for it and
+ * the page's own blocks (`blocksOf`) beside it: what is sent is read from the
+ * payload, and which block sends it from the blocks (which card ticks what,
+ * which pins are Full, which collections hold whom). A part lists only fields
+ * the payload's entry holds. A field two blocks send is listed under both, so
+ * turning it off in one leaves it visibly under the other. `elements` is the
+ * world, read only to place pins on their elements as the payload does.
+ */
+export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], elements: Element[]): PageShares {
+  const byId = new Map(handedOn(elements).map(e => [e.id, e]));
+  const frozenMaps = new Map<string, PayloadMapBlock>();
+  for (const b of payload.blocks) if (b.kind === 'map') frozenMaps.set(b.id, b);
+
+  // Parts per element, walking the blocks in page order; the walk also fixes
+  // each element's first appearance, which orders the rows.
+  const order: string[] = [];
+  const seen = (id: string): void => { if (!order.includes(id)) order.push(id); };
+  const partsOf = new Map<string, SharePart[]>();
+  const add = (id: string, part: SharePart): void => {
+    if (part.fields.length === 0 && !part.picture) return; // a part appears only when it lists something
+    const list = partsOf.get(id) ?? [];
+    list.push(part);
+    partsOf.set(id, list);
+  };
+
+  for (const b of blocks) {
+    if (b.kind === 'element-card') {
+      seen(b.elementId);
+      const entry = payload.elements[b.elementId];
+      if (!entry) continue;
+      // A compact card sends no field of its own (the payload unions full cards only).
+      const fields = b.variant === 'full' ? b.fields.filter(f => f in entry.fields) : [];
+      add(b.elementId, {
+        kind: 'card', blockId: b.id, fields: [...new Set(fields)],
+        picture: b.showImage !== false && entry.image_url !== undefined,
+      });
+    } else if (b.kind === 'collection') {
+      for (const id of new Set(b.elementIds)) {
+        seen(id);
+        const entry = payload.elements[id];
+        if (entry) add(id, { kind: 'collection', blockId: b.id, fields: [], picture: entry.image_url !== undefined });
+      }
+    } else if (b.kind === 'map') {
+      const frozen = frozenMaps.get(b.id);
+      if (!frozen) continue; // the map does not show: its pins send nothing
+      const pinsByTarget = new Map<string, Array<{ pinId: string; target: Element }>>();
+      for (const fp of frozenPinTargets(b, byId)) {
+        seen(fp.target.id);
+        const list = pinsByTarget.get(fp.target.id) ?? [];
+        list.push(fp);
+        pinsByTarget.set(fp.target.id, list);
+      }
+      for (const [id, pins] of pinsByTarget) {
+        const entry = payload.elements[id];
+        if (!entry) continue;
+        // What this block's pins send, as the payload builds it: a pin its
+        // description, a Full pin every filled field.
+        const sent = new Set<string>(['description']);
+        for (const { pinId, target } of pins) {
+          if ((b.fullPinIds ?? []).includes(pinId)) for (const f of populatedFieldNames(target)) sent.add(f);
+        }
+        add(id, {
+          kind: 'map', blockId: b.id,
+          fields: Object.keys(entry.fields).filter(f => sent.has(f)),
+          picture: entry.image_url !== undefined,
+          mapTitle: frozen.title,
+          pinIds: pins.map(p => p.pinId),
+          fullPinIds: pins.map(p => p.pinId).filter(pinId => (b.fullPinIds ?? []).includes(pinId)),
+        });
+      }
+    }
+  }
+  for (const id of Object.keys(payload.elements)) seen(id);
+
+  const rows: ShareRow[] = [];
+  const nameOnly: string[] = [];
+  for (const id of order) {
+    const entry = payload.elements[id];
+    if (!entry) continue; // hidden, proposed or missing: no row, not counted
+    if (Object.keys(entry.fields).length === 0 && entry.image_url === undefined) {
+      nameOnly.push(entry.name);
+      continue;
+    }
+    const parts = partsOf.get(id) ?? [];
+    const listed = new Set(parts.flatMap(p => p.fields));
+    rows.push({
+      elementId: id, name: entry.name, type: entry.type, parts,
+      unnamed: !ownName(byId.get(id) ?? { name: '' }),
+      also: Object.keys(entry.fields).filter(f => !listed.has(f)),
+    });
+  }
+
+  let links = false;
+  let linksOffPage = false;
+  for (const entry of Object.values(payload.elements)) {
+    for (const [field, value] of Object.entries(entry.fields)) {
+      if (relationKindOf(entry.type, field) === null || !Array.isArray(value)) continue;
+      links = true;
+      if ((value as RelationToken[]).some(t => !t.ref)) linksOffPage = true;
+    }
+  }
+  return {
+    rows,
+    nameOnly,
+    clauses: {
+      maps: frozenMaps.size > 0,
+      links,
+      linksOffPage,
+      // A chart that draws nothing names nothing.
+      charts: payload.blocks.some(b => b.kind === 'chart' && b.nodes.length > 0),
+      // A missing knower freezes with no entries, so "with entries" is "its knower resolves".
+      circles: payload.blocks.flatMap(b => b.kind === 'circle' && b.entries.length > 0
+        ? [{ knower: b.title, entries: b.entries.length }] : []),
+    },
+  };
+}
+
+/** `pageShares` for a page as the next Publish would send it: the payload built once, then read. */
+export function pageSharesOf(page: Element, elements: Element[], charts: ChartConfig[] = []): PageShares {
+  return pageShares(buildPagePayload(page, elements, charts), blocksOf(page), elements);
 }
 
 /**
@@ -449,12 +630,11 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   // author explicitly opted in via `fullPinIds` ship every populated field.
   // Fields another block (card/collection) separately disclosed still union
   // in — a map can never DOWNGRADE a deliberate card disclosure.
+  // Only a pin that itself freezes into its map block sends its element
+  // (1.125.13): a map with no published image or no size, a hidden or missing
+  // map, or a pin with no place draws nothing, so it sends nothing.
   for (const mb of blocks.filter((b): b is MapBlock => b.kind === 'map')) {
-    for (const pinId of mb.pinIds) {
-      const pin = byId.get(pinId);
-      const targetId = pin ? (pin as Record<string, unknown>).element_id : null;
-      const target = typeof targetId === 'string' ? byId.get(targetId) : undefined;
-      if (!target) continue;
+    for (const { pinId, target } of frozenPinTargets(mb, byId)) {
       includedIds.add(target.id);
       imageWanted.add(target.id);
       const full = (mb.fullPinIds ?? []).includes(pinId);
@@ -569,6 +749,49 @@ export function projectElementEntry(
   return entry;
 }
 
+/** A map block's map as it publishes: present, with an http(s) image and a size; else null (the block drops). */
+function mapFrameOf(block: MapBlock, byId: Map<string, Element>): { map: Element; imageUrl: string; width: number; height: number } | null {
+  const map = byId.get(block.mapId);
+  if (!map) return null;
+  const rec = map as Record<string, unknown>;
+  const imageUrl = typeof rec.image_url === 'string' ? rec.image_url.trim() : '';
+  if (!/^https?:\/\//i.test(imageUrl)) return null;
+  const width = typeof rec.width === 'number' ? rec.width : 0;
+  const height = typeof rec.height === 'number' ? rec.height : 0;
+  if (width <= 0 || height <= 0) return null;
+  return { map, imageUrl, width, height };
+}
+
+/**
+ * The pins that freeze into a map block, in include-list order, each with its
+ * placed element: none when the map itself drops (`mapFrameOf`), and a pin
+ * only when it is in the world, has a finite x and y, and points at an element
+ * in the world. The payload's one reading of "this pin shows": the map's pins
+ * and the elements pins send (1.125.13) both come from it.
+ */
+export function frozenPinTargets(
+  block: MapBlock,
+  byId: Map<string, Element>,
+): Array<{ pinId: string; x: number; y: number; target: Element }> {
+  if (!mapFrameOf(block, byId)) return [];
+  const out: Array<{ pinId: string; x: number; y: number; target: Element }> = [];
+  for (const pinId of block.pinIds) {
+    const pin = byId.get(pinId);
+    if (!pin) continue;
+    const p = pin as Record<string, unknown>;
+    // A pin moved to another map no longer belongs to this one: the map
+    // editor lists only this map's pins, so it would have no checkbox here.
+    if (p.map_id !== block.mapId) continue;
+    const x = typeof p.x === 'number' ? p.x : NaN;
+    const y = typeof p.y === 'number' ? p.y : NaN;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const target = typeof p.element_id === 'string' ? byId.get(p.element_id) : undefined;
+    if (!target) continue; // pin without a live element discloses nothing
+    out.push({ pinId, x, y, target });
+  }
+  return out;
+}
+
 /**
  * Freeze a map block: image URL + chosen pins normalized to percentages.
  * THE ONE ORIGIN CONVERSION on the publish path: storage is the
@@ -580,7 +803,8 @@ export function projectElementEntry(
  * when image_url is set. Returns null — block drops from the wire — when the map
  * is missing, has no published image (D3: image_url only, local media never
  * leaves the folder), or has no usable dimensions. Pins drop individually
- * when their pin/element is gone (disclose nothing) or out of bounds.
+ * when their pin/element is gone (disclose nothing), unplaced, or moved to
+ * another map (`frozenPinTargets`).
  * Exported for the renderer (builder compiles live → same view).
  */
 export function freezeMapBlock(
@@ -588,25 +812,12 @@ export function freezeMapBlock(
   byId: Map<string, Element>,
   includedIds: ReadonlySet<string>,
 ): PayloadMapBlock | null {
-  const map = byId.get(block.mapId);
-  if (!map) return null;
-  const rec = map as Record<string, unknown>;
-  const imageUrl = typeof rec.image_url === 'string' ? rec.image_url.trim() : '';
-  if (!/^https?:\/\//i.test(imageUrl)) return null;
-  const width = typeof rec.width === 'number' ? rec.width : 0;
-  const height = typeof rec.height === 'number' ? rec.height : 0;
-  if (width <= 0 || height <= 0) return null;
+  const frame = mapFrameOf(block, byId);
+  if (!frame) return null;
+  const { map, imageUrl, width, height } = frame;
 
   const pins: PayloadMapBlock['pins'] = [];
-  for (const pinId of block.pinIds) {
-    const pin = byId.get(pinId);
-    if (!pin) continue;
-    const p = pin as Record<string, unknown>;
-    const x = typeof p.x === 'number' ? p.x : NaN;
-    const y = typeof p.y === 'number' ? p.y : NaN;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const target = typeof p.element_id === 'string' ? byId.get(p.element_id) : undefined;
-    if (!target) continue; // pin without a live element discloses nothing
+  for (const { x, y, target } of frozenPinTargets(block, byId)) {
     const token: PayloadMapBlock['pins'][number] = {
       xPct: Math.round(Math.min(100, Math.max(0, (x / width) * 100)) * 100) / 100,
       yPct: Math.round(Math.min(100, Math.max(0, ((height - y) / height) * 100)) * 100) / 100,
