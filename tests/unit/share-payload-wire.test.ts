@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
-  buildPagePayload, isCardSkipField, pageSharesOf, populatedFieldNames,
+  buildPagePayload, isCardSkipField, leftOutPageLine, pageSharesOf, populatedFieldNames,
 } from '../../src/core/share-payload';
 import { populatedCardFields } from '../../src/middle/share-page-render';
 import { SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SERVER_STAMP_FIELDS } from '../../src/core/constants';
@@ -294,6 +294,46 @@ describe('a card leaves the payload with its element', () => {
     expect(p.elements[BARE].fields.map).toEqual([{ text: 'the coast' }]);
     expect(p.elements[BARE].fields.element_id).toEqual([{ text: 'Ada' }]);
     expect(JSON.stringify(p)).not.toContain(MAP);
+  });
+
+  it('a pin whose file holds both spellings, the bare one naming a hidden map: neither goes out as an id', () => {
+    const HIDDEN_MAP = 'c3000000-0000-0000-0000-000000000003';
+    const BOTH = 'd6000000-0000-0000-0000-000000000006';
+    const elements = [
+      ...world(),
+      el(HIDDEN_MAP, 'the vault', { hidden: true, image_url: 'https://img.example/vault.png', width: 10, height: 10 }, 'map'),
+      el(BOTH, 'both pin', { map: HIDDEN_MAP, map_id: MAP, element_id: ADA, x: 1, y: 1 }, 'pin'),
+    ];
+    expect(populatedCardFields(elements[elements.length - 1])).toContain('map');
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'element-card', elementId: BOTH, variant: 'full', fields: ['map', 'map_id'] },
+      { id: 'b2', kind: 'collection', elementIds: [BOTH] },
+    ]), elements);
+    expect(p.elements[BOTH].fields.map).toBeUndefined();
+    expect(p.elements[BOTH].fields.map_id).toEqual([{ text: 'the coast' }]);
+    const json = JSON.stringify(p);
+    expect(json).not.toContain(HIDDEN_MAP);
+    expect(json).not.toContain(MAP);
+  });
+
+  it('an element whose own id is a name every object answers to is an entry like any other, and a hidden one is still named as left out', () => {
+    const elements = [
+      ...world(),
+      el('__proto__', 'Proto', { description: 'p' }),
+      el('constructor', 'Ctor', { description: 'c', hidden: true }),
+    ];
+    const blocks = [
+      { id: 'b1', kind: 'element-card', elementId: '__proto__', variant: 'full', fields: ['description'] },
+      { id: 'b2', kind: 'element-card', elementId: 'constructor', variant: 'full', fields: ['description'] },
+      { id: 'b3', kind: 'element-card', elementId: ADA, variant: 'compact', fields: [] },
+    ];
+    const p = buildPagePayload(page(blocks), elements);
+    expect(Object.keys(p.elements).sort()).toEqual(['__proto__', ADA].sort());
+    expect(p.elements['__proto__'].name).toBe('Proto');
+    expect(p.blocks.map(b => b.id)).toEqual(['b1', 'b3']);
+    expect(JSON.parse(JSON.stringify(p)).blocks).toHaveLength(2);
+    expect(leftOutPageLine(page(blocks), elements)).toContain('Ctor');
+    expect(() => pageSharesOf(page(blocks), elements)).not.toThrow();
   });
 
   it('a page with every kind of block: no id of the world is on the wire but an included element', () => {

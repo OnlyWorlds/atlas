@@ -545,7 +545,7 @@ function leftOutBy(page: Element, elements: Element[], charts: ChartConfig[], ou
   const whole = buildPayloadFrom(page, elements, charts);
   const handed = buildPayloadFrom(page, elements.filter(e => !out(e)), charts);
   const names = Object.entries(whole.elements)
-    .filter(([id]) => !(id in handed.elements) && out(byId.get(id)))
+    .filter(([id]) => !holdsKey(handed.elements, id) && out(byId.get(id)))
     .map(([, e]) => e.name);
   for (const b of blocksOf(page)) {
     if (b.kind !== 'map') continue;
@@ -679,7 +679,9 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
     }
   }
 
-  const entries: Record<string, PayloadElementEntry> = {};
+  // No prototype: an element's id is a key here, and a hand-made file can call
+  // one `__proto__` or `constructor`.
+  const entries: Record<string, PayloadElementEntry> = Object.create(null);
   for (const id of includedIds) {
     entries[id] = projectElementEntry(
       byId.get(id)!, byId, includedIds, chosenFields.get(id) ?? [], imageWanted.has(id));
