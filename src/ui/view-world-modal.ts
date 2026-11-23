@@ -16,7 +16,8 @@ import { progressLine } from './download-progress';
 import { BaseModal } from './modal-base';
 import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
-import { navigate, homeHash } from '../core/router';
+import { homeHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { enqueueActivationTask } from '../core/activation-chain';
 import type { InitialDownloadProgress } from '../sync/initial-download';
@@ -113,6 +114,8 @@ export class ViewWorldModal extends BaseModal {
         progressBox.hidden = false;
       };
 
+      // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+      const start = openStart();
       try {
         const result = await enqueueActivationTask(() =>
           linkExistingApiWorldInRoot({
@@ -124,9 +127,10 @@ export class ViewWorldModal extends BaseModal {
             onProgress: renderProgress,
           })
         );
+        const since = sinceOpenStart(start);
         this.toasts.success(`Viewing ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         this.hide();
-        navigate(homeHash(result.entry.id));
+        endOpen(result.entry.id, since, homeHash(result.entry.id));
       } catch (err) {
         // A refused key, an unknown world or no connection arrives worded
         // (keyCheckError); the rest is worded here. A read key sends no PIN.

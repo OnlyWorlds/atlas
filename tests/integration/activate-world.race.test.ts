@@ -109,16 +109,18 @@ describe('activateWorld — serialization under concurrent calls', () => {
     const p2 = activateWorld('w2', toastStub);
     const [r1, r2] = await Promise.all([p1, p2]);
 
-    expect(r1).toBe(true);
+    // The later pick wins (1.125.8, conv. 195): activation 1, picked over
+    // while it opened, draws nothing and answers false.
+    expect(r1).toBe(false);
     expect(r2).toBe(true);
-    // Strictly serial: activation 1 fully completes (open 1 start→end, no
-    // second open interleaved) before activation 2 PARKS store 1 (the
-    // switch-away contract since the speed bout — close only on eviction)
-    // and opens store 2.
+    // Strictly serial: activation 1 fully completes its open (open 1
+    // start→end, no second open interleaved), then closes the store it never
+    // made active (store 1 was never in use), before activation 2 opens
+    // store 2.
     expect(events).toEqual([
       'open-start:1',
       'open-end:1',
-      'park:1',
+      'close:1',
       'open-start:2',
       'open-end:2',
     ]);

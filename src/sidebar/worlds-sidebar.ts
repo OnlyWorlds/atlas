@@ -11,20 +11,11 @@
 import { hasFolderMode } from '../core/capabilities';
 import { isAtlasGrounded } from '../core/grounded';
 import { addWorldLabel, newWorldGlyph, openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
-import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
+import { currentActivationGen, enqueueActivation, newerOpenOfAnotherWorld } from '../core/activation-chain';
+import { landOpen, openHoldSet, placeOnWorld, roomStableHash, waitOpenHold } from '../core/open-place';
 import { awaitEviction, evictParkedStore, getActiveStore, parkStore, patchElementsFrom, setActiveStore, takeParkedStore } from '../core/active-store';
 import { escapeAttr, escapeText, installRowKeydownActivation } from '../core/dom-utils';
-import {
-  importHash,
-  knowledgeHash,
-  navigate,
-  onHashChange, parseHash,
-  settingsHash,
-  shareHash,
-  timelineHash,
-  worldHash,
-  writingHash,
-} from '../core/router';
+import { navigate, onHashChange, parseHash } from '../core/router';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused, storedRegistry, updateWorldEntry } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
@@ -817,7 +808,7 @@ export async function activateWorld(
       const d = getState().data;
       if (d.loading) patchSlice('data', { ...d, loading: false });
     }
-  });
+  }, worldId);
 }
 
 async function doActivateWorld(
@@ -883,6 +874,25 @@ async function doActivateWorld(
   // dropped its debounced prose). A no-op when nothing is pending.
   if (!preserveSelection) await flushBeforeLeavingWorld();
   const priorHash = window.location.hash;
+  // Where this open put the person (its first navigation below); the boot's
+  // open puts them nowhere new.
+  let openedHash = priorHash;
+  // An open that fails goes back where it started only when the person is
+  // still where it put them (conv. 195). One who moved meanwhile stays where
+  // they went; a place they reached inside the world that did not open (the
+  // room strip reads the address) is read back onto the world they came from.
+  const goBack = (): void => {
+    if (preserveSelection) return;
+    const now = window.location.hash;
+    if (now === openedHash) {
+      if (now !== priorHash) navigate(priorHash);
+      return;
+    }
+    const here = parseHash(now);
+    if (here.worldId !== worldId) return;
+    const priorWorld = parseHash(priorHash).worldId;
+    window.location.replace(priorWorld ? roomStableHash(here, priorWorld) : priorHash);
+  };
   // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5).
   // Tabs whose mapId isn't in the active world's elements get
   // the stale visual treatment (darkened, click-to-close) in right-pane.ts.
@@ -900,33 +910,11 @@ async function doActivateWorld(
       // room KINDS follow to the new world at their landing level; specific
       // entity ids (narrative/entry/page/focus) are world-bound and drop.
       // Element + map routes fall to home. Settings keeps its tab — the
-      // original 2026-07-10 precedent this generalizes.
-      switch (currentRoute.mode) {
-        case 'settings':
-          navigate(settingsHash(worldId, currentRoute.settingsTab));
-          break;
-        case 'writing':
-          navigate(writingHash(worldId));
-          break;
-        case 'knowledge':
-          navigate(knowledgeHash(worldId));
-          break;
-        case 'timeline':
-          navigate(timelineHash(worldId));
-          break;
-        case 'share':
-          navigate(shareHash(worldId));
-          break;
-        case 'import':
-          navigate(importHash(worldId));
-          break;
-        default:
-          // element / map / home / anything world-bound → home. (Activation
-          // goes home, not /elements; sidebar mode is independent UI
-          // state, activation doesn't force a flip.)
-          navigate(worldHash(worldId));
-      }
+      // original 2026-07-10 precedent this generalizes. (Activation goes
+      // home, not /elements; sidebar mode is independent UI state.)
+      navigate(roomStableHash(currentRoute, worldId));
     }
+    openedHash = window.location.hash;
   } else {
     patchSlice('data', { ...getState().data, loading: true, loadingProgress: null });
   }
@@ -956,7 +944,7 @@ async function doActivateWorld(
       // page that moves it, makes it, or checks it this moment has it. No
       // take-over is offered: a move cannot be taken over.
       else if (opts.sayLockHeld) toasts.show(stayedClosedWhileBusy(entry.name), 'info', 8000);
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      goBack();
       return false;
     }
   }
@@ -966,18 +954,18 @@ async function doActivateWorld(
   } catch (err) {
     console.warn('[worlds-sidebar] could not reach the world', err);
     if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    goBack();
     return false;
   }
   if (resolved.kind === 'gone') {
     settleGoneBrowserWorld(entry, silent, toasts);
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    goBack();
     return false;
   }
   if (resolved.kind === 'landing' || resolved.kind === 'failed') {
     // Another tab still lands it, or this tab's landing failed and its cleanup runs (#865).
     if (!silent) toasts.info(resolved.kind === 'landing' ? LANDING_IN_ANOTHER_TAB('Open') : LANDING_FAILED_HERE);
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    goBack();
     return false;
   }
   if (isBrowserWorld(entry) && entry.cleared_at) {
@@ -1003,7 +991,7 @@ async function doActivateWorld(
         hasFolderMode() ? { actions: [{ label: 'Open the folder', run: () => runAddWorldAction('open-folder', toasts) }] } : undefined,
       );
     }
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    goBack();
     return false;
   }
   // Browser storage needs no permission; only a folder on the drive asks.
@@ -1021,7 +1009,7 @@ async function doActivateWorld(
         retry: () => { void activateWorld(worldId, toasts); },
       });
     }
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    goBack();
     return false;
   }
 
@@ -1085,7 +1073,7 @@ async function doActivateWorld(
       } else if (!silent) {
         showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
       }
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      goBack();
       return false;
     }
     if (isFolderMissing(err)) {
@@ -1100,7 +1088,7 @@ async function doActivateWorld(
         saveRegistry(cleaned);
         patchSlice('registry', cleaned);
         if (!silent) toasts.info(`The folder of "${entry.name}" is gone, so Atlas took it off the list.`);
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        goBack();
         return false;
       }
       // The folder is there; something inside the open failed. Keep the entry
@@ -1110,14 +1098,14 @@ async function doActivateWorld(
       if (!silent) {
         toasts.error(`Could not open ${entry.name}. ${filesWhereOf(entry) === 'browser' ? 'Its storage' : 'The folder'} is still there, so nothing was removed. Try again, and check that no other Atlas tab has it open.`);
       }
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      goBack();
       return false;
     }
     // Another tab is moving this world to a folder: never offered for
     // take-over (1.17, contract §4.4), only said.
     if (err instanceof ELockHeld && err.moving) {
       if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      goBack();
       return false;
     }
     // Another tab holds a live folder lock. Dead-ending here left the user
@@ -1126,10 +1114,11 @@ async function doActivateWorld(
     if (err instanceof ELockHeld && !silent) {
       // The claim waited for the other page's Web Lock (conv. 13): a click
       // made meanwhile is the person's word now, and no confirm asks about a
-      // world they have left. The address goes back first, so the newer
-      // activation reads the true prior address (and restores it if it fails).
+      // world they have left. The address goes back first (unless the person
+      // moved, conv. 195), so the newer activation reads the true prior
+      // address (and restores it if it fails).
       if (gen !== currentActivationGen()) {
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        goBack();
         return false;
       }
       const hb = Date.parse(err.lock.last_heartbeat);
@@ -1141,7 +1130,7 @@ async function doActivateWorld(
       );
       if (!take) {
         toasts.show(stayedClosedHere(entry.name), 'info', 8000);
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        goBack();
         return false;
       }
       store = new FsFolderStore({ forceTakeLock: true });
@@ -1150,7 +1139,7 @@ async function doActivateWorld(
       } catch (err2) {
         console.warn('[worlds-sidebar] open after take-over failed:', err2);
         showProblem(err2, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
-        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        goBack();
         return false;
       }
     } else {
@@ -1160,7 +1149,7 @@ async function doActivateWorld(
       else if (err instanceof ELockHeld && opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
       // A plain sentence ("Atlas could not open this world just now. Try again in a moment.") says itself, with its retry.
       else if (isPlainError(err) && opts.sayLockHeld) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
-      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      goBack();
       return false;
     }
   }
@@ -1234,6 +1223,17 @@ async function doActivateWorld(
         : `An id update in ${entry.name} could not finish, so it is not syncing. Settings, under This world, can finish or undo it.`);
     }
   }
+  // The tests' hold (DEV only): a press made while an open is under way.
+  if (import.meta.env.DEV && openHoldSet()) await waitOpenHold();
+  // Another world picked while this one opened wins (conv. 195): this open
+  // draws nothing. Its store closes (its claim on the folder goes with it),
+  // the address goes back as a failed open's does, and the newer pick, queued
+  // behind this one, opens from there. A newer ask for this same world lets it be.
+  if (newerOpenOfAnotherWorld(gen, worldId)) {
+    await store.close().catch(() => {});
+    goBack();
+    return false;
+  }
   setActiveStore(store);
 
   const nextRegistry = setActiveWorld(getState().registry, worldId);
@@ -1304,29 +1304,27 @@ async function doActivateWorld(
   // never blocks the switch-back.
   if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
-  if (preserveSelection) {
-    // Boot path: URL was already correct (deep route, possibly with /element/<id>).
-    // Fire hashchange so route-aware subscribers re-resolve against the now-
-    // populated state. Non-boot already navigated synchronously above.
-    navigateAfterActivate(worldId);
-  }
+  // The open lands where the person is now (conv. 195), never back where it
+  // started; a world picked meanwhile opens next and draws its own place.
+  if (newerOpenOfAnotherWorld(gen, worldId)) return true;
+  if (preserveSelection) drawAfterBootOpen(worldId);
+  else landOpen(worldId, window.location.hash !== openedHash, null);
   return true;
 }
 
 /**
- * Honor the existing deep URL if it already names this world; otherwise land
- * on elements mode (legacy click→elements behavior).
+ * The boot's open of the world in the address, finished: an address that
+ * names the world (the deep route it opened from, or a room of it the person
+ * moved to) fires again, so route-aware subscribers re-resolve against the
+ * now-populated state. A place the person reached meanwhile that names no
+ * world, or another, is read onto this one (`placeOnWorld`): Settings pressed
+ * in the first moments stays Settings, now of this world.
  */
-function navigateAfterActivate(worldId: string): void {
-  const route = parseHash(window.location.hash);
-  if (route.worldId === worldId) {
-    // URL is already on this world (possibly deep route) — re-fire hashchange.
-    navigate(window.location.hash);
-  } else {
-    // Navigate to home, not /elements. Sidebar mode is now
-    // independent state — activation doesn't dictate sidebar mode.
-    navigate(worldHash(worldId));
-  }
+function drawAfterBootOpen(worldId: string): void {
+  const now = window.location.hash;
+  const place = placeOnWorld(now, worldId);
+  if (place === now) navigate(now);
+  else landOpen(worldId, true, null);
 }
 
 /**

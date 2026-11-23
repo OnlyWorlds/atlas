@@ -20,7 +20,8 @@ import { progressLine } from '../ui/download-progress';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { SIGNED_IN_AGAIN_LINE } from './token-revoke';
 import { mintRecordOf } from './key-takeback';
-import { navigate, homeHash } from '../core/router';
+import { homeHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { linkExistingApiWorldInRoot, PinNeededError } from '../setup/atlas-root-flow';
@@ -318,6 +319,8 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
 
     // ---- Download + register, serialized on the activation chain (R2) ----
     overlay.update('Waiting for a free slot…');
+    // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+    const start = openStart();
     const result = await enqueueActivationTask(() =>
       linkExistingApiWorldInRoot({
         where,
@@ -345,10 +348,11 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
       if (err instanceof PinRefusedError || err instanceof PinNeededError) await client.revokeWorldKey(row.id, minted.id).catch(() => {});
       throw err;
     });
+    const since = sinceOpenStart(start);
     overlay.update('Opening…');
 
     // ---- Complete the handoff (R5 — parity with LinkWorldModal) ----
-    navigate(homeHash(result.entry.id));
+    endOpen(result.entry.id, since, homeHash(result.entry.id));
     if (result.failures.length > 0) {
       // With the PIN later, a refresh first asks for the PIN (1.125.0): say so.
       const n = result.failures.length;

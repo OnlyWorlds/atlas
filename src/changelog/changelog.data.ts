@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.8',
+    date: '2026-11-23',
+    theme: 'A world that finishes opening leaves you where you went',
+    entries: [
+      {
+        id: 'open-lands-where-you-are',
+        title: 'A world that finishes opening leaves you where you went',
+        body: 'A world still opening, after a reload or a click, could replace the place you had gone to meanwhile, such as Settings, with its Home, or take you back where you started. It now finishes into the place you are at, and a world you pick while another is opening is the one that opens, without the first showing in between.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.7',
     date: '2026-11-23',
     theme: 'The list of worlds survives a browser closed by force',

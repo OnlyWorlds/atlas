@@ -23,6 +23,7 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
 import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { homeHash, importHash, navigate, parseHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
@@ -624,11 +625,13 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         const eid = exportWorldId();
         const adoptWorldId = (parsed.format === 'full-world' && eid && !idMatchWorld()) ? eid : undefined;
         const plan = buildPlan();
+        // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+        const start = openStart();
         const { entry, applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress, adoptWorldId, where });
         // The address follows the new world, as a sidebar switch keeps the room:
         // left on the old world's, the tab named it over the new world's
         // elements and a reload opened the old one again.
-        navigate(fromWorldless ? homeHash(entry.id) : importHash(entry.id));
+        endOpen(entry.id, sinceOpenStart(start), fromWorldless ? homeHash(entry.id) : importHash(entry.id));
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.

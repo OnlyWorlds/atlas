@@ -21,7 +21,8 @@ import { BaseModal } from './modal-base';
 import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
 import { getState } from '../core/state';
-import { navigate, homeHash } from '../core/router';
+import { homeHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
@@ -165,6 +166,8 @@ export class LinkWorldModal extends BaseModal {
         progressBox.hidden = false;
       };
 
+      // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+      const start = openStart();
       try {
         // On the activation chain (2026-07-13): a world click during
         // this multi-second download would otherwise close the download's
@@ -188,6 +191,7 @@ export class LinkWorldModal extends BaseModal {
             shouldStop: () => stop,
           })
         );
+        const since = sinceOpenStart(start);
         const failures = result.failures.length;
         if (result.stoppedEarly) {
           this.toasts.info(`Linked ${result.entry.name} with ${result.downloaded} of ${result.stoppedEarly.total} elements. Use Refresh from OnlyWorlds to download the rest.`);
@@ -200,7 +204,7 @@ export class LinkWorldModal extends BaseModal {
           this.toasts.success(`Linked ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
         this.hide();
-        navigate(homeHash(result.entry.id));
+        endOpen(result.entry.id, since, homeHash(result.entry.id));
       } catch (err) {
         if (err instanceof DownloadCancelledError) {
           this.toasts.info('Download cancelled. Nothing was kept.');

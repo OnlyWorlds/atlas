@@ -18,7 +18,8 @@ import { ToastManager } from './toast-manager';
 import { nowIso } from '../store/folder-store';
 import { getState, patchSlice } from '../core/state';
 import { setSidebarModePref } from '../core/ui-prefs';
-import { importHash, navigate, worldHash } from '../core/router';
+import { importHash, worldHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { markNewcomerAnswered } from '../core/newcomer';
 import { startPath } from '../core/guide-path';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
@@ -152,6 +153,8 @@ export class CreateWorldModal extends BaseModal {
       // mid-creation (the FS work isn't safely interruptable). Restored on
       // failure below; not needed on success since the modal closes.
       cancelBtn.hidden = true;
+      // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+      const start = openStart();
       try {
         const link = this.link;
         const { entry } = await createWorldInRoot(name, {
@@ -160,6 +163,7 @@ export class CreateWorldModal extends BaseModal {
           // never draws the question it was answered, not even under this dialog.
           beforeActivate: link ? markNewcomerAnswered : undefined,
         });
+        const since = sinceOpenStart(start);
         // A Start-page world opens on the guide's path at its first step (#964).
         if (link) startPath(entry.id);
         this.toasts.success(`Created ${entry.name}`);
@@ -169,7 +173,7 @@ export class CreateWorldModal extends BaseModal {
         // world's (empty) contents are the visible surface.
         patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
         setSidebarModePref('elements');
-        navigate(worldHash(entry.id));
+        endOpen(entry.id, since, worldHash(entry.id));
       } catch (err) {
         // A refusal (no home folder, no permission) reads as itself; the rest
         // is worded.

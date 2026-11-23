@@ -225,7 +225,7 @@ The guided tour (DESIGN_TOUR).
 - `src/import/`: the Data room engine: parse, normalize, validate, reconcile, `src/import/apply-import-plan.ts`, `src/import/export-world.ts` (the keel envelope).
 - `src/changelog/changelog.data.ts`: the ONE edit surface for the public changelog; `src/changelog/render-changelog.ts` renders it.
 - `src/styles/atlas.css`: one stylesheet. Sentence case throughout.
-- `src/app.ts` (the app: boot-time `reconcileBrowserHome`, then activation), `src/core/activation-chain.ts` (ONE serializer for every flow that opens, closes or sets the active store), `src/main.ts` (boot).
+- `src/app.ts` (the app: boot-time `reconcileBrowserHome`, then activation), `src/core/activation-chain.ts` (ONE serializer for every flow that opens, closes or sets the active store; it keeps the world each activation names, so a later pick of another world wins), `src/core/open-place.ts` (where a finished open draws: the person's place now, read onto the opened world, conv. 195), `src/main.ts` (boot).
 
 ## tests
 

@@ -16,7 +16,8 @@ import { progressLine } from './download-progress';
 import { lockWhereChoice, readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { showProblem } from './problem-fixes';
 import { getState, patchSlice } from '../core/state';
-import { navigate, homeHash } from '../core/router';
+import { homeHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { problemFor } from '../core/problems';
 import { takePendingJoin } from '../core/join-capture';
@@ -436,6 +437,8 @@ export class JoinWorldModal extends BaseModal {
           : pr.total === 0 && pr.phase !== 'open' ? 'World is empty; finishing up' : progressLine(pr);
         progressBox.hidden = false;
       };
+      // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+      const start = openStart();
       try {
         // One download of this world at a time in every tab, and the
         // registry as stored is read again just before, so a world another
@@ -447,6 +450,8 @@ export class JoinWorldModal extends BaseModal {
             ? openPlayerWorld({ player: joinedPlayer, where, onProgress: renderProgress, shouldStop: () => stop })
             : openJoinedWorld({ seat: seat!, where, onProgress: renderProgress, shouldStop: () => stop });
         }));
+        // Read before this flow opens anything itself (its own open below counts as a pick).
+        const since = sinceOpenStart(start);
         this.settled = true;
         this.hide();
         if (outcome.kind === 'downloaded') {
@@ -456,7 +461,7 @@ export class JoinWorldModal extends BaseModal {
           if (r.stoppedEarly) this.toasts.info(`Opened ${opened} with ${r.downloaded} of ${r.stoppedEarly.total} elements. Use Refresh from OnlyWorlds to download the rest.`);
           else if (r.failures.length > 0) this.toasts.error(`Opened ${opened}. ${r.failures.length} element${r.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${r.failures.length === 1 ? 'it' : 'them'}.`);
           else this.toasts.success(`Opened ${opened} · ${r.downloaded} element${r.downloaded === 1 ? '' : 's'} downloaded`);
-          navigate(homeHash(r.entry.id));
+          endOpen(r.entry.id, since, homeHash(r.entry.id));
           return;
         }
         const id = outcome.entry.id;
@@ -482,7 +487,7 @@ export class JoinWorldModal extends BaseModal {
             if (wasActive) attachSyncEngine(outcome.entry, store);
           }
         }
-        navigate(homeHash(id));
+        endOpen(id, since, homeHash(id));
         this.toasts.info(outcome.kind !== 'reconnected' && joinedPlayer ? playerAlreadyHereLine(outcome) : alreadyHereLine(outcome), 12_000);
       } catch (err) {
         busy(false);

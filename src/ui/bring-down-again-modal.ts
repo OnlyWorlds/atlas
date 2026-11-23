@@ -12,7 +12,8 @@ import type { WorldRegistryEntry } from '../core/types';
 import { problemFor } from '../core/problems';
 import { sendsPin } from '../sync/ow-v2-client-adapter';
 import { bringDownAgain } from '../setup/bring-down-again';
-import { homeHash, navigate } from '../core/router';
+import { homeHash } from '../core/router';
+import { endOpen, openStart, sinceOpenStart } from '../core/open-place';
 import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
 
 export class BringDownAgainModal extends BaseModal {
@@ -48,12 +49,15 @@ export class BringDownAgainModal extends BaseModal {
       this.dismissLocked = true;
       progress.hidden = false;
       progress.textContent = 'Asking OnlyWorlds for the world…';
+      // Where the person is as it starts: a place they go to meanwhile stands (conv. 195).
+      const start = openStart();
       try {
         const out = await bringDownAgain(w.id, {
           onProgress: (p) => {
             progress.textContent = p.phase === 'list' ? 'Asking OnlyWorlds for the world…' : progressLine(p);
           },
         });
+        const since = sinceOpenStart(start);
         this.dismissLocked = false;
         this.hide();
         const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${out.failures === 1 ? 'it' : 'them'}.` : '';
@@ -64,7 +68,7 @@ export class BringDownAgainModal extends BaseModal {
         if (missing) this.toasts.error(`"${w.name}" is back in this browser.${missing}${waits}`);
         else if (waits) this.toasts.info(`"${w.name}" is back in this browser.${waits}`, 10_000);
         else this.toasts.success(`"${w.name}" is back in this browser.`);
-        navigate(homeHash(w.id));
+        endOpen(w.id, since, homeHash(w.id));
       } catch (err) {
         console.warn('[bring-down-again] failed:', err);
         this.dismissLocked = false;
