@@ -121,6 +121,19 @@ describe('buildAutolinkIndex', () => {
     expect(found(idx, 'The Iron Gate.')).toEqual(['Iron Gate@4>c2']);
   });
 
+  it('one index for each elements array: the same array gives the same index, a new array a new one', () => {
+    // An elements array is never changed in place (a change is a new array), so the
+    // editor's plugin, Named in the text and bulk link share one build of it.
+    const world = [mk({ id: 'c1', type: 'character', name: 'Drizzle' })];
+    const first = buildAutolinkIndex(world);
+    expect(buildAutolinkIndex(world)).toBe(first);
+    const next = [...world, mk({ id: 'c2', type: 'character', name: 'Kira' })];
+    const second = buildAutolinkIndex(next);
+    expect(second).not.toBe(first);
+    expect(found(second, 'Kira')).toEqual(['Kira@0>c2']);
+    expect(buildAutolinkIndex(world)).toBe(first);
+  });
+
   it('ids holds an element only for a name the finder keeps (3 to 200 code points)', () => {
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'Al' }),

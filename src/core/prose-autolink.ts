@@ -92,6 +92,9 @@ export function candidateIds(index: AutolinkIndex): ReadonlySet<string> {
   return index.ids;
 }
 
+/** The index made for each elements array (see {@link buildAutolinkIndex}). */
+const indexes = new WeakMap<readonly Element[], AutolinkIndex>();
+
 /**
  * Build the autolink index from a snapshot of the world's elements: the SDK's
  * `nameFinder` over every element that is not a narrative, pin, marker or map
@@ -113,8 +116,23 @@ export function candidateIds(index: AutolinkIndex): ReadonlySet<string> {
  * "echo" fold to one name). That resolves the correct way by itself: a name
  * two elements share is never answered, so an ambiguous pair links to
  * neither rather than guessing.
+ *
+ * ONE INDEX FOR EACH ELEMENTS ARRAY: the same array gives the same index
+ * object, so the editor's plugin, Named in the text and bulk link, each handed
+ * the same lore array on a save, share one build (on a big world the build is
+ * the costly part). It rests on the rule `core/strand.ts` states: an elements
+ * array, and every element in it, is never changed in place; a change is a
+ * new array (`listElements` hands out fresh copies), so a new index.
  */
 export function buildAutolinkIndex(elements: readonly Element[]): AutolinkIndex {
+  const hit = indexes.get(elements);
+  if (hit) return hit;
+  const index = makeAutolinkIndex(elements);
+  indexes.set(elements, index);
+  return index;
+}
+
+function makeAutolinkIndex(elements: readonly Element[]): AutolinkIndex {
   const scanned: Element[] = [];
   const namesOf = new Map<Element, string[]>();
   const ids = new Set<string>();
