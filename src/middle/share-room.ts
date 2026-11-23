@@ -1931,9 +1931,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     else what.append(`Collection${count}: `);
     const items = part.fields.map(humanizeFieldName);
     if (part.picture) items.push('its picture');
-    what.append(andList(items));
+    // Every part line ends with a full stop, the collection's second sentence too.
+    what.append(andList(items), '.');
     // A member always sends its picture: the remedy is leaving the collection.
-    if (part.kind === 'collection') what.append('. Remove it from the collection to stop sending it.');
+    if (part.kind === 'collection') what.append(' Remove it from the collection to stop sending it.');
     li.appendChild(what);
 
     const btn = document.createElement('button');
