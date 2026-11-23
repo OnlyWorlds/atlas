@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'unexpected-refusal-next-step',
         title: 'A refusal Atlas did not expect says what to do next, and the Data room says one thing one way',
-        body: 'When OnlyWorlds refuses a step that sends no PIN, such as an invite, the demo world or a shared world\'s download, for a reason Atlas does not know, the line now asks you to send the details as feedback if it keeps happening, and the details come with it. In the Data room, a reply Atlas cannot read is always met with Paste only the JSON, and the review\'s line for a link by id to an element of another type names the field as its neighbours do and reads as one line. A reply of very many code blocks no longer holds up typing in the box.',
+        body: 'When OnlyWorlds refuses a step that sends no PIN, such as opening an invite, the demo world or a shared world\'s download, for a reason Atlas does not know, the line now says what to do if it keeps happening: tell us, with the details where Atlas offers them. In the Data room, a reply with code block marks Atlas cannot read past is met with the same words as a reply of several code blocks, Paste only the JSON, and the review\'s line for a link by id to an element of another type names the field as its neighbours do and reads as one line. A reply of very many code blocks no longer holds up typing in the box.',
         tags: ['sync', 'import', 'fix'],
       },
     ],

@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import ts from 'typescript';
 import { OwApiError } from '@onlyworlds/sdk';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
@@ -80,27 +81,21 @@ describe('a seat\'s lost credential is its seat secret', () => {
 const SRC = join(__dirname, '..', '..', 'src');
 
 /**
- * Every string literal of a source, comments left out, with its offset: one pass over the whole text, so
- * a template that runs over several lines is one literal, and a comment's quote opens none. A quoted
- * string ends at its line's end (JavaScript allows no other), so a quote inside a regex literal costs at
- * most the rest of its line.
+ * Every string literal of a source, with its offset, read by TypeScript's own parser: a template over
+ * several lines, one inside another's `${}`, and a literal beside a regex or a console call are each
+ * read as the language reads them, and a comment holds none. A template's parts are its own literals.
  */
 function literalsOf(src: string): Array<{ at: number; lit: string }> {
+  const file = ts.createSourceFile('x.ts', src, ts.ScriptTarget.Latest, true);
   const out: Array<{ at: number; lit: string }> = [];
-  let i = 0;
-  while (i < src.length) {
-    const c = src[i];
-    if (c === '/' && src[i + 1] === '/') { const e = src.indexOf('\n', i); i = e < 0 ? src.length : e; continue; }
-    if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? src.length : e + 2; continue; }
-    if (c === "'" || c === '"' || c === '`') {
-      let j = i + 1;
-      while (j < src.length && src[j] !== c && (c === '`' || src[j] !== '\n')) j += src[j] === '\\' ? 2 : 1;
-      out.push({ at: i, lit: src.slice(i, j + 1) });
-      i = j + 1;
-      continue;
+  const visit = (node: ts.Node): void => {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node)
+      || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+      out.push({ at: node.getStart(file), lit: node.getText(file) });
     }
-    i++;
-  }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
   return out;
 }
 
@@ -138,22 +133,29 @@ describe('the census of the words', () => {
     expect(OLD_WORDS.test("'this browser no longer has its seat secret, so it cannot sync.'")).toBe(false);
   });
 
-  it('the scan reads a template over several lines, a toast beside a console line, and no comment', () => {
+  it('the scan reads what the language reads: templates over lines and inside templates, beside a regex, no comment', () => {
     const plant = [
       'const a = `OnlyWorlds refused too many',
       '  different PINs for ${key}.`;',
       "console.warn('x'); toasts.error('OnlyWorlds takes PINs again soon.');",
       "// 'a comment that says different PINs'",
       "/* `nor this one, PINs` */ const b = 'url // not a comment';",
-      "const r = /'/;",
-      "const c = 'after a regex';",
+      "if (/^https:\\/\\//.test(u)) throw new PlainError('An address with PINs in it.');",
+      'const n = `outer ${n === 1 ? `one` : `many`} then the PINs part`;',
+      "const r = /'/; const c = 'after a regex';",
+      'const t = /`/;',
+      "const d = 'after a backtick regex, PINs';",
     ].join('\n');
     const lits = literalsOf(plant).map(l => l.lit);
     expect(lits.filter(l => OLD_WORDS.test(l))).toEqual([
-      '`OnlyWorlds refused too many\n  different PINs for ${key}.`',
+      '`OnlyWorlds refused too many\n  different PINs for ${',
       "'OnlyWorlds takes PINs again soon.'",
+      "'An address with PINs in it.'",
+      '} then the PINs part`',
+      "'after a backtick regex, PINs'",
     ]);
     expect(lits).toContain("'url // not a comment'");
     expect(lits).toContain("'after a regex'");
+    expect(lits).toContain('`one`');
   });
 });
