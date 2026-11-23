@@ -205,7 +205,7 @@ describe('a fuzz of hand ids', () => {
   };
   const ALPHABET = [
     'a', 'b', 'A', '1', '-', '_', '/', '@', '?', '=', '&', '#', '%', '(', '<', '`',
-    ' ', ')', '.', ',', ';', ':', '!', '\'', '"', ']', '>',
+    ' ', '\t', '\n', '\u00a0', ')', '.', ',', ';', ':', '!', '\'', '"', ']', '>',
   ];
   const TYPES = ['character', 'location', 'Character', 'thing'];
   const typeWords: readonly string[] = ALL_ELEMENT_TYPES;

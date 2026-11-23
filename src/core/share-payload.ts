@@ -619,7 +619,7 @@ function leftOutBy(page: Element, elements: Element[], charts: ChartConfig[], ou
   if (!elements.some(out)) return [];
   const byId = new Map(elements.map(e => [e.id, e]));
   const whole = buildPayloadFrom(page, elements, charts);
-  const handed = buildPayloadFrom(page, elements.filter(e => !out(e)), charts);
+  const handed = buildPayloadFrom(page, elements.filter(e => !out(e)), charts, elements);
   const names = Object.entries(whole.elements)
     .filter(([id]) => !holdsKey(handed.elements, id) && out(byId.get(id)))
     .map(([, e]) => e.name);
