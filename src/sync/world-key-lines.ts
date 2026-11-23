@@ -49,7 +49,7 @@ export function seatRefusalLine(reason: KeyRefusal | null | undefined, opts: { p
   const lead = opts.paused ? 'Sync paused: ' : '';
   if (reason === 'key_revoked') return `${lead}${opts.paused ? 'this' : 'This'} seat's key was renewed or revoked on onlyworlds.com.`;
   if (reason === 'pin') return `${lead}OnlyWorlds did not accept this seat secret.`;
-  return `${lead}OnlyWorlds no longer accepts this world's seat. The owner may have removed it.`;
+  return `${lead}OnlyWorlds no longer takes this world's seat. The owner may have removed it.`;
 }
 
 /** A seat world's pill title: its refusal, short, as `keyRefusalPill` is (no closing stop). */
@@ -76,7 +76,7 @@ export function clearedKeyRefusalLine(err: unknown, kind: HeldKeyKind): string |
   if (reason !== 'key_revoked' && reason !== 'key_unknown') return null;
   const revoked = reason === 'key_revoked';
   const what = kind === 'seat'
-    ? (revoked ? 'This seat\'s key was renewed or revoked on onlyworlds.com' : 'OnlyWorlds no longer accepts this world\'s seat')
+    ? (revoked ? 'This seat\'s key was renewed or revoked on onlyworlds.com' : 'OnlyWorlds no longer takes this world\'s seat')
     : (revoked ? 'This world\'s key was revoked on onlyworlds.com' : 'OnlyWorlds no longer knows this world\'s key');
   const why = revoked ? '' : kind === 'seat' ? ' The owner may have removed it.' : ' The world was deleted there, or you were removed from it.';
   const way = kind === 'account'

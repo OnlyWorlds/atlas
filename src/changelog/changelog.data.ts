@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.15',
+    date: '2026-11-23',
+    theme: 'Three sentences said one way',
+    entries: [
+      {
+        id: 'nameless-world-no-quotes-part-lines-one-verb',
+        title: 'A world with no name is not put in quotes, the Publish list ends each line the same way, and a refused seat has one verb',
+        body: 'When another tab took the world you were on and Atlas had no name for it, the line read "The world you were on" in quotes, as if that were its name. It is now said without them. In the Publish section\'s list of what a page shares, every line now ends with a full stop, where only a collection\'s did. A seat OnlyWorlds refuses was said with "no longer accepts" in two places and "no longer takes" in a third: all three now say "no longer takes".',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.14',
     date: '2026-11-23',
     theme: 'A published page carries only what it draws',

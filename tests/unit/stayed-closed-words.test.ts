@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { stayedClosedHere, stayedClosedWhileBusy, checkingOtherTabLine, CHECKING_OTHER_TAB_AFTER_MS } from '../../src/sidebar/worlds-sidebar';
+import { stayedClosedHere, stayedClosedWhileBusy, openElsewhereNow, checkingOtherTabLine, CHECKING_OTHER_TAB_AFTER_MS } from '../../src/sidebar/worlds-sidebar';
 
 describe('the world lock says tab, and names what to press', () => {
   it('the held line: close that tab and open again, or open again and take it over', () => {
@@ -15,6 +15,14 @@ describe('the world lock says tab, and names what to press', () => {
 
   it('the moving line keeps its own second sentence, with tab', () => {
     expect(stayedClosedWhileBusy('Saltmere')).toBe('"Saltmere" stayed closed here. Another Atlas tab may still have it open, or be moving it. Open it again here once that tab is done.');
+  });
+
+  it('a world another tab took is named in quotes; one with no name is said plainly, never a phrase in quotes', () => {
+    expect(openElsewhereNow('Saltmere')).toBe('"Saltmere" was closed here: another Atlas tab may have it open now. Open it again to take it back.');
+    // 5 and null: a list entry is read as stored, so a damaged one can hold a name that is no text.
+    for (const none of [undefined, '', '   ', 5 as unknown as string, null as unknown as string]) {
+      expect(openElsewhereNow(none)).toBe('The world you were on was closed here: another Atlas tab may have it open now. Open it again to take it back.');
+    }
   });
 
   it('neither says page, as the take-over question does not', () => {

@@ -287,7 +287,7 @@ describe('the Publish section lists what the page shares', () => {
   it("a Full pin sending more than the description: Edit map lands on that pin's Full toggle", async () => {
     await setup([{ id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_ASH], fullPinIds: [PIN_ASH] }]);
     openPublish();
-    expect(rowOf(ASH)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Full pin on Realm: Description, Mood and its picture');
+    expect(rowOf(ASH)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Full pin on Realm: Description, Mood and its picture.');
     press(ASH, 'map')!.click();
     await vi.waitFor(() =>
       expect(document.activeElement).toBe(host.querySelector(`[data-block-id="mb"] [data-pin-id="${PIN_ASH}"] .atlas-share-pin-full-toggle`)));
@@ -296,7 +296,7 @@ describe('the Publish section lists what the page shares', () => {
   it('a Full pin sending only the description: Edit map lands on its include checkbox', async () => {
     await setup([{ id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_BRAM], fullPinIds: [PIN_BRAM] }]);
     openPublish();
-    expect(rowOf(BRAM)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Full pin on Realm: Description');
+    expect(rowOf(BRAM)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Full pin on Realm: Description.');
     press(BRAM, 'map')!.click();
     await vi.waitFor(() =>
       expect(document.activeElement).toBe(host.querySelector(`[data-block-id="mb"] [data-pin-id="${PIN_BRAM}"] input[type="checkbox"]`)));
@@ -310,7 +310,7 @@ describe('the Publish section lists what the page shares', () => {
     openPublish();
     const parts = [...rowOf(ASH)!.querySelectorAll('[data-part-kind="card"]')];
     expect(parts.map(p => p.querySelector('.atlas-share-shares-what')!.textContent)).toEqual([
-      'Card 1 of 2: Description and its picture', 'Card 2 of 2: Mood',
+      'Card 1 of 2: Description and its picture.', 'Card 2 of 2: Mood.',
     ]);
     const labels = parts.map(p => p.querySelector('button')!.getAttribute('aria-label'));
     expect(new Set(labels).size).toBe(2);
