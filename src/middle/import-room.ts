@@ -26,7 +26,7 @@ import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
-import { jsonFaultAdvice, jsonTextOf, parsePayload } from '../import/parse';
+import { SEVERAL_BLOCKS_LINE, holdsSeveralBlocks, jsonFaultAdvice, jsonTextOf, parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
@@ -161,6 +161,15 @@ export function jsonErrorWhere(text: string, err: unknown): string {
   const line = before.split('\n').length;
   const column = pos - before.lastIndexOf('\n');
   return ` near line ${line}, column ${column}`;
+}
+
+/**
+ * The line for text that is not valid JSON, after `lead` ("Not valid JSON"): where, then what to do. A
+ * reply of several code blocks with no one block of JSON says so alone, in one line.
+ */
+export function jsonFaultLine(lead: string, text: string, err: unknown): string {
+  if (holdsSeveralBlocks(text)) return SEVERAL_BLOCKS_LINE;
+  return `${lead}${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`;
 }
 
 /** The clipboard refused a write (no focus, or the permission is off). */
@@ -346,7 +355,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     try {
       raw = JSON.parse(text);
     } catch (err) {
-      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
+      showError(jsonFaultLine(`${sourceLabel} isn't valid JSON`, text, err));
       return;
     }
     const result = parsePayload(raw);
@@ -414,7 +423,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       raw = JSON.parse(text);
     } catch (err) {
       pasteEl.classList.add('is-invalid');
-      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
+      setLive('invalid', jsonFaultLine('Not valid JSON', text, err));
       return;
     }
     const result = parsePayload(raw);

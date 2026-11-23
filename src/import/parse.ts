@@ -23,31 +23,95 @@ import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { knownFieldsFor } from '../editor/field-schema';
 import type { ParseResult, RawRecord } from './types';
 
+/** A fenced block of a pasted reply: its inside runs from `from` to `to`; `to` is -1 for one never closed. */
+interface FencedBlock { lineEnd: number; from: number; to: number }
+
+/**
+ * The fenced blocks of a text, in order: a ``` or ~~~ mark opens one, the rest of its line is the block's
+ * label, and the next mark of the same kind closes it (a block never closed runs to the end, and is the
+ * last). Each kind's next mark is searched for only once the reading has passed the last one found, so
+ * every stretch of the text is searched once per kind: linear in the text's length.
+ */
+function fencedBlocks(text: string): FencedBlock[] {
+  const blocks: FencedBlock[] = [];
+  const next = { '```': -2, '~~~': -2 };
+  const find = (mark: '```' | '~~~', from: number): number => {
+    if (next[mark] !== -1 && next[mark] < from) next[mark] = text.indexOf(mark, from);
+    return next[mark];
+  };
+  let at = 0;
+  for (;;) {
+    const tick = find('```', at);
+    const tilde = find('~~~', at);
+    if (tick < 0 && tilde < 0) return blocks;
+    const mark = tilde < 0 || (tick >= 0 && tick < tilde) ? '```' : '~~~';
+    const open = mark === '```' ? tick : tilde;
+    const lineEnd = text.indexOf('\n', open + 3);
+    if (lineEnd < 0) { blocks.push({ lineEnd: text.length, from: text.length, to: -1 }); return blocks; }
+    const close = find(mark, lineEnd + 1);
+    if (close < 0) { blocks.push({ lineEnd, from: lineEnd + 1, to: -1 }); return blocks; }
+    blocks.push({ lineEnd, from: lineEnd + 1, to: close });
+    at = close + 3;
+  }
+}
+
+/** A closed block's inside parses as JSON. A text that starts with no JSON value is not tried. */
+function parsesAsJson(text: string, b: FencedBlock): boolean {
+  if (b.to < 0) return false;
+  const inside = text.slice(b.from, b.to);
+  if (!/^\s*[[{"\-0-9tfn]/.test(inside)) return false;
+  try { JSON.parse(inside); return true; } catch { return false; }
+}
+
+/**
+ * The one block of a text with more than one that parses as JSON, or null when none or several do. It
+ * stops at the second one that parses.
+ */
+function theOneParsing(text: string, blocks: FencedBlock[]): FencedBlock | null {
+  let found: FencedBlock | null = null;
+  for (const b of blocks) {
+    if (!parsesAsJson(text, b)) continue;
+    if (found) return null;
+    found = b;
+  }
+  return found;
+}
+
 /**
  * The JSON inside a reply pasted with its code fence. A chat's "copy message" hands over the fence
  * lines, and some models fence their JSON whatever the instruction says; the box then met "Not valid
- * JSON" with nothing naming the fence. Text that already starts as JSON is returned as it is. Otherwise,
- * when the text holds exactly one fenced block, the block's inside is returned, with as many line ends
- * before it as the pasted text had, so a fault's line number is the pasted text's own. Two blocks, or one
- * never closed, are no guess: the text comes back whole. Index searches only: linear in the text's length.
+ * JSON" with nothing naming the fence. Text that already starts as JSON is returned as it is. A ~~~ fence
+ * is read as a ``` fence is. When the text holds exactly one fenced block, the block's inside is
+ * returned; with more than one, the one block whose inside parses as JSON. Either way it comes with as
+ * many line ends before it as the pasted text had, so a fault's line number is the pasted text's own. One
+ * block never closed, or several where none or more than one parse, are no guess: the text comes back
+ * whole (`holdsSeveralBlocks` tells the second). Linear in the text's length.
  */
 export function jsonTextOf(text: string): string {
   const lead = text.trimStart();
   if (lead.startsWith('{') || lead.startsWith('[')) return text;
-  const open = text.indexOf('```');
-  if (open < 0) return text;
-  const lineEnd = text.indexOf('\n', open + 3);
-  if (lineEnd < 0) return text;
-  const close = text.indexOf('```', lineEnd + 1);
-  if (close < 0 || text.indexOf('```', close + 3) >= 0) return text;
+  const blocks = fencedBlocks(text);
+  if (blocks.length === 0) return text;
+  const block = blocks.length === 1 ? blocks[0] : theOneParsing(text, blocks);
+  if (!block || block.to < 0) return text;
   let lines = 0;
-  for (let i = text.indexOf('\n'); i >= 0 && i <= lineEnd; i = text.indexOf('\n', i + 1)) lines++;
-  return '\n'.repeat(lines) + text.slice(lineEnd + 1, close);
+  for (let i = text.indexOf('\n'); i >= 0 && i <= block.lineEnd; i = text.indexOf('\n', i + 1)) lines++;
+  return '\n'.repeat(lines) + text.slice(block.from, block.to);
+}
+
+/** The review's line for a reply of several code blocks where none or more than one is JSON. */
+export const SEVERAL_BLOCKS_LINE = 'The reply holds more than one code block, and Atlas cannot tell which one is the world. Paste only the JSON.';
+
+/** The text holds more than one fenced block (a text `jsonTextOf` gave back whole holds no one to read). */
+export function holdsSeveralBlocks(text: string): boolean {
+  const lead = text.trimStart();
+  if (lead.startsWith('{') || lead.startsWith('[')) return false;
+  return fencedBlocks(text).length > 1;
 }
 
 /**
  * What to say after "isn't valid JSON": text that still holds code block marks was a reply Atlas could
- * not read past (two blocks, one left open, a `~~~` fence), and the advice about a comma would be wrong.
+ * not read past (a block left open), and the advice about a comma would be wrong.
  */
 export function jsonFaultAdvice(text: string): string {
   return text.includes('```') || text.includes('~~~')
