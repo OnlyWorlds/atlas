@@ -12,6 +12,7 @@
 
 import { REGISTRY_STORAGE_KEY } from '../core/constants';
 import { readsOnlyByShape } from '../core/key-scope';
+import { registrySeq, writeRegistryCopy } from './registry-copy';
 import { defaultRegistry } from '../core/types';
 import type { TypeStripNames, WorldRegistryEntry, WorldsRegistry } from '../core/types';
 
@@ -169,18 +170,30 @@ function readRegistry(): WorldsRegistry {
 export function saveRegistry(reg: WorldsRegistry): boolean {
   try {
     let out = reg;
+    const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
+    // Stored but unreadable: write this tab's copy whole, as before; its number counts 0.
+    let readable = true;
+    let storedSeq = 0;
+    try {
+      const parsed = raw ? JSON.parse(raw) as { worlds?: unknown } : null;
+      readable = !raw || Array.isArray(parsed?.worlds);
+      if (readable) storedSeq = registrySeq(parsed);
+    } catch { readable = false; }
     if (tabBase) {
-      const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
       // Nothing stored = nothing another tab kept: entries this tab did not
       // change are dropped with it (a save after "clear site data" must not
       // bring the forgotten worlds back).
-      // Stored but unreadable: write this tab's copy whole, as before.
-      let readable = true;
-      try { readable = !raw || Array.isArray((JSON.parse(raw) as { worlds?: unknown })?.worlds); } catch { readable = false; }
       if (readable) out = mergeRegistry(tabBase, reg, raw ? readRegistry() : defaultRegistry());
     }
-    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(out));
+    // The number rides inside the one JSON value (registry/registry-copy.ts):
+    // above the stored one, and at least the clock, so a save made after a
+    // boot outranks any copy from an earlier session. Set on a fresh object.
+    const numbered: WorldsRegistry = { ...out, saved_seq: Math.max(storedSeq + 1, Date.now()) };
+    const json = JSON.stringify(numbered);
+    localStorage.setItem(REGISTRY_STORAGE_KEY, json);
     tabBase = JSON.parse(JSON.stringify(reg)) as WorldsRegistry;
+    // Only once the save reached localStorage: the copy holds exactly what was set.
+    writeRegistryCopy(json, numbered.saved_seq as number);
     return true;
   } catch (err) {
     console.error('[registry] save failed:', err);
