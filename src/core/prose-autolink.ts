@@ -228,6 +228,9 @@ function escapeRegexLiteral(text: string): string {
 // Markdown transforms
 // ---------------------------------------------------------------------------
 
+/** A label the markdown link form cannot carry and give back unescaped. */
+const MARKDOWN_UNSAFE_LABEL = /[[\]\\]/;
+
 export interface MarkdownAutolinkResult {
   story: string;
   linked: AutolinkCandidate[];
@@ -257,13 +260,19 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
     if (id !== null) already.add(id);
   }
 
-  const replacements: Array<{ from: number; to: number; cand: AutolinkCandidate }> = [];
+  const replacements: Array<{ from: number; to: number; cand: AutolinkCandidate; label: string }> = [];
   const proposed = new Set<string>();
   for (const { start, end, candidate: cand } of index.find(story)) {
     if (only && cand.id !== only) continue;
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
+    const label = promotionLabel(story.slice(start, end), cand);
+    // A label holding `[`, `]` or a backslash is written into a link that
+    // `unlinkMarkdown` cannot read back (and a trailing backslash escapes the
+    // closing bracket), so this markdown path passes such a mention over and
+    // leaves its text as it was. The open editor links it through rich text.
+    if (MARKDOWN_UNSAFE_LABEL.test(label)) continue;
     proposed.add(cand.id);
-    replacements.push({ from: start, to: end, cand });
+    replacements.push({ from: start, to: end, cand, label });
   }
   if (replacements.length === 0) return { story, linked: [] };
 
@@ -271,7 +280,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
   for (let i = replacements.length - 1; i >= 0; i--) {
     const r = replacements[i];
     out = out.slice(0, r.from)
-      + `[${promotionLabel(story.slice(r.from, r.to), r.cand)}](${owLinkHref(r.cand.type, r.cand.id)})`
+      + `[${r.label}](${owLinkHref(r.cand.type, r.cand.id)})`
       + out.slice(r.to);
   }
   return { story: out, linked: replacements.map(r => r.cand) };
