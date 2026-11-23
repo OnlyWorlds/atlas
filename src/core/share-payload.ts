@@ -24,6 +24,7 @@
 
 import { FIELD_SCHEMA } from '@onlyworlds/sdk';
 import type { Element } from './types';
+import { SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SERVER_STAMP_FIELDS } from './constants';
 import {
   blocksOf, pageIntentOf, parsePageTheme,
   type PageBlock, type PageIntent, type ElementCardBlock, type CircleBlock,
@@ -131,11 +132,16 @@ export interface PagePayload {
 /**
  * Field names that never belong on a card or in a payload entry:
  * identity/meta, sync stamps, the image (rendered as the card image, not a
- * field row), and the whole atlas-local extension family.
+ * field row), the whole atlas-local extension family, and what the server
+ * says about an element (1.125.14: the world it is in, when and by whom and
+ * through which door it was written, its marks). A Full pin sends every
+ * filled field this does not skip, so a server field left off this list is
+ * published by every Full pin.
  */
-const CARD_SKIP_FIELDS = new Set([
+const CARD_SKIP_FIELDS = new Set<string>([
   'id', 'type', 'name', 'local_updated_at', 'server_updated_at',
   'image_url',
+  ...SERVER_STAMP_FIELDS, ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS,
 ]);
 
 export function isCardSkipField(name: string): boolean {
@@ -588,8 +594,8 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   const blocks = blocksOf(page);
 
   // Included set = card-bound elements + collection members that exist.
-  // Blocks pointing at missing elements stay in the block list (the viewer
-  // renders honestly) but contribute nothing to `elements`.
+  // A card pointing at a missing element contributes nothing to `elements`
+  // and leaves the block list too (1.125.14, below).
   const cards = blocks.filter((b): b is ElementCardBlock => b.kind === 'element-card');
   const collections = blocks.filter((b): b is CollectionBlock => b.kind === 'collection');
   const includedIds = new Set(cards.map(c => c.elementId).filter(id => byId.has(id)));
@@ -683,6 +689,16 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
     }
     if (b.kind === 'map') return freezeMapBlock(b, byId, includedIds);
     if (b.kind === 'chart') return freezeChartBlock(b.chartId, b.id, charts, elements, includedIds);
+    if (b.kind === 'element-card') {
+      // A card leaves with its element (1.125.14): one that is hidden,
+      // proposed or no longer in the world drew nothing, and its block named
+      // the element's id and its ticked fields on a public wire. A card that
+      // stays names only the fields its entry holds (a full card's ticks that
+      // are filled and sendable; a compact card draws none).
+      const entry = entries[b.elementId];
+      if (!entry) return null;
+      return { ...b, fields: b.variant === 'full' ? b.fields.filter(f => f in entry.fields) : [] };
+    }
     return { ...b };
   }).filter((b): b is PayloadBlock => b !== null);
 

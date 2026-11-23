@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.14',
+    date: '2026-11-23',
+    theme: 'A published page carries only what it draws',
+    entries: [
+      {
+        id: 'full-pin-sends-no-server-record',
+        title: 'A map pin set to Full no longer publishes when an element was made or who wrote it',
+        body: 'A pin set to Full sends every filled field of its element. That included what OnlyWorlds records beside an element: when it was made, a change counter and, in a world that syncs, the ids of the members who made it and last changed it and the door the last change came through. None of these is sent now, by a Full pin or by a card, and a card\'s field list no longer offers them. A page already published keeps what it was published with until you press Republish: if one of your published pages has a pin set to Full, republish it.',
+        tags: ['pages', 'privacy', 'fix'],
+      },
+      {
+        id: 'left-out-card-leaves-page-data',
+        title: 'A card of a hidden, proposed or missing element no longer leaves its id in a published page\'s data',
+        body: 'A published page already drew nothing for a card whose element is hidden, proposed and not yet reviewed, or no longer in the world. The page\'s data, which anyone with its address can read, still held that card: the element\'s id and the names of the fields ticked on it. The card now leaves the published data with its element, and a card that stays names only the fields it sends. A page already published changes when you republish it.',
+        tags: ['pages', 'privacy', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.13',
     date: '2026-11-23',
     theme: 'Before Publish, a page says what it shares',

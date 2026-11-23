@@ -122,11 +122,11 @@ describe('buildPagePayload', () => {
     expect(Object.keys(p.elements[IREENA].fields).sort()).toEqual(['birthplace', 'description']);
   });
 
-  it('a card bound to a missing element stays in blocks but adds no entry', () => {
+  it('a card bound to a missing element leaves the payload: no block, no entry', () => {
     const p = buildPagePayload(makePage([
       { id: 'b1', kind: 'element-card', elementId: GONE, variant: 'full', fields: ['description'] },
     ]), world());
-    expect(p.blocks).toHaveLength(1);
+    expect(p.blocks).toEqual([]);
     expect(p.elements).toEqual({});
   });
 
