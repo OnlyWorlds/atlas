@@ -10,7 +10,8 @@
  * Suppression rules (stacked to keep the feature un-annoying):
  *
  *   - Case compared by simple case folding; the writer's text is the label
- *   - Whole names only, by Unicode's word edges in any script
+ *   - Whole names only: no letter, combining mark, decimal digit or
+ *     underscore stands on either side of the name, in any script
  *   - Min 3 code points per name/alias (kills "Al", "Bo"); one over 200 is
  *     not looked for
  *   - First mention only per doc — once an element is chip-linked anywhere

@@ -144,3 +144,22 @@ describe('a name longer than 200 code points is not looked for', () => {
     expectEveryPath([el(1, 'Kira', { atlas_aliases: [long(201)] })], `${long(201)} and Kira.`, [`Kira@${201 + 5}`]);
   });
 });
+
+describe('the losses a whole word brings, named', () => {
+  it('a name starting with a mark is not found where a letter comes just before it (.NET in ASP.NET)', () => {
+    expectEveryPath([el(1, '.NET')], 'We used ASP.NET here.', []);
+  });
+  it('a name ending in a mark is not found where a digit follows it (Co. in Co.5)', () => {
+    expectEveryPath([el(1, 'Co.')], 'Pay Co.5 now', []);
+  });
+  it('a name is not found inside a longer word that goes on with a letter (Zoë in Zoëlle)', () => {
+    expectEveryPath([el(1, 'Zoë')], 'Then Zoëlle rode.', []);
+  });
+});
+
+describe('a name ending in a full stop is found before punctuation', () => {
+  it('Co. before a comma and before a closing bracket', () => {
+    expectEveryPath([el(1, 'Co.')], 'Acme Co., sold', ['Co.@5']);
+    expectEveryPath([el(1, 'Co.')], '(Acme Co.)', ['Co.@6']);
+  });
+});

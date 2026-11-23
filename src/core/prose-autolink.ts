@@ -13,7 +13,8 @@
  *
  * Names are found by the SDK's `nameFinder` (conv. 197), the one reader of
  * element names in prose for the hints and every "link the mentions" path:
- * a whole name by Unicode's own word edges, case compared by simple case
+ * a whole name only (no letter, combining mark, decimal digit or underscore
+ * stands on either side of it, in any script), case compared by simple case
  * folding, the longest name where several start together, a shared name never
  * answered, nothing read inside a link or an address. Atlas keeps around it:
  * first mention only per document, existing links respected, `only`, and the
@@ -102,7 +103,7 @@ const indexes = new WeakMap<readonly Element[], AutolinkIndex>();
  * `atlas_aliases`. A name that is not a string, or is longer than
  * {@link MAX_NAME_CODE_POINTS}, is passed over.
  *
- * CASE-INSENSITIVE (Titus's ask), by simple case folding (the SDK's
+ * CASE-INSENSITIVE, by simple case folding (the SDK's
  * `'folded'`), so prose that writes "the consul" mid-sentence links to the
  * element named "Consul" without anyone having to register a lowercase alias
  * for it. Word edges still apply, so "drizzling" does not match "Drizzle".
