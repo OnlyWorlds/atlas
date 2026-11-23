@@ -6,19 +6,22 @@
  * Pressing Tab promotes the text into an ElementChip; ignoring it lets the
  * suggestion fade as the writer keeps typing.
  *
+ * Names are found by the kernel's index, the SDK's `nameFinder` (conv. 197).
  * Suppression rules (stacked to keep the feature un-annoying):
  *
- *   - Case-sensitive match (proper nouns are uppercase; common nouns aren't)
- *   - Min 3 chars per name/alias (kills "Al", "Bo")
+ *   - Case compared by simple case folding; the writer's text is the label
+ *   - Whole names only, by Unicode's word edges in any script
+ *   - Min 3 code points per name/alias (kills "Al", "Bo"); one over 200 is
+ *     not looked for
  *   - First mention only per doc — once an element is chip-linked anywhere
  *     in this narrative, no more underlines for it
  *   - Ambiguous names suppressed entirely (2+ elements share the same name)
  *   - The `@` mention picker takes priority — when its popover is visible,
  *     we don't decorate (avoids competing affordances)
  *
- * The plugin recomputes decorations on every doc change. Cheap at OW scale
- * (worlds rarely top a few hundred elements), and one combined regex is the
- * hot loop. Optimization (Aho-Corasick / trie) is a future bout if needed.
+ * The plugin recomputes decorations on every doc change, one `find` per text
+ * node; the finder walks a trie of the world's names, so its cost is the
+ * text's length times the longest name's, whatever the number of names.
  *
  * See DESIGN_WRITING.md §Autolink for the design rationale.
  */
@@ -30,7 +33,7 @@ import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Element } from '../core/types';
-import { buildAutolinkIndex, candidateIds, promotionLabel } from '../core/prose-autolink';
+import { buildAutolinkIndex, promotionLabel } from '../core/prose-autolink';
 import { namedId } from '../core/ow-links';
 import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 
@@ -47,7 +50,7 @@ export type { AutolinkCandidate, AutolinkIndex };
  */
 function collectChippedIds(doc: PmNode, index: AutolinkIndex): Set<string> {
   const ids = new Set<string>();
-  const held = candidateIds(index);
+  const held = index.ids;
   doc.descendants((node) => {
     if (node.type.name === 'elementChip') {
       const id = node.attrs.id as string | null;
@@ -68,7 +71,7 @@ interface ScanMatch {
  * for decoration. Applies the suppression rules:
  *
  *   - skip text inside elementChip nodes (already linked)
- *   - skip when there are multiple candidates for the matched key (ambiguous)
+ *   - a name two elements share is never answered by the finder (ambiguous)
  *   - skip when the candidate's id is already chipped elsewhere in the doc
  */
 function scanDocForMatches(
@@ -77,7 +80,7 @@ function scanDocForMatches(
   alreadyChipped: Set<string>,
 ): ScanMatch[] {
   const matches: ScanMatch[] = [];
-  if (!index.scanner) return matches;
+  if (index.ids.size === 0) return matches;
   // Track ids we've already proposed in this scan — same element should only
   // be decorated once per doc even if mentioned multiple times.
   const proposedIds = new Set<string>();
@@ -89,28 +92,12 @@ function scanDocForMatches(
     const text = node.text ?? '';
     if (text.length === 0) return;
 
-    // Fresh lastIndex per node — combined regex is /g but we don't share state.
-    const re = new RegExp(index.scanner!.source, index.scanner!.flags);
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      const matched = m[0];
-      if (m[0].length === 0) {
-        re.lastIndex++;
-        continue;
-      }
-      const candidates = index.byName.get(matched.toLowerCase());
-      if (!candidates || candidates.length === 0) continue;
-      // Ambiguity suppression — multiple elements share this exact key.
-      if (candidates.length > 1) continue;
-      const cand = candidates[0];
+    // The finder never answers a shared name (ambiguity suppression).
+    for (const { start, end, candidate: cand } of index.find(text)) {
       // First-mention rule: skip if already chipped OR already proposed.
       if (alreadyChipped.has(cand.id) || proposedIds.has(cand.id)) continue;
       proposedIds.add(cand.id);
-      matches.push({
-        from: pos + m.index,
-        to: pos + m.index + matched.length,
-        candidate: cand,
-      });
+      matches.push({ from: pos + start, to: pos + end, candidate: cand });
     }
   });
 
