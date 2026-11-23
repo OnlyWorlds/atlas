@@ -253,6 +253,17 @@ export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via', 
  */
 export const SERVER_MARK_FIELDS = ['hidden', 'x_served_trimmed'] as const;
 
+/**
+ * keel's own record of an element beside who wrote it: the world it is in,
+ * when it was made and last changed there, and its commit counter. On disk
+ * where a pull wrote them (`created_at` is on a file made here too;
+ * `change_seq` on older files only, a pull no longer writes it), and never
+ * content: with `SERVER_AUTHOR_FIELDS` and `SERVER_MARK_FIELDS` they are
+ * what the server says about an element, which a published page never
+ * carries (`isCardSkipField`).
+ */
+export const SERVER_STAMP_FIELDS = ['world', 'created_at', 'updated_at', 'change_seq'] as const;
+
 export const ATLAS_LOCAL_ONLY_FIELDS = [
   'image_media_id',
   // Writing workspace richtext payload (DESIGN_WRITING.md §Storage model, convention #47).

@@ -17,13 +17,14 @@
  * Prose `ow://` links follow the same rule at RENDER time (the renderer
  * checks membership; see share-page-render).
  *
- * Pure module: no DOM, no store, no state — the SDK's FIELD_SCHEMA is its
+ * Pure module: no DOM, no store, no state — the SDK's FIELD_SCHEMA (read through `relationFieldsFor`) is its
  * only dependency (relation detection must match the editor's view of the
  * schema). Unit-tested in tests/unit/share-payload.test.ts.
  */
 
-import { FIELD_SCHEMA } from '@onlyworlds/sdk';
-import type { Element } from './types';
+import type { Element, ElementType } from './types';
+import { SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SERVER_STAMP_FIELDS, isProfileField } from './constants';
+import { relationFieldsFor } from '../editor/field-schema';
 import {
   blocksOf, pageIntentOf, parsePageTheme,
   type PageBlock, type PageIntent, type ElementCardBlock, type CircleBlock,
@@ -131,15 +132,31 @@ export interface PagePayload {
 /**
  * Field names that never belong on a card or in a payload entry:
  * identity/meta, sync stamps, the image (rendered as the card image, not a
- * field row), and the whole atlas-local extension family.
+ * field row), the whole atlas-local extension family, and what the server
+ * says about an element (1.125.14: the world it is in, when and by whom and
+ * through which door it was written, its marks, and `known_of`, a stub's
+ * mark, which says how its reader sees the world). A Full pin sends every
+ * filled field this does not skip, so a server field left off this list is
+ * published by every Full pin. A published profile's key (`isProfileField`:
+ * a room's, a review's, a report's mark and the like) is machinery other
+ * tools read, some of it ids of this world, and is no card field either; a
+ * person's own `x_` field is. `__proto__` is never a field: a file can hold
+ * it as a key.
  */
-const CARD_SKIP_FIELDS = new Set([
+const CARD_SKIP_FIELDS = new Set<string>([
   'id', 'type', 'name', 'local_updated_at', 'server_updated_at',
   'image_url',
+  ...SERVER_STAMP_FIELDS, ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS,
+  'known_of', '__proto__',
 ]);
 
 export function isCardSkipField(name: string): boolean {
-  return CARD_SKIP_FIELDS.has(name) || name.startsWith('atlas_') || name === 'image_media_id';
+  return CARD_SKIP_FIELDS.has(name) || name.startsWith('atlas_') || name === 'image_media_id' || isProfileField(name);
+}
+
+/** Does this object hold the key itself? Never `in` or a bare lookup: a world file can tick `constructor`, or card an element by that id. */
+function holdsKey(obj: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 /** Does this value carry displayable content? */
@@ -284,11 +301,21 @@ export function scrubMarkdownForPayload(
 
 type RelationKind = 'single' | 'multi' | null;
 
+const relationKinds = new Map<string, Map<string, 'single' | 'multi'>>();
+
+/**
+ * A field's link kind, by the name the file holds it under: a pin's and a
+ * marker's link fields are `map_id` and `zone_id` on disk (`relationFieldsFor`),
+ * and read by the schema's bare name they went out as raw ids (1.125.14).
+ * Both names are read: a file from another tool can hold the bare one.
+ */
 function relationKindOf(elementType: string, fieldName: string): RelationKind {
-  const meta = (FIELD_SCHEMA as Record<string, Record<string, { type?: string } | undefined>>)[elementType]?.[fieldName];
-  if (meta?.type === 'single_link') return 'single';
-  if (meta?.type === 'multi_link') return 'multi';
-  return null;
+  let kinds = relationKinds.get(elementType);
+  if (!kinds) {
+    kinds = new Map(relationFieldsFor(elementType as ElementType).flatMap(r => [[r.schemaField, r.kind], [r.diskField, r.kind]]));
+    relationKinds.set(elementType, kinds);
+  }
+  return kinds.get(fieldName) ?? null;
 }
 
 /** Extract an element id from a raw relation value (bare id string, or a nested `{id}` defensively). */
@@ -377,6 +404,11 @@ export interface PageShares {
   clauses: ShareClauses;
 }
 
+/** A payload's entry for an id, or undefined: only an entry the payload itself holds. */
+function entryOf(payload: PagePayload, id: string): PayloadElementEntry | undefined {
+  return holdsKey(payload.elements, id) ? payload.elements[id] : undefined;
+}
+
 /**
  * What a page shares, from the payload `buildPagePayload` returned for it and
  * the page's own blocks (`blocksOf`) beside it: what is sent is read from the
@@ -406,10 +438,10 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
   for (const b of blocks) {
     if (b.kind === 'element-card') {
       seen(b.elementId);
-      const entry = payload.elements[b.elementId];
+      const entry = entryOf(payload, b.elementId);
       if (!entry) continue;
       // A compact card sends no field of its own (the payload unions full cards only).
-      const fields = b.variant === 'full' ? b.fields.filter(f => f in entry.fields) : [];
+      const fields = b.variant === 'full' ? b.fields.filter(f => holdsKey(entry.fields, f)) : [];
       add(b.elementId, {
         kind: 'card', blockId: b.id, fields: [...new Set(fields)],
         picture: b.showImage !== false && entry.image_url !== undefined,
@@ -417,7 +449,7 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
     } else if (b.kind === 'collection') {
       for (const id of new Set(b.elementIds)) {
         seen(id);
-        const entry = payload.elements[id];
+        const entry = entryOf(payload, id);
         if (entry) add(id, { kind: 'collection', blockId: b.id, fields: [], picture: entry.image_url !== undefined });
       }
     } else if (b.kind === 'map') {
@@ -431,7 +463,7 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
         pinsByTarget.set(fp.target.id, list);
       }
       for (const [id, pins] of pinsByTarget) {
-        const entry = payload.elements[id];
+        const entry = entryOf(payload, id);
         if (!entry) continue;
         // What this block's pins send, as the payload builds it: a pin its
         // description, a Full pin every filled field.
@@ -455,7 +487,7 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
   const rows: ShareRow[] = [];
   const nameOnly: string[] = [];
   for (const id of order) {
-    const entry = payload.elements[id];
+    const entry = entryOf(payload, id);
     if (!entry) continue; // hidden, proposed or missing: no row, not counted
     if (Object.keys(entry.fields).length === 0 && entry.image_url === undefined) {
       nameOnly.push(entry.name);
@@ -513,7 +545,7 @@ function leftOutBy(page: Element, elements: Element[], charts: ChartConfig[], ou
   const whole = buildPayloadFrom(page, elements, charts);
   const handed = buildPayloadFrom(page, elements.filter(e => !out(e)), charts);
   const names = Object.entries(whole.elements)
-    .filter(([id]) => !(id in handed.elements) && out(byId.get(id)))
+    .filter(([id]) => !holdsKey(handed.elements, id) && out(byId.get(id)))
     .map(([, e]) => e.name);
   for (const b of blocksOf(page)) {
     if (b.kind !== 'map') continue;
@@ -588,8 +620,8 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   const blocks = blocksOf(page);
 
   // Included set = card-bound elements + collection members that exist.
-  // Blocks pointing at missing elements stay in the block list (the viewer
-  // renders honestly) but contribute nothing to `elements`.
+  // A card pointing at a missing element contributes nothing to `elements`
+  // and leaves the block list too (1.125.14, below).
   const cards = blocks.filter((b): b is ElementCardBlock => b.kind === 'element-card');
   const collections = blocks.filter((b): b is CollectionBlock => b.kind === 'collection');
   const includedIds = new Set(cards.map(c => c.elementId).filter(id => byId.has(id)));
@@ -647,7 +679,9 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
     }
   }
 
-  const entries: Record<string, PayloadElementEntry> = {};
+  // No prototype: an element's id is a key here, and a hand-made file can call
+  // one `__proto__` or `constructor`.
+  const entries: Record<string, PayloadElementEntry> = Object.create(null);
   for (const id of includedIds) {
     entries[id] = projectElementEntry(
       byId.get(id)!, byId, includedIds, chosenFields.get(id) ?? [], imageWanted.has(id));
@@ -683,6 +717,16 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
     }
     if (b.kind === 'map') return freezeMapBlock(b, byId, includedIds);
     if (b.kind === 'chart') return freezeChartBlock(b.chartId, b.id, charts, elements, includedIds);
+    if (b.kind === 'element-card') {
+      // A card leaves with its element (1.125.14): one that is hidden,
+      // proposed or no longer in the world drew nothing, and its block named
+      // the element's id and its ticked fields on a public wire. A card that
+      // stays names only the fields its entry holds, each once (a full card's
+      // ticks that are filled and sendable; a compact card draws none).
+      const entry = holdsKey(entries, b.elementId) ? entries[b.elementId] : undefined;
+      if (!entry) return null;
+      return { ...b, fields: b.variant === 'full' ? [...new Set(b.fields)].filter(f => holdsKey(entry.fields, f)) : [] };
+    }
     return { ...b };
   }).filter((b): b is PayloadBlock => b !== null);
 
