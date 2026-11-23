@@ -126,6 +126,9 @@ test('a sign-in over a token Atlas minted revokes the old one by its id', async 
   await boot(page, '#/settings/onlyworlds');
   await page.evaluate(() => {
     const reg = { ...(window as any).__atlasTestApi.getState().registry };
+    // The stored number, not the one this tab loaded: a seed below the
+    // registry's landed copy would be restored over at the reload.
+    reg.saved_seq = JSON.parse(localStorage.getItem('atlas_worlds_registry') ?? '{}').saved_seq;
     reg.account_token = 'ow_a_OLDERTABTOKEN1';
     reg.account_token_id = '0f1e2d3c-4b5a-4968-8776-655443322110';
     reg.account_token_id_tail = reg.account_token.slice(-8);

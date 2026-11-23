@@ -109,7 +109,17 @@ async function goneKeepsItsRow(page: Page) {
 async function lostRegistryReadopts(page: Page) {
   await boot(page);
   await seedTwoBrowserWorlds(page);
-  await page.evaluate(() => localStorage.removeItem('atlas_worlds_registry'));
+  // The registry's landed copy goes too, or it brings the list back and the
+  // re-adoption this tests never runs.
+  await page.evaluate(async () => {
+    localStorage.removeItem('atlas_worlds_registry');
+    await new Promise<void>((res) => {
+      const req = indexedDB.deleteDatabase('atlas-registry-copy');
+      req.onsuccess = () => res();
+      req.onerror = () => res();
+      req.onblocked = () => res();
+    });
+  });
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
   await expect.poll(() => page.evaluate(async () => {
