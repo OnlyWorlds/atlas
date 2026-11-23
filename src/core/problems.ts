@@ -237,7 +237,7 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     }
     case 'server-refused':
-      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
+      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If it keeps happening, send the details as feedback.'}`;
     case 'host-refused':
       return `The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish ${doing}.${saved}${isHostBlocked(err) ? ` ${hostRefusalCause('then try again', opts.oneLine === true)}` : ''}`;
     case 'server':
@@ -303,17 +303,10 @@ export interface ProblemOpts {
    * The step sends no `API-Pin` at all (an invite's preview or redeem, an account call, a download by a key
    * that only reads, the demo's): a refusal names no World PIN or seat secret. `true` where nothing the
    * step made stays behind when it fails, so its line says nothing changed; `may-have-left` where
-   * something can (a folder's half-made download, a key just made, a world made here first).
+   * something can (a key just made, a seat held, a world made here first). A download keeps nothing
+   * when it fails, in a folder as in this browser, unless its folder could not be removed (`downloadNoPin`).
    */
   noPin?: boolean | 'may-have-left';
-}
-
-/**
- * A download's `noPin`: into this browser a failure removes what it made; into a folder its half-made
- * files can stay.
- */
-export function downloadNoPin(where: string | undefined): true | 'may-have-left' {
-  return where === 'browser' ? true : 'may-have-left';
 }
 
 /** Whose credential this problem's step sent: as the caller said, else the given world's, else not known. */
@@ -329,6 +322,26 @@ function activeWhere(): FilesWhere {
   const id = s.active?.worldId;
   return filesWhereOf(id ? s.registry.worlds.find(w => w.id === id) : undefined);
 }
+
+const leftBehind = new WeakSet<object>();
+
+/** A failed step left something on disk (a download's folder it could not remove). */
+export function markLeftBehind(err: unknown): void {
+  if (err && typeof err === 'object') leftBehind.add(err);
+}
+
+/** The failed step left something on disk (`markLeftBehind`). */
+export function leftSomethingBehind(err: unknown): boolean {
+  return !!err && typeof err === 'object' && leftBehind.has(err);
+}
+
+/** A failed download's `noPin`: nothing kept, unless its folder could not be removed. */
+export function downloadNoPin(err: unknown): true | 'may-have-left' {
+  return leftSomethingBehind(err) ? 'may-have-left' : true;
+}
+
+/** A cancelled download's line, by what it left. */
+export const CANCELLED_LEFT_LINE = 'Download cancelled. Part of it may still be in your OnlyWorlds folder, on no list.';
 
 export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
   const doing = opts.doing?.trim() || DEFAULT_DOING;

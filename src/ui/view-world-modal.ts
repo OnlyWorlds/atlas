@@ -131,7 +131,7 @@ export class ViewWorldModal extends BaseModal {
         // A refused key, an unknown world or no connection arrives worded
         // (keyCheckError); the rest is worded here. A read key sends no PIN.
         console.warn('[view-world] view failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where, noPin: downloadNoPin(where) }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where, noPin: downloadNoPin(err) }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;
