@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.13',
+    date: '2026-11-23',
+    theme: 'Before Publish, a page says what it shares',
+    entries: [
+      {
+        id: 'publish-says-what-it-shares',
+        title: 'A pin on a map that does not show on a published page no longer sends its element',
+        body: 'A pin on a map with no published image, on a hidden map, or with no place on its map still sent its element\'s description, and for a Full pin every filled field, though the page never showed that pin. Such a pin now sends nothing.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.12',
     date: '2026-11-23',
     theme: 'A world another tab took is closed here',

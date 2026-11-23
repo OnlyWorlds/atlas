@@ -449,12 +449,11 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   // author explicitly opted in via `fullPinIds` ship every populated field.
   // Fields another block (card/collection) separately disclosed still union
   // in — a map can never DOWNGRADE a deliberate card disclosure.
+  // Only a pin that itself freezes into its map block sends its element
+  // (1.125.13): a map with no published image or no size, a hidden or missing
+  // map, or a pin with no place draws nothing, so it sends nothing.
   for (const mb of blocks.filter((b): b is MapBlock => b.kind === 'map')) {
-    for (const pinId of mb.pinIds) {
-      const pin = byId.get(pinId);
-      const targetId = pin ? (pin as Record<string, unknown>).element_id : null;
-      const target = typeof targetId === 'string' ? byId.get(targetId) : undefined;
-      if (!target) continue;
+    for (const { pinId, target } of frozenPinTargets(mb, byId)) {
       includedIds.add(target.id);
       imageWanted.add(target.id);
       const full = (mb.fullPinIds ?? []).includes(pinId);
@@ -583,11 +582,8 @@ export function projectElementEntry(
  * when their pin/element is gone (disclose nothing) or out of bounds.
  * Exported for the renderer (builder compiles live → same view).
  */
-export function freezeMapBlock(
-  block: MapBlock,
-  byId: Map<string, Element>,
-  includedIds: ReadonlySet<string>,
-): PayloadMapBlock | null {
+/** A map block's map as it publishes: present, with an http(s) image and a size; else null (the block drops). */
+function mapFrameOf(block: MapBlock, byId: Map<string, Element>): { map: Element; imageUrl: string; width: number; height: number } | null {
   const map = byId.get(block.mapId);
   if (!map) return null;
   const rec = map as Record<string, unknown>;
@@ -596,8 +592,22 @@ export function freezeMapBlock(
   const width = typeof rec.width === 'number' ? rec.width : 0;
   const height = typeof rec.height === 'number' ? rec.height : 0;
   if (width <= 0 || height <= 0) return null;
+  return { map, imageUrl, width, height };
+}
 
-  const pins: PayloadMapBlock['pins'] = [];
+/**
+ * The pins that freeze into a map block, in include-list order, each with its
+ * placed element: none when the map itself drops (`mapFrameOf`), and a pin
+ * only when it is in the world, has a finite x and y, and points at an element
+ * in the world. The payload's one reading of "this pin shows": the map's pins
+ * and the elements pins send (1.125.13) both come from it.
+ */
+export function frozenPinTargets(
+  block: MapBlock,
+  byId: Map<string, Element>,
+): Array<{ pinId: string; x: number; y: number; target: Element }> {
+  if (!mapFrameOf(block, byId)) return [];
+  const out: Array<{ pinId: string; x: number; y: number; target: Element }> = [];
   for (const pinId of block.pinIds) {
     const pin = byId.get(pinId);
     if (!pin) continue;
@@ -607,6 +617,22 @@ export function freezeMapBlock(
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
     const target = typeof p.element_id === 'string' ? byId.get(p.element_id) : undefined;
     if (!target) continue; // pin without a live element discloses nothing
+    out.push({ pinId, x, y, target });
+  }
+  return out;
+}
+
+export function freezeMapBlock(
+  block: MapBlock,
+  byId: Map<string, Element>,
+  includedIds: ReadonlySet<string>,
+): PayloadMapBlock | null {
+  const frame = mapFrameOf(block, byId);
+  if (!frame) return null;
+  const { map, imageUrl, width, height } = frame;
+
+  const pins: PayloadMapBlock['pins'] = [];
+  for (const { x, y, target } of frozenPinTargets(block, byId)) {
     const token: PayloadMapBlock['pins'][number] = {
       xPct: Math.round(Math.min(100, Math.max(0, (x / width) * 100)) * 100) / 100,
       yPct: Math.round(Math.min(100, Math.max(0, ((height - y) / height) * 100)) * 100) / 100,
