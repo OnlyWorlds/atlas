@@ -19,7 +19,7 @@ import {
   writeRegistryCopy,
   type RestoreLocks,
 } from '../../src/registry/registry-copy';
-import { FORGET_PARTIAL_LINE, forgetEverything } from '../../src/setup/forget-browser';
+import { FORGET_PARTIAL_LINE, forgetEverything, installForgetPresence } from '../../src/setup/forget-browser';
 import { FakeDirHandle } from '../fixtures/fake-fs';
 import { slowIdbOpens } from '../fixtures/slow-idb-open';
 import { patchSlice } from '../../src/core/state';
@@ -598,7 +598,7 @@ describe('the boot restore\'s bounds and locks', () => {
     // A third tab holds the restore lock and closes mid-restore, never live.
     const closing = await hub.hold('closing', 'atlas-registry-restore');
     const read = () => sleep(120).then(() => regJson(9, ['nine']));
-    const a = restoreRegistryAtBoot({ locks: hub.tab('a'), lockWaitMs: 200, windowMs: 150, readCopy: read });
+    const a = restoreRegistryAtBoot({ locks: hub.tab('a'), lockWaitMs: 2000, windowMs: 150, readCopy: read });
     await sleep(10);
     const b = restoreRegistryAtBoot({ locks: hub.tab('b'), lockWaitMs: 200, windowMs: 150 });
     await sleep(175);
@@ -662,5 +662,30 @@ describe('Forget this browser and a tab opened meanwhile', () => {
     });
     await sleep(30);
     expect(await copyRecord()).toBeUndefined();
+  });
+});
+
+describe('a tab that hears another tab forgot this browser', () => {
+  it('stops its copy writes and deletes its copy before it reloads, a write running and a second waiting included', async () => {
+    loadRegistry();
+    let reloaded = 0;
+    const uninstall = installForgetPresence({ reload: () => { reloaded++; } });
+    const slow = slowIdbOpens(150);
+    try {
+      // This tab saved twice just before the other tab's clear: one write opening, one string waiting.
+      saveRegistry({ ...defaultRegistry(), worlds: [entry('w-1'), entry('b1')] });
+      saveRegistry({ ...defaultRegistry(), worlds: [entry('w-1'), entry('b2')] });
+      const other = new BroadcastChannel('atlas-forget');
+      other.postMessage({ kind: 'forgotten', from: 'the-tab-that-forgot' });
+      other.close();
+      await vi.waitFor(() => expect(reloaded).toBe(1), { timeout: 3000 });
+      expect(await copyRecord()).toBeUndefined();
+      // Nothing lands later either.
+      await sleep(300);
+      expect(await copyRecord()).toBeUndefined();
+    } finally {
+      slow.restore();
+      uninstall();
+    }
   });
 });

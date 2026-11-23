@@ -75,7 +75,8 @@ let presence: BroadcastChannel | null = null;
  * Every Atlas tab answers a forget's roll call, and reloads when another tab
  * has forgotten (its memory would otherwise write the registry back).
  */
-export function installForgetPresence(): () => void {
+export function installForgetPresence(deps: { reload?: () => void } = {}): () => void {
+  const reload = deps.reload ?? (() => location.replace(location.pathname));
   if (typeof BroadcastChannel === 'undefined' || presence) return () => {};
   presence = new BroadcastChannel(CHANNEL);
   const me = presence;
@@ -83,7 +84,12 @@ export function installForgetPresence(): () => void {
     const msg = e.data as { kind?: string; id?: string; from?: string } | null;
     if (!msg || msg.from === TAB) return;
     if (msg.kind === 'here?') me.postMessage({ kind: 'here', id: msg.id, from: TAB });
-    else if (msg.kind === 'forgotten') location.replace(location.pathname);
+    else if (msg.kind === 'forgotten') {
+      // This tab's copy goes too before it reloads: a write of its own still
+      // running, or a string waiting behind one, would make the copy again
+      // after the forget deleted it, and the next start would restore it.
+      void stopRegistryCopyWrites().then(() => deleteRegistryCopy()).catch(() => 'failed').finally(reload);
+    }
   };
   return () => { me.close(); if (presence === me) presence = null; };
 }
