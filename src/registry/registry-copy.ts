@@ -19,9 +19,13 @@
  *   `versionchange`.
  * - The boot (`restoreRegistryAtBoot`, before `startApp`) restores only with
  *   no other Atlas tab live (the shared lock `atlas-live`), under the
- *   exclusive lock `atlas-registry-restore` waited for at most W, and only
- *   when the copy's read finished within R of the grant: a tab that gave up
- *   waiting (W, from after this tab's grant) always finds this one past R.
+ *   exclusive lock `atlas-registry-restore`, and only in time. Two bounds:
+ *   W, how long a booting tab waits for the restore lock (2 s,
+ *   `LOCK_CLAIM_WAIT_MS`; past it, no restore), and R, how late after its
+ *   request for that lock a tab may still put the copy back (1.5 s,
+ *   `RESTORE_WINDOW_MS`). R is below W, and lock requests queue in order, so
+ *   a tab that asked later and gave up waiting at W, then went live, always
+ *   finds this tab past R: a restore never lands beside a tab that went live.
  *   The registry is restored whole, never entry by entry: an entry the copy
  *   has and `localStorage` lacks is a lost make only when the copy is newer.
  * - Every failure here is one console line: the copy never changes what
@@ -45,7 +49,7 @@ const VERSION = 1;
 export const RESTORE_LOCK = 'atlas-registry-restore';
 /** Held shared by every tab past its restore, for the tab's life. */
 export const LIVE_LOCK = 'atlas-live';
-/** R: a restore decided later than this after its lock's grant is dropped (below W, `LOCK_CLAIM_WAIT_MS`). */
+/** R: a restore decided later than this after its lock was requested is dropped (below W, `LOCK_CLAIM_WAIT_MS`). */
 export const RESTORE_WINDOW_MS = 1_500;
 /** The copy's read, bounded, when `localStorage` holds a readable registry. */
 export const COPY_READ_BOUND_MS = 500;
@@ -319,9 +323,10 @@ const LATE = Symbol('late');
 
 /**
  * Decide, before `startApp`, whether the copy goes back into `localStorage`
- * (rule order: the restore lock within W; no live tab; the copy read within
- * its bound; within R of the grant, `localStorage` read and set in the task
- * the read finished in; then `atlas-live` on every branch with Web Locks).
+ * (in order: the restore lock within W; no live tab; the copy read within
+ * its bound; within R of the lock's request, `localStorage` read and set in
+ * the task the read finished in; then `atlas-live` on every branch where Web
+ * Locks exist).
  * Never rejects: a failure is one console line and boots as today.
  */
 export async function restoreRegistryAtBoot(deps: RestoreDeps = {}): Promise<RestoreOutcome> {
@@ -334,21 +339,30 @@ export async function restoreRegistryAtBoot(deps: RestoreDeps = {}): Promise<Res
   if (!locks) return 'no-locks';
   const l = locks;
 
-  // 1. The restore lock, waited for at most W.
+  // 1. The restore lock, waited for at most W. The wait ends by its own
+  // timer, so a browser that ignored the abort cannot hold boot; a grant that
+  // comes after the wait ended is handed straight back.
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), W);
   let release: (() => void) | null = null;
   let grantAt = 0;
+  // R counts from the request: every tab queued behind this one asked later,
+  // so it gives up no earlier than this request plus W, past this request plus R.
+  const requestAt = performance.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const claim = await new Promise<'granted' | 'late' | 'no-locks'>(resolve => {
+    let settled = false;
+    const settle = (v: 'granted' | 'late' | 'no-locks') => { if (!settled) { settled = true; resolve(v); } };
+    timer = setTimeout(() => { ac.abort(); settle('late'); }, W);
     try {
       const held = l.request(RESTORE_LOCK, { mode: 'exclusive', signal: ac.signal }, () => {
+        if (settled) return undefined; // too late: the lock goes back at once
         grantAt = performance.now();
-        resolve('granted');
+        settle('granted');
         return new Promise<void>(r => { release = r; });
       });
-      held.catch(() => resolve(ac.signal.aborted ? 'late' : 'no-locks'));
+      held.catch(() => settle(ac.signal.aborted ? 'late' : 'no-locks'));
     } catch {
-      resolve('no-locks');
+      settle('no-locks');
     }
   });
   clearTimeout(timer);
@@ -359,7 +373,7 @@ export async function restoreRegistryAtBoot(deps: RestoreDeps = {}): Promise<Res
   try {
     outcome = claim === 'late'
       ? 'lock-late'
-      : await decide(l, grantAt, deps, ms => { readMs = ms; });
+      : await decide(l, requestAt, deps, ms => { readMs = ms; });
   } catch (err) {
     say('could not read the copy of the list of worlds', err);
     outcome = 'failed';
@@ -378,12 +392,12 @@ export async function restoreRegistryAtBoot(deps: RestoreDeps = {}): Promise<Res
     console.info(`[registry-copy] no restore: ${outcome}`, { readMs });
   }
   try {
-    performance.measure('atlas-registry-restore', { start: started, detail: { outcome, readMs, sinceGrantMs: grantAt ? performance.now() - grantAt : null } });
+    performance.measure('atlas-registry-restore', { start: started, detail: { outcome, readMs, sinceGrantMs: grantAt ? performance.now() - grantAt : null, sinceRequestMs: performance.now() - requestAt } });
   } catch { /* no User Timing here */ }
   return outcome;
 }
 
-async function decide(l: RestoreLocks, grantAt: number, deps: RestoreDeps, noteRead: (ms: number) => void): Promise<RestoreOutcome> {
+async function decide(l: RestoreLocks, requestAt: number, deps: RestoreDeps, noteRead: (ms: number) => void): Promise<RestoreOutcome> {
   const R = deps.windowMs ?? RESTORE_WINDOW_MS;
   // A live tab means the browser process kept localStorage.
   let snap: Awaited<ReturnType<RestoreLocks['query']>>;
@@ -397,7 +411,7 @@ async function decide(l: RestoreLocks, grantAt: number, deps: RestoreDeps, noteR
   // 2. The read, bounded.
   if (!deps.readCopy && !idbHere()) return 'failed';
   const readable = parseRegistry(localStorage.getItem(REGISTRY_STORAGE_KEY)) !== null;
-  const bound = readable ? (deps.readBoundMs ?? COPY_READ_BOUND_MS) : Math.max(0, R - (performance.now() - grantAt));
+  const bound = readable ? (deps.readBoundMs ?? COPY_READ_BOUND_MS) : Math.max(0, R - (performance.now() - requestAt));
   const readStart = performance.now();
   let boundTimer: ReturnType<typeof setTimeout> | undefined;
   const got = await Promise.race([
@@ -406,11 +420,11 @@ async function decide(l: RestoreLocks, grantAt: number, deps: RestoreDeps, noteR
   ]);
   clearTimeout(boundTimer);
 
-  // 3. This task: within R of the grant, read localStorage, decide and set.
+  // 3. This task: within R of the request, read localStorage, decide and set.
   const now = performance.now();
   noteRead(now - readStart);
   if (got === LATE || now - readStart > bound) return 'read-late';
-  if (now - grantAt > R) return 'dropped-late';
+  if (now - requestAt > R) return 'dropped-late';
   if (got === null) return 'no-copy';
   const copy = parseRegistry(got);
   if (!copy) {

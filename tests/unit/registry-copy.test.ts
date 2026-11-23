@@ -21,6 +21,7 @@ import {
 } from '../../src/registry/registry-copy';
 import { FORGET_PARTIAL_LINE, forgetEverything } from '../../src/setup/forget-browser';
 import { FakeDirHandle } from '../fixtures/fake-fs';
+import { slowIdbOpens } from '../fixtures/slow-idb-open';
 import { patchSlice } from '../../src/core/state';
 import { toastManager } from '../../src/ui/toast-manager';
 
@@ -169,7 +170,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 const storedSeq = (): number => (JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY) ?? '{}') as { saved_seq?: number }).saved_seq ?? 0;
 
 describe('a save leaves its copy', () => {
-  it('U1 a save writes the copy with the stored string and its saved_seq', async () => {
+  it('a save writes the copy with the stored string and its saved_seq', async () => {
     loadRegistry();
     const reg: WorldsRegistry = { ...defaultRegistry(), worlds: [entry('w-1')] };
     expect(saveRegistry(reg)).toBe(true);
@@ -182,7 +183,7 @@ describe('a save leaves its copy', () => {
     expect((reg as { saved_seq?: number }).saved_seq).toBeUndefined();
   });
 
-  it('U1 the copy holds the merge\'s result, not the argument, when another tab saved meanwhile', async () => {
+  it('the copy holds the merge\'s result, not the argument, when another tab saved meanwhile', async () => {
     localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(10, ['w-1']));
     const mine = loadRegistry();
     // Another tab adds a world.
@@ -210,7 +211,7 @@ describe('a save leaves its copy', () => {
     expect(storedSeq()).toBeGreaterThanOrEqual(before);
   });
 
-  it('U5 a seq 7 copy write then a seq 6 write: the copy keeps 7', async () => {
+  it('a seq 7 copy write then a seq 6 write: the copy keeps 7', async () => {
     writeRegistryCopy(regJson(7, ['seven']), 7);
     writeRegistryCopy(regJson(6, ['six']), 6);
     await registryCopyLanded();
@@ -227,7 +228,7 @@ describe('a save leaves its copy', () => {
     expect(rec?.registry).toBe(regJson(7, ['seven']));
   });
 
-  it('U6 a setItem that throws writes no copy, and the toast says so as today', async () => {
+  it('a setItem that throws writes no copy, and the toast says so as today', async () => {
     loadRegistry();
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
     expect(saveRegistry({ ...defaultRegistry(), worlds: [entry('w-1')] })).toBe(false);
@@ -266,7 +267,7 @@ describe('a save leaves its copy', () => {
 });
 
 describe('the boot restore', () => {
-  it('U2 no registry in localStorage, a copy holding w-1 at seq 3: the restore lists w-1 as w-1', async () => {
+  it('no registry in localStorage, a copy holding w-1 at seq 3: the restore lists w-1 as w-1', async () => {
     await seedCopy(regJson(3, ['w-1']), 3);
     expect(await restoreRegistryAtBoot({ locks: new LockHub().tab('a') })).toBe('restored');
     expect(loadRegistry().worlds.map(w => w.id)).toEqual(['w-1']);
@@ -275,21 +276,21 @@ describe('the boot restore', () => {
     expect(toastManager.show).not.toHaveBeenCalled();
   });
 
-  it('U3 localStorage at seq 5, copy at seq 4: localStorage untouched', async () => {
+  it('localStorage at seq 5, copy at seq 4: localStorage untouched', async () => {
     localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(5, ['five']));
     await seedCopy(regJson(4, ['four']), 4);
     expect(await restoreRegistryAtBoot({ locks: new LockHub().tab('a') })).toBe('kept');
     expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(5, ['five']));
   });
 
-  it('U4 equal seqs: localStorage untouched', async () => {
+  it('equal seqs: localStorage untouched', async () => {
     localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(5, ['five']));
     await seedCopy(regJson(5, ['five-copy']), 5);
     expect(await restoreRegistryAtBoot({ locks: new LockHub().tab('a') })).toBe('kept');
     expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(5, ['five']));
   });
 
-  it('a stored registry that will not parse, or has no saved_seq below the copy\'s, takes the copy', async () => {
+  it('a stored registry that will not parse, or has no saved_seq, takes a copy with one', async () => {
     localStorage.setItem(REGISTRY_STORAGE_KEY, '{broken');
     await seedCopy(regJson(4, ['four']), 4);
     expect(await restoreRegistryAtBoot({ locks: new LockHub().tab('a') })).toBe('restored');
@@ -299,7 +300,7 @@ describe('the boot restore', () => {
     expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(4, ['four']));
   });
 
-  it('U8 an older Atlas\'s save (the stored saved_seq kept, the content changed): localStorage still wins', async () => {
+  it('an older Atlas\'s save (the stored saved_seq kept, the content changed): localStorage still wins', async () => {
     localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(5, ['a']));
     saveRegistry(loadRegistry());
     await registryCopyLanded();
@@ -310,7 +311,7 @@ describe('the boot restore', () => {
     expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(seq, ['a', 'b']));
   });
 
-  it('U7 each copy failure is one console line: saveRegistry\'s answer unchanged, no toast, boot as today', async () => {
+  it('each copy failure is one console line: saveRegistry\'s answer unchanged, no toast, boot as today', async () => {
     // A copy that will not parse, and one with no worlds array.
     for (const bad of ['{nope', '{"saved_seq":9}']) {
       localStorage.clear();
@@ -362,7 +363,7 @@ describe('the boot restore', () => {
     expect(toastManager.show).not.toHaveBeenCalled();
   });
 
-  it('U7 no indexedDB: saves answer as today, said once on the console', async () => {
+  it('no indexedDB: saves answer as today, said once on the console', async () => {
     const idb = globalThis.indexedDB;
     // @ts-expect-error removed for the test
     delete globalThis.indexedDB;
@@ -387,7 +388,7 @@ describe('the boot restore', () => {
     expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBeNull();
   });
 
-  it('U10 a boot whose copy read timed out, then a save: the next boot shows the session\'s list, not the copy\'s', async () => {
+  it('a boot whose copy read timed out, then a save: the next boot shows the session\'s list, not the copy\'s', async () => {
     const earlier = Date.now() - 60_000;
     await seedCopy(regJson(earlier, ['old']), earlier);
     // Boot 1: the read never finishes inside its bound; the app boots empty.
@@ -401,7 +402,7 @@ describe('the boot restore', () => {
     expect(loadRegistry().worlds.map(w => w.id)).toEqual(['new']);
   });
 
-  it('U11 a second tab holding atlas-live, localStorage behind the copy: no restore, localStorage untouched', async () => {
+  it('a second tab holding atlas-live, localStorage behind the copy: no restore, localStorage untouched', async () => {
     const hub = new LockHub();
     await hub.hold('other', 'atlas-live', 'shared');
     localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(5, ['five']));
@@ -412,7 +413,7 @@ describe('the boot restore', () => {
     await vi.waitFor(() => expect(hub.holds('a', 'atlas-live')).toBe(true));
   });
 
-  it('U12 a restore lock that is never released: boot goes on within W, with no restore, and takes atlas-live', async () => {
+  it('a restore lock that is never released: boot goes on within W, with no restore, and takes atlas-live', async () => {
     const hub = new LockHub();
     await hub.hold('stuck', 'atlas-registry-restore');
     await seedCopy(regJson(9, ['nine']), 9);
@@ -423,16 +424,16 @@ describe('the boot restore', () => {
     await vi.waitFor(() => expect(hub.holds('a', 'atlas-live')).toBe(true));
   });
 
-  it('U12 a holder whose copy read finishes past R, after the waiting tab went live: no setItem', async () => {
+  it('a holder whose copy read finishes past R, after the waiting tab went live: no setItem', async () => {
     const hub = new LockHub();
     localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(1, ['one']));
     await seedCopy(regJson(9, ['nine']), 9);
-    const slowRead = () => sleep(400).then(() => regJson(9, ['nine']));
-    const a = restoreRegistryAtBoot({ locks: hub.tab('a'), lockWaitMs: 200, windowMs: 150, readCopy: slowRead });
+    const slowRead = () => sleep(1200).then(() => regJson(9, ['nine']));
+    const a = restoreRegistryAtBoot({ locks: hub.tab('a'), lockWaitMs: 200, windowMs: 150, readBoundMs: 3000, readCopy: slowRead });
     await sleep(10);
     const tB = Date.now();
     expect(await restoreRegistryAtBoot({ locks: hub.tab('b'), lockWaitMs: 200, windowMs: 150 })).toBe('lock-late');
-    expect(Date.now() - tB).toBeLessThan(380);
+    expect(Date.now() - tB).toBeLessThan(1000);
     await vi.waitFor(() => expect(hub.holds('b', 'atlas-live')).toBe(true));
     expect(await a).toBe('dropped-late');
     expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(1, ['one']));
@@ -451,7 +452,7 @@ describe('the boot restore', () => {
   });
 });
 
-describe('U9 Forget this browser leaves no copy', () => {
+describe('Forget this browser leaves no copy', () => {
   const token = 'ow_a_FORGETTOKEN12345678';
   const signedIn = (): WorldsRegistry => ({
     ...defaultRegistry(), worlds: [entry('w-1')],
@@ -535,5 +536,131 @@ describe('U9 Forget this browser leaves no copy', () => {
     saveRegistry({ ...defaultRegistry(), worlds: [entry('w-2')] });
     await registryCopyLanded();
     expect((JSON.parse((await copyRecord())!.registry) as WorldsRegistry).worlds.map(w => w.id)).toEqual(['w-2']);
+  });
+});
+
+describe('the copy\'s writes', () => {
+  it('one copy write is in flight at a time, and the string waiting behind it is the latest save', async () => {
+    loadRegistry();
+    const slow = slowIdbOpens(80);
+    try {
+      saveRegistry({ ...defaultRegistry(), worlds: [entry('first')] });
+      saveRegistry({ ...defaultRegistry(), worlds: [entry('second')] });
+      saveRegistry({ ...defaultRegistry(), worlds: [entry('third')] });
+      expect(slow.opens()).toBe(1);
+      await registryCopyLanded();
+      expect(slow.opens()).toBe(2);
+      const rec = await copyRecord();
+      expect(rec?.registry).toBe(localStorage.getItem(REGISTRY_STORAGE_KEY));
+      expect((JSON.parse(rec!.registry) as WorldsRegistry).worlds.map(w => w.id)).toEqual(['third']);
+    } finally {
+      slow.restore();
+    }
+  });
+
+  it('a copy connection closes when the copy is deleted under it', async () => {
+    loadRegistry();
+    // The write opens, and its transaction never ends: the connection stays open.
+    const realTx = IDBDatabase.prototype.transaction;
+    const txSpy = vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args: unknown[]) {
+      // The database's own upgrade runs as it is.
+      if (args[1] === 'versionchange') return (realTx as (...a: unknown[]) => IDBTransaction).apply(this, args);
+      return { objectStore: () => ({ get: () => ({}) }) } as unknown as IDBTransaction;
+    });
+    saveRegistry({ ...defaultRegistry(), worlds: [entry('w-1')] });
+    await vi.waitFor(() => expect(txSpy).toHaveBeenCalled());
+    txSpy.mockRestore();
+    const outcome = await new Promise<string>(resolve => {
+      const req = indexedDB.deleteDatabase(REGISTRY_COPY_DB);
+      req.onsuccess = () => resolve('deleted');
+      req.onerror = () => resolve('failed');
+      req.onblocked = () => resolve('blocked');
+    });
+    expect(outcome).toBe('deleted');
+  });
+
+  it('registryCopyLanded answers at once when copy writes are stopped, for a save made before the stop too', async () => {
+    loadRegistry();
+    vi.spyOn(indexedDB, 'open').mockImplementation(() => ({}) as IDBOpenDBRequest);
+    saveRegistry({ ...defaultRegistry(), worlds: [entry('w-1')] });
+    void stopRegistryCopyWrites(5000);
+    const t0 = Date.now();
+    await registryCopyLanded();
+    expect(Date.now() - t0).toBeLessThan(50);
+  });
+});
+
+describe('the boot restore\'s bounds and locks', () => {
+  it('a tab granted late, after a holder let go without going live, does not restore beside the tab that gave up waiting', async () => {
+    const hub = new LockHub();
+    localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(1, ['one']));
+    await seedCopy(regJson(9, ['nine']), 9);
+    // A third tab holds the restore lock and closes mid-restore, never live.
+    const closing = await hub.hold('closing', 'atlas-registry-restore');
+    const read = () => sleep(120).then(() => regJson(9, ['nine']));
+    const a = restoreRegistryAtBoot({ locks: hub.tab('a'), lockWaitMs: 200, windowMs: 150, readCopy: read });
+    await sleep(10);
+    const b = restoreRegistryAtBoot({ locks: hub.tab('b'), lockWaitMs: 200, windowMs: 150 });
+    await sleep(175);
+    closing();
+    expect(await b).toBe('lock-late');
+    expect(await a).toBe('dropped-late');
+    expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(1, ['one']));
+  });
+
+  it('a lock request that ignores its abort still ends the wait at W, and a grant that comes later is handed straight back', async () => {
+    const hub = new LockHub();
+    const release = await hub.hold('stuck', 'atlas-registry-restore');
+    const tab = hub.tab('a');
+    const deaf: RestoreLocks = { request: (name, opts, cb) => tab.request(name, { mode: opts.mode }, cb), query: () => tab.query() };
+    const t0 = Date.now();
+    const out = await Promise.race([restoreRegistryAtBoot({ locks: deaf, lockWaitMs: 150 }), sleep(1500).then(() => 'still waiting')]);
+    expect(out).toBe('lock-late');
+    expect(Date.now() - t0).toBeLessThan(800);
+    release();
+    await vi.waitFor(() => expect(hub.held.some(h => h.name === 'atlas-registry-restore')).toBe(false));
+    expect(hub.queue.some(q => q.name === 'atlas-registry-restore')).toBe(false);
+  });
+
+  it('a tab waiting for atlas-live counts as live: no restore', async () => {
+    await seedCopy(regJson(9, ['nine']), 9);
+    const tab = new LockHub().tab('a');
+    const locks: RestoreLocks = { request: tab.request, query: async () => ({ held: [], pending: [{ name: 'atlas-live' }] }) };
+    expect(await restoreRegistryAtBoot({ locks })).toBe('live-tab');
+    expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('a read that finishes after its bound, before the bound\'s timer ran, is dropped', async () => {
+    localStorage.setItem(REGISTRY_STORAGE_KEY, regJson(1, ['one']));
+    await seedCopy(regJson(9, ['nine']), 9);
+    const blocking = () => {
+      const t = performance.now();
+      while (performance.now() - t < 80) { /* the page is busy */ }
+      return Promise.resolve(regJson(9, ['nine']));
+    };
+    expect(await restoreRegistryAtBoot({ locks: new LockHub().tab('a'), readBoundMs: 40, readCopy: blocking })).toBe('read-late');
+    expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBe(regJson(1, ['one']));
+  });
+});
+
+describe('Forget this browser and a tab opened meanwhile', () => {
+  it('a copy another tab writes while the forget waits on its revokes is gone afterwards', async () => {
+    const token = 'ow_a_FORGETTOKEN12345678';
+    const reg: WorldsRegistry = {
+      ...defaultRegistry(), worlds: [entry('w-1')],
+      account_token: token, account_token_id: '0f1e2d3c-4b5a-4968-8776-655443322110', account_token_id_tail: token.slice(-8),
+    };
+    loadRegistry();
+    saveRegistry(reg);
+    patchSlice('registry', reg);
+    await registryCopyLanded();
+    await forgetEverything({
+      opfsRoot: async () => new FakeDirHandle('opfs') as unknown as FileSystemDirectoryHandle,
+      reload: () => {},
+      // Another tab, opened during the forget, saves: its own copy writes are not stopped.
+      revoke: async () => { const now = Date.now(); await seedCopy(regJson(now, ['w-1', 'w-other']), now); },
+    });
+    await sleep(30);
+    expect(await copyRecord()).toBeUndefined();
   });
 });

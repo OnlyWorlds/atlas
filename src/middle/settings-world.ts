@@ -567,12 +567,14 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     evictParkedStore(world.id);
     const next = deleteWorldEntry(getState().registry, world.id);
     saveRegistry(next);
+    // Out of state at once: a save from the old state during the wait below
+    // would merge the world back.
+    patchSlice('registry', next);
     // The copy holds the save before the handle goes: else the two databases
     // commit in either order, and a kill between them lists the world with
     // no handle (registry/registry-copy.ts).
     await registryCopyLanded();
     await deleteHandle(world.folder.handle_key).catch(() => {});
-    patchSlice('registry', next);
     patchSlice('active', null);
     patchSlice('data', { elements: [] });
     patchSlice('ui', { ...getState().ui, selectedElementId: null });
@@ -629,10 +631,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // Now drop registry + handle.
       const next = deleteWorldEntry(getState().registry, world.id);
       saveRegistry(next);
-      // The copy holds the save before the handle goes (as Forget, above).
+      // Out of state at once, and the copy holds the save before the handle goes (as Forget, above).
+      patchSlice('registry', next);
       await registryCopyLanded();
       await deleteHandle(world.folder.handle_key).catch(() => {});
-      patchSlice('registry', next);
       patchSlice('active', null);
       patchSlice('data', { elements: [] });
       patchSlice('ui', { ...getState().ui, selectedElementId: null });

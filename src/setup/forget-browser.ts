@@ -190,6 +190,9 @@ export async function forgetEverything(deps: {
   if (token && tokenId) await (deps.revoke ?? revokeAtlasToken)(token, tokenId).catch(() => {});
   localStorage.clear();
   sessionStorage.clear();
+  // Again, best effort: an Atlas tab opened during the revokes saves with its
+  // own copy writes running, and its copy would bring the list back.
+  await deleteRegistryCopy().catch(() => 'failed');
   // Closed after the post: a message already posted is still delivered, and
   // an open channel left behind receives every later roll call (in the
   // one-process test run it took the next test's and threw there).
