@@ -1881,8 +1881,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     li.dataset.elementId = row.elementId;
     const who = document.createElement('div');
     who.className = 'atlas-share-shares-who';
-    // "Ash · Character"; an element with no name of its own, "(no name) · Character".
-    who.appendChild(bdi(row.unnamed ? '(no name)' : row.name));
+    // "Ash · Character"; an element with no name of its own, the house's unnamed form ("The unnamed character · Character").
+    who.appendChild(bdi(row.unnamed ? nameOrUnnamed({ name: '', type: row.type }, { start: true }) : row.name));
     const kind = document.createElement('span');
     kind.className = 'atlas-share-shares-kind';
     kind.textContent = typeNameStart(row.type);
@@ -1992,7 +1992,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     }
     for (const circle of c.circles) {
       const span = document.createElement('span');
-      span.append('The circle shares what ', bdi(circle.knower), ` knows (${circle.entries} ${circle.entries === 1 ? 'entry' : 'entries'}).`);
+      // The knower first: its title is already start-cased ("The unnamed character"), and a Character's block is no circle.
+      span.append(bdi(circle.knower), `'s knowledge: ${circle.entries} ${circle.entries === 1 ? 'entry' : 'entries'} shared.`);
       said.push(span);
     }
     if (said.length === 0) return null;
@@ -2120,7 +2121,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     hint.className = 'atlas-share-section-hint';
     hint.textContent = pub?.revoked
       ? 'Revoked. Republishing restores this address with the current composition.'
-      : 'Publish a frozen snapshot at an address of its own. This page shares what is listed below.';
+      : 'Publish a frozen snapshot at an address of its own: the page\'s title and words, and what the list here names from the world.';
     section.appendChild(hint);
     section.appendChild(buildSharesList(page, false));
 

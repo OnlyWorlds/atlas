@@ -163,7 +163,7 @@ describe('the Publish section lists what the page shares', () => {
     expect(l, 'the list is in the Publish section').toBeTruthy();
     expect(l!.closest('[data-role="publish-section"]')).toBeTruthy();
     expect(l!.textContent).toContain('What this page shares');
-    expect(host.querySelector('[data-role="publish-section"]')!.textContent).toContain('This page shares what is listed below.');
+    expect(host.querySelector('[data-role="publish-section"]')!.textContent).toContain('the page\'s title and words, and what the list here names from the world.');
     expect(host.querySelector('[data-role="publish-section"]')!.textContent).not.toContain('Only what the blocks include is shared.');
     // Above the address input.
     const slug = host.querySelector('.atlas-share-slug')!;
@@ -318,12 +318,12 @@ describe('the Publish section lists what the page shares', () => {
     expect(parts[0].hasAttribute('data-block-id')).toBe(false);
   });
 
-  it('an element with no name of its own reads "(no name)"', async () => {
+  it('an element with no name of its own reads the house\'s unnamed form', async () => {
     await setup([{ id: 'k1', kind: 'element-card', elementId: ASH, variant: 'full', fields: ['description'] }]);
     await store.updateElement(ASH, { name: '' } as Partial<Element>);
     await tick();
     openPublish();
-    await vi.waitFor(() => expect(rowOf(ASH)!.querySelector('.atlas-share-shares-who')!.textContent).toBe('(no name) · Character'));
+    await vi.waitFor(() => expect(rowOf(ASH)!.querySelector('.atlas-share-shares-who')!.textContent).toBe('The unnamed character · Character'));
   });
 
   it('a hidden page, which Publish refuses, shows no list', async () => {
