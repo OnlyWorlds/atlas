@@ -12,12 +12,14 @@ import {
   sameCellWords, storyForWritingRoom, storyLines, strandWhole, whenOf, type LinePart,
 } from '../../src/core/strand-journey';
 
-const slot = (id: string, name: string) => ({ id, name });
-const S = slot('n', 'The Lantern Ferry');
-const EV = slot('e', 'The night crossing');
-const PL = slot('l', 'Saltmere Quay');
-const CH = slot('c', 'Odile');
-const NOW = slot('m', 'The Drowned Library');
+// A slot says its element's type since SDK 4.177.0 (`OwStrandSlot.type`).
+type SlotType = NonNullable<OwStrand['narrative']>['type'];
+const slot = (id: string, name: string, type: SlotType) => ({ id, name, type });
+const S = slot('n', 'The Lantern Ferry', 'narrative');
+const EV = slot('e', 'The night crossing', 'event');
+const PL = slot('l', 'Saltmere Quay', 'location');
+const CH = slot('c', 'Odile', 'character');
+const NOW = slot('m', 'The Drowned Library', 'location');
 const strand = (p: Partial<OwStrand>): OwStrand => ({ ...EMPTY_STRAND, ...p });
 const el = (type: string, id: string, extra: Record<string, unknown> = {}) => ({ id, type, name: id, ...extra }) as unknown as Element;
 const index = (...els: Element[]) => new Map(els.map(e => [e.id, e]));
@@ -47,9 +49,9 @@ describe('R3: each card asks from what is filled (1.122.0, W1)', () => {
   });
 
   it('a blank name reads its unnamed form, in the strand\'s word for a story', () => {
-    const blank = { id: 'x', name: '  ' };
-    expect(cardCopy('event', strand({ narrative: blank }))).toMatchObject({ title: 'What happens in the unnamed story?' });
-    expect(cardCopy('now', strand({ narrative: S, event: blank, character: blank })).what).toBe('The unnamed event may be long past; the unnamed character is still somewhere.');
+    const blank = (type: SlotType) => slot('x', '  ', type);
+    expect(cardCopy('event', strand({ narrative: blank('narrative') }))).toMatchObject({ title: 'What happens in the unnamed story?' });
+    expect(cardCopy('now', strand({ narrative: S, event: blank('event'), character: blank('character') })).what).toBe('The unnamed event may be long past; the unnamed character is still somewhere.');
   });
 
   it('no word on any card says "hero" or "year", and none carries an em-dash', () => {
