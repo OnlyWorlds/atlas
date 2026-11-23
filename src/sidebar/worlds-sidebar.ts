@@ -758,7 +758,7 @@ export function stayedClosedHere(name: string): string {
 
 /** Said when another tab took the world this tab was on while a different world failed to open here. */
 export function openElsewhereNow(name: string): string {
-  return `"${name}" is open in another Atlas tab now, so it is closed here. Open it again to take it back.`;
+  return `"${name}" was closed here: another Atlas tab may have it open now. Open it again to take it back.`;
 }
 
 /**
@@ -920,12 +920,13 @@ async function doActivateWorld(
     if (priorWorldId && priorWorldId !== worldId && getState().active?.worldId === priorWorldId && priorStore) {
       const parked = takeParkedStore(priorWorldId);
       if (parked && parked !== priorStore) parkStore(priorWorldId, parked);
-      // Its lock taken by another tab meanwhile (a parked lock is takeable at once): it stays parked, and
-      // nothing here holds it open any more, no store, no sync and no address of it, so no edit reaches the
-      // other tab's files; a click on it opens it the ordinary way, take-over question and all.
+      // Its lock taken meanwhile, most likely by another tab (a parked lock is takeable at once; a lock file
+      // that cannot be read refuses too): it is closed here, its sync detached and its address left, so no
+      // edit made here reaches the other tab's files (close removes only a lock that is its own); a click on
+      // it opens it the ordinary way, take-over question and all.
       else if (parked && !(await priorStore.unpark())) {
-        parkStore(priorWorldId, priorStore);
         if (getCurrentSyncWorldId() === priorWorldId) detachSyncEngine();
+        await priorStore.close().catch(() => {});
         setActiveStore(null);
         patchSlice('active', null);
         const name = getState().registry.worlds.find(w => w.id === priorWorldId)?.name ?? 'The world you were on';

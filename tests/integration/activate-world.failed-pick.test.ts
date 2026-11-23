@@ -220,10 +220,12 @@ describe('a failed pick leaves the prior world as it was', () => {
     expect(getState().active).toBeNull();
     expect(window.location.hash).toBe('#/');
     expect(getState().data.elements).toEqual([]);
-    expect(said).toContain('"World One" is open in another Atlas tab now, so it is closed here. Open it again to take it back.');
-    expect(store.parked).toBe(true);
-    // A click on it takes the ordinary path, not the already-open shortcut: the parked store is let go
-    // (the other tab still holds it) and a cold open meets the other tab's lock, so the take-over is asked.
+    expect(said).toContain('"World One" was closed here: another Atlas tab may have it open now. Open it again to take it back.');
+    // Closed here, not parked: nothing keeps a handle into the other tab's folder.
+    expect(store.closed).toBe(true);
+    expect(takeParkedStore('w1')).toBeNull();
+    // A click on it takes the ordinary path, not the already-open shortcut: a cold open meets the other tab's
+    // lock, so the take-over is asked.
     lockHeld.add('k-w1');
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     expect(await activateWorld('w1', toastStub)).toBe(false);
