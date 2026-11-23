@@ -84,7 +84,8 @@ describe('the census: each site whose step sends no PIN says so', () => {
     ['ui/join-world-modal.ts', "'reading the link to the world'", /noPin: true/],
     ['ui/join-world-modal.ts', "'joining the world'", /noPin: true/],
     ['ui/join-world-modal.ts', "'checking the seat on OnlyWorlds'", /noPin: true/],
-    ['ui/join-world-modal.ts', "'downloading the world'", /noPin: downloadNoPin\(where\)/],
+    // The same click spent the code and holds the seat before the download: something stays, wherever it lands.
+    ['ui/join-world-modal.ts', "'downloading the world'", /noPin: 'may-have-left'/],
     ['ui/view-world-modal.ts', "'downloading the shared world'", /noPin: downloadNoPin\(where\)/],
     ['ui/link-world-modal.ts', "'downloading the world'", /noPin: readsOnlyByShape\(apiKey\) \? downloadNoPin\(where\) : undefined/],
     ['ui/new-api-world-modal.ts', "'creating the world online'", /noPin: 'may-have-left'/],

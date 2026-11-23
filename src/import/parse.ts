@@ -55,11 +55,20 @@ function fencedBlocks(text: string): FencedBlock[] {
   }
 }
 
-/** A closed block's inside parses as JSON. A text that starts with no JSON value is not tried. */
+/** A JSON value ends on one of these: `}` `]` `"`, a digit, or the `e` and `l` of true, false and null. */
+const JSON_END = new Set(['}', ']', '"', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'e', 'l']);
+
+/**
+ * A closed block's inside parses as JSON. A text that cannot start or end as a JSON value is not tried:
+ * a failed parse throws, and the throw is the cost of a block.
+ */
 function parsesAsJson(text: string, b: FencedBlock): boolean {
   if (b.to < 0) return false;
   const inside = text.slice(b.from, b.to);
   if (!/^\s*[[{"\-0-9tfn]/.test(inside)) return false;
+  let end = inside.length - 1;
+  while (end >= 0 && /\s/.test(inside[end])) end--;
+  if (end < 0 || !JSON_END.has(inside[end])) return false;
   try { JSON.parse(inside); return true; } catch { return false; }
 }
 

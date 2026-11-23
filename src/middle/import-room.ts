@@ -165,10 +165,11 @@ export function jsonErrorWhere(text: string, err: unknown): string {
 
 /**
  * The line for text that is not valid JSON, after `lead` ("Not valid JSON"): where, then what to do. A
- * reply of several code blocks with no one block of JSON says so alone, in one line.
+ * reply of several code blocks with no one block of JSON says so alone, in one line. `text` is what was
+ * parsed (`jsonTextOf`'s answer); the blocks are counted in `pasted`, the reply as it came.
  */
-export function jsonFaultLine(lead: string, text: string, err: unknown): string {
-  if (holdsSeveralBlocks(text)) return SEVERAL_BLOCKS_LINE;
+export function jsonFaultLine(lead: string, text: string, err: unknown, pasted: string = text): string {
+  if (holdsSeveralBlocks(pasted)) return SEVERAL_BLOCKS_LINE;
   return `${lead}${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`;
 }
 
@@ -355,7 +356,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     try {
       raw = JSON.parse(text);
     } catch (err) {
-      showError(jsonFaultLine(`${sourceLabel} isn't valid JSON`, text, err));
+      showError(jsonFaultLine(`${sourceLabel} isn't valid JSON`, text, err, pastedOrRead));
       return;
     }
     const result = parsePayload(raw);
@@ -423,7 +424,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       raw = JSON.parse(text);
     } catch (err) {
       pasteEl.classList.add('is-invalid');
-      setLive('invalid', jsonFaultLine('Not valid JSON', text, err));
+      setLive('invalid', jsonFaultLine('Not valid JSON', text, err, typed));
       return;
     }
     const result = parsePayload(raw);

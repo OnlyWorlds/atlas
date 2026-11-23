@@ -14,7 +14,7 @@ const SEVERAL = 'The reply holds more than one code block, and Atlas cannot tell
 /** The line the review shows for text that does not parse, as the pasted box says it. */
 const faultOf = (pasted: string): string => {
   const text = jsonTextOf(pasted);
-  try { JSON.parse(text); } catch (err) { return jsonFaultLine('Not valid JSON', text, err); }
+  try { JSON.parse(text); } catch (err) { return jsonFaultLine('Not valid JSON', text, err, pasted); }
   return '';
 };
 
@@ -56,6 +56,14 @@ describe('more than one code block', () => {
     expect(faultOf('```\nnot json\n```\n~~~\nnor this\n~~~')).toBe(SEVERAL);
   });
 
+  // The count is the pasted reply's: one block whose text holds fence pairs of the other kind is one block.
+  it('one block holding fence pairs of the other kind is one block', () => {
+    for (const one of ['```\nfoo ~~~\nbar\n~~~\nx ~~~\ny\n~~~\n```', '~~~\nfoo ```\nbar\n```\nx ```\ny\n```\n~~~']) {
+      expect(faultOf(one)).not.toBe(SEVERAL);
+      expect(faultOf(one)).toMatch(/^Not valid JSON/);
+    }
+  });
+
   it('one block that does not parse, or one never closed, keeps its own words', () => {
     expect(faultOf('```json\n{"Character": [{"name": "A",}]}\n```')).toMatch(/^Not valid JSON near line 2, column \d+\. Check for a missing comma, quote, or bracket\.$/);
     expect(faultOf('```json\n' + body)).toContain('code block marks');
@@ -71,6 +79,16 @@ describe('the reader stays linear in the text\'s length', () => {
     expect(jsonTextOf(many)).toBe(many);
     expect(jsonTextOf(mixed)).toBe(mixed);
     jsonTextOf(marks);
+    expect(performance.now() - t0).toBeLessThan(1500);
+  });
+
+  // Each block starts like JSON and none can end like it: no block is handed to JSON.parse, whose thrown
+  // error is the cost of a block (about 10 microseconds, so 300,000 of them took seconds).
+  it('a large paste of blocks that start like JSON and cannot end like it', () => {
+    const open = '```\n[1,2,\n```\n'.repeat(300_000);
+    const t0 = performance.now();
+    expect(jsonTextOf(open)).toBe(open);
+    expect(faultOf(open)).toBe(SEVERAL);
     expect(performance.now() - t0).toBeLessThan(1500);
   });
 });
