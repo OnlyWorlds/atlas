@@ -1214,6 +1214,10 @@ async function doActivateWorld(
         const strand = done.map.size > 0 ? await diskStrand(store) : null;
         if (strand) (meta as unknown as Record<string, unknown>)[STRAND_KEY] = strand.value;
         const next = rekeyRouteHash(window.location.hash, worldId, done.map);
+        // At boot this counts as a move (the end of the open compares the address
+        // with the one it started from), so a deep link to a re-keyed element gets no
+        // second hashchange at the end: this replace fires its own, and the rooms
+        // read the opened world from state.
         if (next) window.location.replace(next);
         // A finished Route 2 journal speaks even on the silent boot path: the
         // link itself is still not done, and nothing else would say so (a
@@ -1308,16 +1312,18 @@ async function doActivateWorld(
   // never blocks the switch-back.
   if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
-  const hereWorldId = parseHash(window.location.hash).worldId;
-  const movedWithin = window.location.hash !== startHash && (hereWorldId === null || hereWorldId === worldId);
+  const here = parseHash(window.location.hash);
+  const movedWithin = window.location.hash !== startHash
+    && ((here.worldId === null && here.mode !== 'welcome') || here.worldId === worldId);
   if (preserveSelection && !movedWithin) {
     // Boot path: URL was already correct (deep route, possibly with /element/<id>).
     // Fire hashchange so route-aware subscribers re-resolve against the now-
     // populated state. Non-boot already navigated synchronously above.
     // Not when the person moved meanwhile to a place that stands with this world
     // (1.125.8): one that names no world (Settings pressed in the first moments
-    // gave way to the world's Home), or a room of it. An address that names
-    // another world would open that one on a reload, so it lands on this world's Home.
+    // gave way to the world's Home), or a room of it. The welcome page's address
+    // and one that names another world would open something else on a reload, so
+    // they land on this world's Home.
     navigateAfterActivate(worldId);
   }
   return true;

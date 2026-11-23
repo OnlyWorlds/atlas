@@ -1,8 +1,9 @@
 /**
  * The boot's open of the world in the address (1.125.8): a person who moved
  * meanwhile to a place that stands with that world (one that names no world,
- * or a room of it) stays there when it finishes; an address still the one it
- * started from, or one that names another world, lands as before. The open is held by its folder
+ * the welcome page aside, or a room of it) stays there when it finishes; an
+ * address still the one it started from, the welcome page's, or one that names
+ * another world, lands as before. The open is held by its folder
  * permission, which the boot only queries, or by what runs before it on the
  * activation chain, as the boot's reconciliation does.
  */
@@ -129,6 +130,15 @@ describe('the boot\'s open, the person moved meanwhile', () => {
     expect(getState().active?.worldId).toBe('w1');
     expect(window.location.hash).toBe('#/settings/general');
     expect(history.length).toBe(entries);
+  });
+
+  // The shell draws the open world's Home there, and a reload would draw the welcome page.
+  it('the welcome page: the opened world\'s Home, as before', async () => {
+    const boot = await heldBoot('#/w/w1/writing');
+    window.location.hash = '#/';
+    expect(await boot.finish()).toBe(true);
+    expect(getState().active?.worldId).toBe('w1');
+    expect(window.location.hash).toBe('#/w/w1');
   });
 
   // An address that names one world over another would open the other on a reload.
