@@ -1902,7 +1902,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const also = document.createElement('li');
       also.className = 'atlas-share-shares-part';
       also.dataset.partKind = 'also';
-      also.textContent = `Also sent: ${andList(row.also.map(humanizeFieldName))}`;
+      also.textContent = `Also sent: ${andList(row.also.map(humanizeFieldName))}.`;
       parts.appendChild(also);
     }
     li.appendChild(parts);

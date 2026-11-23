@@ -759,7 +759,8 @@ export function stayedClosedHere(name: string): string {
 /** Said when another tab took the world this tab was on while a different world failed to open here. */
 export function openElsewhereNow(name: string | undefined): string {
   // A name is said in quotes; a world with none is said plainly, never a phrase in quotes as if it were its name.
-  const world = name?.trim() ? `"${name}"` : 'The world you were on';
+  // The list's entry is read as stored, so a name that is no text counts as none.
+  const world = typeof name === 'string' && name.trim() ? `"${name}"` : 'The world you were on';
   return `${world} was closed here: another Atlas tab may have it open now. Open it again to take it back.`;
 }
 

@@ -19,7 +19,8 @@ describe('the world lock says tab, and names what to press', () => {
 
   it('a world another tab took is named in quotes; one with no name is said plainly, never a phrase in quotes', () => {
     expect(openElsewhereNow('Saltmere')).toBe('"Saltmere" was closed here: another Atlas tab may have it open now. Open it again to take it back.');
-    for (const none of [undefined, '', '   ']) {
+    // 5 and null: a list entry is read as stored, so a damaged one can hold a name that is no text.
+    for (const none of [undefined, '', '   ', 5 as unknown as string, null as unknown as string]) {
       expect(openElsewhereNow(none)).toBe('The world you were on was closed here: another Atlas tab may have it open now. Open it again to take it back.');
     }
   });

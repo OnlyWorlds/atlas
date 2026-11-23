@@ -139,7 +139,7 @@ describe('bring it down again', () => {
     // A guest's read key, minted from the account: its way back is the account's, never a link.
     ['a guest\'s account world', { api: { ...cleared().api!, read_only: true, key_mint: { id: 'm1', tail: 'abcd' } } }, 'key_revoked', /open it again from onlyworlds\.com\. A world file of it brings it back too\.$/],
     ['a read-key world', { api: { ...cleared().api!, read_only: true } }, 'key_revoked', /revoked on onlyworlds\.com, .*by a new link or key from whoever shared it\. A world file of it brings it back too\.$/],
-    ['a seat world', { api: { ...cleared().api!, api_key: 'ow_w_seatgone'.padEnd(37, 'k'), seat: { role: 'editor' } } }, 'invalid_credentials', /^OnlyWorlds no longer takes this world's seat,.* The owner may have removed it\. .*by a new link from whoever made the seat\. Or open a world file/],
+    ['a seat world', { api: { ...cleared().api!, api_key: 'ow_w_seatgone'.padEnd(37, 'k'), seat: { role: 'editor' } } }, 'invalid_credentials', /^OnlyWorlds no longer takes this world's seat, .* The owner may have removed it\. .*by a new link from whoever made the seat\. Or open a world file/],
   ];
   for (const [kind, over, code, line] of refusedKeyRows) {
     it(`${kind} whose key keel refuses (${code}) says so and its ways back, keeping nothing`, async () => {
