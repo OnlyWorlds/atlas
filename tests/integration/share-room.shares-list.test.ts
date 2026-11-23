@@ -58,6 +58,8 @@ const ASH = 'a1000000-0000-0000-0000-000000000001';
 const BRAM = 'a2000000-0000-0000-0000-000000000002';
 const MAP = 'm1000000-0000-0000-0000-000000000001';
 const PIN_ASH = 'p1000000-0000-0000-0000-000000000001';
+const PIN_BRAM = 'p2000000-0000-0000-0000-000000000002';
+const EVENT = 'ev000000-0000-0000-0000-000000000001';
 
 function makeToasts() {
   return { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn(), show: vi.fn() };
@@ -81,7 +83,7 @@ describe('the Publish section lists what the page shares', () => {
   let host: HTMLElement;
   let unmount: (() => void) | null = null;
 
-  async function setup(blocks: PageBlock[], opts: { published?: boolean; charts?: ChartConfig[]; chartDelayMs?: number } = {}): Promise<void> {
+  async function setup(blocks: PageBlock[], opts: { published?: boolean; charts?: ChartConfig[]; chartDelayMs?: number; page?: Record<string, unknown> } = {}): Promise<void> {
     const fake = statefulSharingHandlers(SHARING_BASE_URL);
     mswServer.use(...fake.handlers);
     store = new MockFolderStore();
@@ -92,6 +94,8 @@ describe('the Publish section lists what the page shares', () => {
     await store.createElement('character', { id: BRAM, name: 'Bram', description: 'The miller.' } as Partial<Element>);
     await store.createElement('map', { id: MAP, name: 'Realm', image_url: 'https://img.example/realm.png', width: 100, height: 100 } as Partial<Element>);
     await store.createElement('pin', { id: PIN_ASH, name: 'p', map_id: MAP, element_id: ASH, x: 10, y: 10 } as Partial<Element>);
+    await store.createElement('pin', { id: PIN_BRAM, name: 'p', map_id: MAP, element_id: BRAM, x: 20, y: 20 } as Partial<Element>);
+    await store.createElement('event', { id: EVENT, name: 'The flood', start_date: 12 } as Partial<Element>);
     if (opts.charts) {
       const charts = opts.charts;
       const delay = opts.chartDelayMs ?? 0;
@@ -102,6 +106,7 @@ describe('the Publish section lists what the page shares', () => {
       ...(opts.published ? { atlas_page_pub: {
         id: 'srv-pg', slug: 'primer-page', published_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z', revoked: false,
       } } : {}),
+      ...(opts.page ?? {}),
     } as Partial<Element>);
     pageId = page.id;
 
@@ -158,13 +163,17 @@ describe('the Publish section lists what the page shares', () => {
     expect(l, 'the list is in the Publish section').toBeTruthy();
     expect(l!.closest('[data-role="publish-section"]')).toBeTruthy();
     expect(l!.textContent).toContain('What this page shares');
+    expect(host.querySelector('[data-role="publish-section"]')!.textContent).toContain('This page shares what is listed below.');
+    expect(host.querySelector('[data-role="publish-section"]')!.textContent).not.toContain('Only what the blocks include is shared.');
     // Above the address input.
     const slug = host.querySelector('.atlas-share-slug')!;
     expect(l!.compareDocumentPosition(slug) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const ash = rowOf(ASH)!;
     expect(ash.querySelector('bdi')!.textContent).toBe('Ash');
+    expect(ash.querySelector('.atlas-share-shares-who')!.textContent).toBe('Ash · Character');
     expect(ash.querySelector('[data-part-kind="card"]')!.textContent).toContain('Description');
     const pin = ash.querySelector('[data-part-kind="map"]')!;
+    expect(pin.textContent).toContain('Full pin on Realm');
     expect(pin.textContent).toContain('Description');
     expect(pin.textContent).toContain('Mood');
     expect(rowOf(BRAM)).toBeNull();
@@ -177,6 +186,7 @@ describe('the Publish section lists what the page shares', () => {
     openPublish();
     const l = list();
     expect(l).toBeTruthy();
+    expect(l!.textContent).toContain('What a republish shares');
     const repub = host.querySelector('[data-action="republish"]')!;
     expect(l!.compareDocumentPosition(repub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rowOf(ASH)).toBeTruthy();
@@ -207,6 +217,8 @@ describe('the Publish section lists what the page shares', () => {
       { id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_ASH] },
     ]);
     openPublish();
+    expect(rowOf(ASH)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Pin on Realm');
+    expect(rowOf(ASH)!.querySelector('[data-part-kind="map"]')!.textContent).not.toContain('Full pin');
     const btn = press(ASH, 'map')!;
     expect(btn.textContent).toBe('Edit map');
     btn.click();
@@ -219,7 +231,8 @@ describe('the Publish section lists what the page shares', () => {
     await setup([{ id: 'col', kind: 'collection', elementIds: [BRAM, ASH] }]);
     openPublish();
     const part = rowOf(ASH)!.querySelector('[data-part-kind="collection"]')!;
-    expect(part.textContent).toContain('remove it from the collection to stop sending its picture');
+    expect(part.textContent).toContain('Collection: its picture. Remove it from the collection to stop sending it.');
+    expect(part.textContent!.match(/its picture/g)).toHaveLength(1);
     const btn = press(ASH, 'collection')!;
     expect(btn.textContent).toBe('Edit collection');
     btn.click();
@@ -254,6 +267,7 @@ describe('the Publish section lists what the page shares', () => {
     expect(host.querySelector('[data-role="share-shares-else"]')?.textContent ?? '').not.toContain('Charts share');
     await vi.waitFor(() =>
       expect(host.querySelector('[data-role="share-shares-else"]')?.textContent ?? '').toContain('Charts share'));
+    expect(host.querySelector('[data-role="share-shares-else"]')!.textContent).not.toContain('republish');
   });
 
   it("the first card deleted, its row's press opens the next card", async () => {
@@ -268,6 +282,63 @@ describe('the Publish section lists what the page shares', () => {
     await vi.waitFor(() => expect(rowOf(ASH)!.querySelectorAll('[data-part-kind="card"]')).toHaveLength(1));
     press(ASH, 'card')!.click();
     await vi.waitFor(() => expect(host.querySelector('[data-block-id="k2"] .atlas-share-card-edit')).toBeTruthy());
+  });
+
+  it("a Full pin sending more than the description: Edit map lands on that pin's Full toggle", async () => {
+    await setup([{ id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_ASH], fullPinIds: [PIN_ASH] }]);
+    openPublish();
+    expect(rowOf(ASH)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Full pin on Realm: Description, Mood and its picture');
+    press(ASH, 'map')!.click();
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(host.querySelector(`[data-block-id="mb"] [data-pin-id="${PIN_ASH}"] .atlas-share-pin-full-toggle`)));
+  });
+
+  it('a Full pin sending only the description: Edit map lands on its include checkbox', async () => {
+    await setup([{ id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_BRAM], fullPinIds: [PIN_BRAM] }]);
+    openPublish();
+    expect(rowOf(BRAM)!.querySelector('[data-part-kind="map"]')!.textContent).toContain('Full pin on Realm: Description');
+    press(BRAM, 'map')!.click();
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(host.querySelector(`[data-block-id="mb"] [data-pin-id="${PIN_BRAM}"] input[type="checkbox"]`)));
+  });
+
+  it('two cards of one element are numbered by page order, each press named apart', async () => {
+    await setup([
+      { id: 'k1', kind: 'element-card', elementId: ASH, variant: 'full', fields: ['description'] },
+      { id: 'k2', kind: 'element-card', elementId: ASH, variant: 'full', fields: ['x_mood'], showImage: false },
+    ]);
+    openPublish();
+    const parts = [...rowOf(ASH)!.querySelectorAll('[data-part-kind="card"]')];
+    expect(parts.map(p => p.querySelector('.atlas-share-shares-what')!.textContent)).toEqual([
+      'Card 1 of 2: Description and its picture', 'Card 2 of 2: Mood',
+    ]);
+    const labels = parts.map(p => p.querySelector('button')!.getAttribute('aria-label'));
+    expect(new Set(labels).size).toBe(2);
+    expect(parts.map(p => (p as HTMLElement).dataset.sharesBlock)).toEqual(['k1', 'k2']);
+    expect(parts[0].hasAttribute('data-block-id')).toBe(false);
+  });
+
+  it('an element with no name of its own reads "(no name)"', async () => {
+    await setup([{ id: 'k1', kind: 'element-card', elementId: ASH, variant: 'full', fields: ['description'] }]);
+    await store.updateElement(ASH, { name: '' } as Partial<Element>);
+    await tick();
+    openPublish();
+    await vi.waitFor(() => expect(rowOf(ASH)!.querySelector('.atlas-share-shares-who')!.textContent).toBe('(no name) · Character'));
+  });
+
+  it('a hidden page, which Publish refuses, shows no list', async () => {
+    await setup([{ id: 'k1', kind: 'element-card', elementId: ASH, variant: 'full', fields: ['description'] }], { page: { hidden: true } });
+    openPublish();
+    expect(host.querySelector('[data-role="publish-section"]')).toBeTruthy();
+    const l = list();
+    expect(l === null || l.hidden).toBe(true);
+  });
+
+  it('a block id holding a line feed still opens and focuses (matched by its data, not a selector)', async () => {
+    await setup([{ id: 'k\n1', kind: 'element-card', elementId: ASH, variant: 'full', fields: ['description'] }]);
+    openPublish();
+    press(ASH, 'card')!.click();
+    await vi.waitFor(() => expect(document.activeElement?.closest('.atlas-share-card-edit')).toBeTruthy());
   });
 
   it('a new card is full and shows its description (the default the list exists for)', async () => {

@@ -38,7 +38,7 @@ import { findAddresses, findLooseAddressRuns, namedId } from './ow-links';
 import { getZoneShape } from '../tabs/right/zone-derived';
 import { freezeChartBlock, type PayloadChartBlock } from '../visualization/timeline/chart-freeze';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { capitalise, missingLabel, nameOrUnnamed, theUnnamed } from './type-words';
+import { capitalise, missingLabel, nameOrUnnamed, ownName, theUnnamed } from './type-words';
 
 // ---------------------------------------------------------------------------
 // Payload types (the §5 wire shape).
@@ -340,6 +340,8 @@ export interface SharePart {
   /** A map part: the map's name as published, and this element's pins on it that show. */
   mapTitle?: string;
   pinIds?: string[];
+  /** A map part: those of `pinIds` that are Full (each sends every filled field). */
+  fullPinIds?: string[];
 }
 
 /** One element whose payload entry sends a field or a picture. */
@@ -347,6 +349,8 @@ export interface ShareRow {
   elementId: string;
   name: string;
   type: string;
+  /** The element has no name of its own (`name` is then its unnamed form). */
+  unnamed: boolean;
   parts: SharePart[];
   /** A field the entry sends that no block above sends (none expected; nothing sent goes unlisted). */
   also: string[];
@@ -360,7 +364,7 @@ export interface ShareClauses {
   links: boolean;
   /** A link names an element not on the page (a token with no `ref`). */
   linksOffPage: boolean;
-  /** A chart block: the names and dates of what it draws. */
+  /** A chart block that draws something: the names and dates of what it draws. */
   charts: boolean;
   /** Each circle block with entries: its knower's name as published, and how many entries. */
   circles: Array<{ knower: string; entries: number }>;
@@ -441,6 +445,7 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
           picture: entry.image_url !== undefined,
           mapTitle: frozen.title,
           pinIds: pins.map(p => p.pinId),
+          fullPinIds: pins.map(p => p.pinId).filter(pinId => (b.fullPinIds ?? []).includes(pinId)),
         });
       }
     }
@@ -460,6 +465,7 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
     const listed = new Set(parts.flatMap(p => p.fields));
     rows.push({
       elementId: id, name: entry.name, type: entry.type, parts,
+      unnamed: !ownName(byId.get(id) ?? { name: '' }),
       also: Object.keys(entry.fields).filter(f => !listed.has(f)),
     });
   }
@@ -480,7 +486,8 @@ export function pageShares(payload: PagePayload, blocks: readonly PageBlock[], e
       maps: frozenMaps.size > 0,
       links,
       linksOffPage,
-      charts: payload.blocks.some(b => b.kind === 'chart'),
+      // A chart that draws nothing names nothing.
+      charts: payload.blocks.some(b => b.kind === 'chart' && b.nodes.length > 0),
       // A missing knower freezes with no entries, so "with entries" is "its knower resolves".
       circles: payload.blocks.flatMap(b => b.kind === 'circle' && b.entries.length > 0
         ? [{ knower: b.title, entries: b.entries.length }] : []),
@@ -742,20 +749,6 @@ export function projectElementEntry(
   return entry;
 }
 
-/**
- * Freeze a map block: image URL + chosen pins normalized to percentages.
- * THE ONE ORIGIN CONVERSION on the publish path: storage is the
- * schema's BOTTOM-left, the payload's `yPct` is a TOP-left CSS percentage by
- * contract (SHARING_CONTRACT.md §5), so `yPct = (height - y) / height`. The
- * renderers (atlas preview, tools/show) apply `yPct` as `top:` and never
- * convert, which is why pages published before the y-flip still draw right. The
- * map's width/height fields hold the image dimensions, auto-detected by atlas
- * when image_url is set. Returns null — block drops from the wire — when the map
- * is missing, has no published image (D3: image_url only, local media never
- * leaves the folder), or has no usable dimensions. Pins drop individually
- * when their pin/element is gone (disclose nothing) or out of bounds.
- * Exported for the renderer (builder compiles live → same view).
- */
 /** A map block's map as it publishes: present, with an http(s) image and a size; else null (the block drops). */
 function mapFrameOf(block: MapBlock, byId: Map<string, Element>): { map: Element; imageUrl: string; width: number; height: number } | null {
   const map = byId.get(block.mapId);
@@ -786,6 +779,9 @@ export function frozenPinTargets(
     const pin = byId.get(pinId);
     if (!pin) continue;
     const p = pin as Record<string, unknown>;
+    // A pin moved to another map no longer belongs to this one: the map
+    // editor lists only this map's pins, so it would have no checkbox here.
+    if (p.map_id !== block.mapId) continue;
     const x = typeof p.x === 'number' ? p.x : NaN;
     const y = typeof p.y === 'number' ? p.y : NaN;
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
@@ -796,6 +792,21 @@ export function frozenPinTargets(
   return out;
 }
 
+/**
+ * Freeze a map block: image URL + chosen pins normalized to percentages.
+ * THE ONE ORIGIN CONVERSION on the publish path: storage is the
+ * schema's BOTTOM-left, the payload's `yPct` is a TOP-left CSS percentage by
+ * contract (SHARING_CONTRACT.md §5), so `yPct = (height - y) / height`. The
+ * renderers (atlas preview, tools/show) apply `yPct` as `top:` and never
+ * convert, which is why pages published before the y-flip still draw right. The
+ * map's width/height fields hold the image dimensions, auto-detected by atlas
+ * when image_url is set. Returns null — block drops from the wire — when the map
+ * is missing, has no published image (D3: image_url only, local media never
+ * leaves the folder), or has no usable dimensions. Pins drop individually
+ * when their pin/element is gone (disclose nothing), unplaced, or moved to
+ * another map (`frozenPinTargets`).
+ * Exported for the renderer (builder compiles live → same view).
+ */
 export function freezeMapBlock(
   block: MapBlock,
   byId: Map<string, Element>,

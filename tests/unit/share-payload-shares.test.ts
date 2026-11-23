@@ -131,9 +131,27 @@ describe('pageShares: one row per element that sends a field or a picture', () =
     const ash = s.rows.find(r => r.elementId === ASH)!;
     expect(ash.parts).toEqual([
       { kind: 'card', blockId: 'k1', fields: ['birthplace'], picture: true },
-      { kind: 'map', blockId: 'mb', fields: ['description'], picture: true, mapTitle: 'Realm', pinIds: [PIN_ASH] },
+      { kind: 'map', blockId: 'mb', fields: ['description'], picture: true, mapTitle: 'Realm', pinIds: [PIN_ASH], fullPinIds: [] },
     ]);
     expectNothingUnlisted(blocks);
+  });
+
+  it('a map part names which of its pins are Full, so the press can land on that toggle', () => {
+    const s = sharesOf([{ id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_ASH, PIN_BRAM], fullPinIds: [PIN_ASH] }]);
+    expect(s.rows.find(r => r.elementId === ASH)!.parts[0].fullPinIds).toEqual([PIN_ASH]);
+    expect(s.rows.find(r => r.elementId === BRAM)!.parts[0].fullPinIds).toEqual([]);
+  });
+
+  it('a pin moved to another map has no part on its old one', () => {
+    const moved = world().map(e => e.id === PIN_ASH ? ({ ...e, map_id: MAP2 } as unknown as Element) : e);
+    const s = sharesOf([card('k1', BRAM, ['description']), { id: 'mb', kind: 'map', mapId: MAP, pinIds: [PIN_ASH] }], moved);
+    expect(s.rows.map(r => r.elementId)).toEqual([BRAM]);
+  });
+
+  it('an element with no name of its own is marked unnamed', () => {
+    const els = [...world(), { id: 'u1000000-0000-0000-0000-000000000001', type: 'character', name: '', description: 'Who?' } as unknown as Element];
+    const s = sharesOf([card('k1', 'u1000000-0000-0000-0000-000000000001', ['description']), card('k2', ASH, ['description'])], els);
+    expect(s.rows.map(r => r.unnamed)).toEqual([true, false]);
   });
 
   it('description ticked on the card and pinned: listed under both, so unticking it on the card still shows it sent', () => {
@@ -257,11 +275,14 @@ describe('pageShares: what else goes out, each clause only with its carrier', ()
     expect(c).toMatchObject({ maps: true, links: true, linksOffPage: true });
   });
 
-  it('a chart block', () => {
+  it('a chart block that draws something; one that draws nothing, or a missing chart, adds nothing', () => {
     const chart = { schema_version: 1, id: 'ch1', name: 'Years', axis: { kind: 'time', direction: 'both' },
       scope: { kind: 'all' }, render: '2d' } as ChartConfig;
-    expect(sharesOf([{ id: 'cb', kind: 'chart', chartId: 'ch1' }], world(), [chart]).clauses.charts).toBe(true);
-    expect(sharesOf([{ id: 'cb', kind: 'chart', chartId: 'ch1' }], world(), []).clauses.charts).toBe(false);
+    const dated = [...world(), { id: 'ev000000-0000-0000-0000-000000000001', type: 'event', name: 'The flood', start_date: 12 } as unknown as Element];
+    expect(sharesOf([{ id: 'cb', kind: 'chart', chartId: 'ch1' }], dated, [chart]).clauses.charts).toBe(true);
+    // world() holds no dated element: the chart draws nothing.
+    expect(sharesOf([{ id: 'cb', kind: 'chart', chartId: 'ch1' }], world(), [chart]).clauses.charts).toBe(false);
+    expect(sharesOf([{ id: 'cb', kind: 'chart', chartId: 'ch1' }], dated, []).clauses.charts).toBe(false);
   });
 
   it('a circle with entries names its knower and the count; an empty circle and a missing knower add nothing', () => {

@@ -13333,6 +13333,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-share-shares-names,
 .atlas-share-shares-else {
   margin: 8px 0 0;
+  overflow-wrap: anywhere;
 }
 
 /* The chip "Edit collection" lands on: seen, though it holds no control of its own. */

@@ -627,6 +627,27 @@ describe('buildPagePayload', () => {
     expect((p.blocks[0] as { pins: Array<{ ref?: string }> }).pins.map(pin => pin.ref)).toEqual([D]);
   });
 
+  it('a pin moved to another map neither draws nor sends on its old map (1.125.13)', () => {
+    // The map editor lists only the pins whose map is this map, so a pin still
+    // in the include-list after it moved had no checkbox to turn it off.
+    const OLD = 'm6000000-0000-0000-0000-000000000006';
+    const NEW = 'm7000000-0000-0000-0000-000000000007';
+    const E = 'ee000000-0000-0000-0000-00000000000e';
+    const PE = 'pe000000-0000-0000-0000-00000000000e';
+    const elements: Element[] = [
+      { id: OLD, type: 'map', name: 'Old', image_url: 'https://img.example/o.png', width: 100, height: 100 },
+      { id: NEW, type: 'map', name: 'New', image_url: 'https://img.example/n.png', width: 100, height: 100 },
+      { id: E, type: 'character', name: 'E', description: 'SECRET-E', image_url: 'https://img.example/e.png' },
+      { id: PE, type: 'pin', map_id: NEW, element_id: E, x: 10, y: 10 },
+    ] as unknown as Element[];
+    const page = makePage([{ id: 'b1', kind: 'map', mapId: OLD, pinIds: [PE], fullPinIds: [PE] }]);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [OLD, PE];
+    const p = buildPagePayload(page, elements);
+    expect((p.blocks[0] as { pins: unknown[] }).pins).toEqual([]);
+    expect(p.elements).toEqual({});
+    expect(JSON.stringify(p)).not.toContain('SECRET-E');
+  });
+
   it('fullPinIds heals alongside pinIds on id-swap (opt-in follows its pin)', () => {
     const MAP = 'm1000000-0000-0000-0000-000000000001';
     const PIN1 = 'pin10000-0000-0000-0000-000000000001';
@@ -671,7 +692,7 @@ describe('freezeMapBlock — image URL scheme guard', () => {
   function mapWorld(imageUrl: string, dims: { width?: number; height?: number } = { width: 1000, height: 800 }): Map<string, Element> {
     const els: Element[] = [
       { id: MAP, type: 'map', name: 'Barovia', image_url: imageUrl, ...dims, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
-      { id: PIN, type: 'pin', name: 'Vallaki pin', x: 500, y: 400, element_id: VALLAKI, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
+      { id: PIN, type: 'pin', name: 'Vallaki pin', map_id: MAP, x: 500, y: 400, element_id: VALLAKI, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
       { id: VALLAKI, type: 'location', name: 'Vallaki', local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
     ];
     return new Map(els.map(e => [e.id, e]));
