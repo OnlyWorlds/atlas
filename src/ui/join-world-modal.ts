@@ -411,8 +411,8 @@ export class JoinWorldModal extends BaseModal {
           busy(false);
           progressBox.hidden = true;
           // keel answers a removed or revoked key 401; an agent key's world gone, 404.
-          if (err instanceof OwV2Error && (err.status === 401 || (err.status === 404 && held.kind === 'agent'))) {
-            say(`OnlyWorlds no longer takes the seat kept for ${p.world.name}: it was removed on onlyworlds.com, or the world is gone. Remove it from your list.`);
+          if (seatRefused(err, held.kind)) {
+            say(seatGoneLine(p.world.name));
             openBtn.hidden = true;
             removeHeldBtn.hidden = false;
           } else {
@@ -501,6 +501,14 @@ export class JoinWorldModal extends BaseModal {
         // A join's download sends no API-Pin: an agent's seat key reads bare (the link asks no /me beside a
         // seat), a player's read key never takes one. The same click spent the code and holds the seat
         // before it, so something stays wherever the world was to land.
+        // keel refused the seat mid-download: Retry is refused again, so the held seat goes by its button.
+        // Only the key's own 401: a 404 here can be one element's, not the world's.
+        if (err instanceof OwV2Error && err.status === 401 && this.heldName()) {
+          say(`${seatGoneLine(p.world.name)}${leftSomethingBehind(err) ? ' Part of it may still be in your OnlyWorlds folder, on no list.' : ''}`);
+          openBtn.hidden = true;
+          removeHeldBtn.hidden = false;
+          return;
+        }
         say(problemFor(err, { inline: true, doing: 'downloading the world', where, noPin: 'may-have-left' }).sentence);
         openBtn.textContent = 'Retry';
       }
@@ -508,6 +516,15 @@ export class JoinWorldModal extends BaseModal {
 
     return overlay;
   }
+}
+
+/** keel no longer takes a held seat's key: a removed or revoked key answers 401; an agent key's world gone, 404. */
+function seatRefused(err: unknown, kind: 'player' | 'agent'): boolean {
+  return err instanceof OwV2Error && (err.status === 401 || (err.status === 404 && kind === 'agent'));
+}
+
+function seatGoneLine(worldName: string): string {
+  return `OnlyWorlds no longer takes the seat kept for ${worldName}: it was removed on onlyworlds.com, or the world is gone. Remove it from your list.`;
 }
 
 /** A world here whose name matches, case-insensitively (R8: names are free text). */

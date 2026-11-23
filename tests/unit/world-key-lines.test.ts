@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { OwV2Error } from '../../src/sync/ow-v2-client-adapter';
-import { keyRefusalHere, keyRefusalLine, keyRefusalOf, keyRefusalPill, seatRefusalLine } from '../../src/sync/world-key-lines';
+import { clearedKeyRefusalLine, keyRefusalHere, keyRefusalLine, keyRefusalOf, keyRefusalPill, seatRefusalLine } from '../../src/sync/world-key-lines';
 import type { KeyRefusal } from '../../src/core/types';
 
 const err = (status: number, code: string, param: string | null = null) =>
@@ -53,6 +53,24 @@ describe('the lines', () => {
     expect(seatRefusalLine('key_revoked', { paused: false })).toBe('This seat\'s key was renewed or revoked on onlyworlds.com.');
     expect(seatRefusalLine('key_unknown')).toMatch(/may have removed it/);
     for (const r of reasons) expect(seatRefusalLine(r)).not.toMatch(/new key|unlink/i);
+  });
+
+  it('a cleared world\'s refused key: what happened and the ways back for each kind, never Retry or Unlink', () => {
+    const kinds = ['account', 'read', 'seat'] as const;
+    for (const code of ['key_revoked', 'invalid_credentials']) {
+      for (const k of kinds) {
+        const line = clearedKeyRefusalLine(err(401, code), k)!;
+        expect(line).toMatch(/so Atlas could not download it again\. Nothing changed\./);
+        expect(line).toMatch(/open a world file of it, or remove it from your list and /);
+        expect(line).not.toMatch(/try again|retry|unlink|feedback|—/i);
+      }
+    }
+    expect(clearedKeyRefusalLine(err(401, 'key_revoked'), 'seat')).toMatch(/^This seat's key was renewed or revoked/);
+    expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'read')).toMatch(/deleted there, or you were removed from it/);
+    // Not about the key: the caller's general line words it.
+    for (const e of [err(401, 'invalid_credentials', 'API-Pin'), err(403, 'permission_error'), err(500, 'server_error'), new Error('x')]) {
+      expect(clearedKeyRefusalLine(e, 'account')).toBeNull();
+    }
   });
 
   it('the unknown key names what makes keel forget one', () => {
