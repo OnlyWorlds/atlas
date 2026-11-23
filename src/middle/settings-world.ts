@@ -20,6 +20,7 @@ import {
   effectiveSyncPaused,
   updateWorldEntry,
 } from '../registry/registry';
+import { registryCopyLanded } from '../registry/registry-copy';
 import { deleteHandle, loadHandle } from '../store/handle-vault';
 import { FIRST_STEPS_ON, startPath } from '../core/guide-path';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
@@ -566,6 +567,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     evictParkedStore(world.id);
     const next = deleteWorldEntry(getState().registry, world.id);
     saveRegistry(next);
+    // The copy holds the save before the handle goes: else the two databases
+    // commit in either order, and a kill between them lists the world with
+    // no handle (registry/registry-copy.ts).
+    await registryCopyLanded();
     await deleteHandle(world.folder.handle_key).catch(() => {});
     patchSlice('registry', next);
     patchSlice('active', null);
@@ -624,6 +629,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // Now drop registry + handle.
       const next = deleteWorldEntry(getState().registry, world.id);
       saveRegistry(next);
+      // The copy holds the save before the handle goes (as Forget, above).
+      await registryCopyLanded();
       await deleteHandle(world.folder.handle_key).catch(() => {});
       patchSlice('registry', next);
       patchSlice('active', null);
