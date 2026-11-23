@@ -1308,13 +1308,16 @@ async function doActivateWorld(
   // never blocks the switch-back.
   if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
-  if (preserveSelection && window.location.hash === startHash) {
+  const hereWorldId = parseHash(window.location.hash).worldId;
+  const movedWithin = window.location.hash !== startHash && (hereWorldId === null || hereWorldId === worldId);
+  if (preserveSelection && !movedWithin) {
     // Boot path: URL was already correct (deep route, possibly with /element/<id>).
     // Fire hashchange so route-aware subscribers re-resolve against the now-
     // populated state. Non-boot already navigated synchronously above.
-    // Only while the address is the one the boot's open started from (1.125.8):
-    // moved meanwhile, the person is where they chose to be (Settings pressed in
-    // the first moments gave way to the world's Home), and it stays theirs.
+    // Not when the person moved meanwhile to a place that stands with this world
+    // (1.125.8): one that names no world (Settings pressed in the first moments
+    // gave way to the world's Home), or a room of it. An address that names
+    // another world would open that one on a reload, so it lands on this world's Home.
     navigateAfterActivate(worldId);
   }
   return true;

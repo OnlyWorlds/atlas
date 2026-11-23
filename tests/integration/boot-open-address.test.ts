@@ -1,7 +1,8 @@
 /**
- * The boot's open of the world in the address (1.125.8): when it finishes it
- * navigates only if the address is still the one it started from; a person
- * who moved meanwhile stays where they went. The open is held by its folder
+ * The boot's open of the world in the address (1.125.8): a person who moved
+ * meanwhile to a place that stands with that world (one that names no world,
+ * or a room of it) stays there when it finishes; an address still the one it
+ * started from, or one that names another world, lands as before. The open is held by its folder
  * permission, which the boot only queries, or by what runs before it on the
  * activation chain, as the boot's reconciliation does.
  */
@@ -130,17 +131,19 @@ describe('the boot\'s open, the person moved meanwhile', () => {
     expect(history.length).toBe(entries);
   });
 
-  // As Back does at any other moment: Atlas opens no world on Back.
-  it('Back, to another world\'s address: the address stays where Back led', async () => {
-    window.location.hash = '#/w/w2/timeline';
-    await tick();
-    const boot = await heldBoot('#/w/w1');
-    history.back();
-    await vi.waitFor(() => expect(window.location.hash).toBe('#/w/w2/timeline'));
-    expect(await boot.finish()).toBe(true);
-    expect(getState().active?.worldId).toBe('w1');
-    expect(window.location.hash).toBe('#/w/w2/timeline');
-  });
+  // An address that names one world over another would open the other on a reload.
+  for (const other of ['#/w/w2/timeline', '#/w/w2/settings/world', '#/w/not-in-the-list']) {
+    it(`Back, to another world's address (${other}): the opened world's Home, as before`, async () => {
+      window.location.hash = other;
+      await tick();
+      const boot = await heldBoot('#/w/w1/writing');
+      history.back();
+      await vi.waitFor(() => expect(window.location.hash).toBe(other));
+      expect(await boot.finish()).toBe(true);
+      expect(getState().active?.worldId).toBe('w1');
+      expect(window.location.hash).toBe('#/w/w1');
+    });
+  }
 });
 
 describe('the boot\'s open, nothing pressed: as before', () => {
