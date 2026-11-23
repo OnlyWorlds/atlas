@@ -154,7 +154,7 @@ One user-chosen folder that holds atlas-made worlds. Set once per browser profil
 
 **Discovery**: after resolving the root, atlas scans its subfolders for a valid `world.json` and registers each (`isSameEntry` avoids duplicates; a world id already registered from another folder is skipped). An `api` block registers the world api-linked; absent, local-only.
 
-**Recovery**: when localStorage is cleared but IndexedDB survives, `hydrateAtlasRoot` surfaces `state.atlasRootRecoverable`. The welcome panel then shows "Re-link OnlyWorlds folder" (plus "Or set up a different folder"), which re-grants, validates the marker, restores the registry entry and rediscovers the worlds; the worlds sidebar shows the recoverable state too.
+**Recovery**: when localStorage is cleared but IndexedDB survives, `hydrateAtlasRoot` surfaces `state.atlasRootRecoverable`. The welcome panel then shows "Re-link OnlyWorlds folder" (plus "Or set up a different folder"), which re-grants, validates the marker, restores the registry entry and rediscovers the worlds; the worlds sidebar shows the recoverable state too. Since 1.125.7 a `localStorage` cleared alone comes back whole from the registry's landed copy at the next start (conv. 194), so this shows when the copy went too, or its restore was skipped.
 
 **Subfolder naming**: created worlds get `<slugified-name>-<id8>` directories; `world.json` carries the friendly name. The link flow never writes into an existing folder: it falls to `-2`, `-3` suffixes.
 

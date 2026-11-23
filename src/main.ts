@@ -1,8 +1,10 @@
 /**
  * Atlas — folder-first OnlyWorlds world browser and editor.
  *
- * Boot order: app shell mounts → registry hydrates from localStorage → router
- * resolves the current hash → middle panel renders for the active mode.
+ * Boot order: the registry's landed copy goes back when it is newer than
+ * localStorage (registry/registry-copy.ts) → app shell mounts → registry
+ * hydrates from localStorage → router resolves the current hash → middle
+ * panel renders for the active mode.
  */
 
 // Self-host the Material Symbols icon font (vs Google Fonts CDN) so the app
@@ -31,6 +33,9 @@ import { installUnexpectedErrorReporter } from './ui/unexpected-errors';
 import { captureJoinCode } from './core/join-capture';
 import { captureOpenWorld } from './core/open-capture';
 import { isSignInCallback, startSignInCallback, dropStaleResume, type SignInOutcome } from './sync/onlyworlds-sign-in';
+import {
+  deleteRegistryCopy, restoreRegistryAtBoot, resumeRegistryCopyWrites, stopRegistryCopyWrites,
+} from './registry/registry-copy';
 
 // Sign in with OnlyWorlds' return (contract R3): the code is traded before any
 // other request Atlas makes, and the address becomes `/` plus the route the
@@ -63,6 +68,9 @@ function renderUnsupportedPage(root: HTMLElement): void {
   root.appendChild(wrap);
 }
 
+/** The boot's restore of the registry's copy; the test harness waits on it before a reset. */
+let registryRestored: Promise<unknown> = Promise.resolve();
+
 function boot(): void {
   // A `#/join/` link's code leaves the address bar before anything else runs
   // (#104, contract R2); the app's render runs the door with it.
@@ -85,6 +93,15 @@ function boot(): void {
     renderUnsupportedPage(root);
     return;
   }
+  // A kill seconds after a save can lose the list of worlds from
+  // localStorage while its landed copy survives: the copy goes back first,
+  // when it is newer (registry/registry-copy.ts). Nothing before startApp
+  // reads the registry. The restore never rejects.
+  registryRestored = restoreRegistryAtBoot();
+  void registryRestored.then(() => startAfterRestore(root));
+}
+
+function startAfterRestore(root: HTMLElement): void {
   startApp(root);
   // Back from Sign in with OnlyWorlds: the token is kept once the registry has loaded (contract R4).
   if (signInReturn) {
@@ -189,11 +206,22 @@ if (import.meta.env.DEV) {
      * (handle-vault), OPFS. Lets each Playwright test start clean.
      */
     async resetAll(): Promise<void> {
+      // The boot's restore first: a reset made while it still reads the
+      // copy would be blocked by its open, and it would then restore the
+      // previous test's list.
+      await registryRestored;
       // Parked stores hold handles into the OPFS being wiped — drop them
       // first (their heartbeats are already stopped by park()).
       const { clearParkedStores } = await import('./core/active-store');
       clearParkedStores();
+      // The registry's copy goes as Forget this browser takes it: writes
+      // stopped (a string waiting from a save before the reset would
+      // otherwise recreate it), the one in flight waited out, the copy
+      // deleted, writes resumed.
+      await stopRegistryCopyWrites();
       localStorage.clear();
+      await deleteRegistryCopy(undefined, { pastBlocked: true });
+      resumeRegistryCopyWrites();
       // wipe IDB databases atlas knows about
       const dbs = ['atlas-handles'];
       for (const name of dbs) {

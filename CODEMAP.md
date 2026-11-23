@@ -86,7 +86,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/store/world-file.ts`: the world file: `collectWorldFiles` (the portable copy: no `api`, no sync files, no transient file), `zipWorld`, `portableStamps`/`sameStamps` (the two-walk torn check), `readWorldZip` (the reader that refuses before anything is written). fflate, a lazy chunk.
 - `src/store/rekey.ts`: THE RE-KEY KERNEL: journaled new ids, recovery, `rollbackRekey` (conv. 105).
 - `src/store/rekey-body.ts`: `rekeyBody`, the reference id transform (chips, `ow://`, page blocks; conv. 106).
-- `src/store/handle-vault.ts`: FileSystemDirectoryHandle persistence, over `src/store/idb.ts` (promise-wrapped IDB, handle-vault only).
+- `src/store/handle-vault.ts`: FileSystemDirectoryHandle persistence, over `src/store/idb.ts` (promise-wrapped IDB for the vault; the registry's copy keeps its own calls).
 
 ## src/sync
 
@@ -124,6 +124,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 ## src/registry, src/demo, src/editor, src/layout
 
 - `src/registry/registry.ts`: the localStorage registry + helpers (two-tab merge, conv. 115; `rekeyRegistryEntry` moves the ids an entry carries, the retired cast's `favorites` among them).
+- `src/registry/registry-copy.ts`: the registry's landed copy (1.125.7, conv. 194): every save's string in its own IndexedDB, numbered by `saved_seq`; `restoreRegistryAtBoot` before `startApp` under the `atlas-registry-restore` and `atlas-live` Web Locks; `registryCopyLanded` for a removal that deletes a handle; stop, delete and resume for Forget this browser and the test harness. Unit `tests/unit/registry-copy.test.ts`, `tests/unit/registry-copy-removals.test.ts`.
 - `src/demo/hyperion-world.json`: the TOUR bundle, baked from demo key 0000000000 (its ids are the live demo world's). Re-bakes follow DESIGN_TOUR's trap list.
 - `src/demo/demo-page.json`: the example share page (`#/demo`).
 - `src/demo/demo-view.ts`: `mountDemo` / `unmountDemo` / `isDemoMounted`, the view-only example page. A demo origin never earns a guide note.
@@ -212,7 +213,7 @@ The guided tour (DESIGN_TOUR).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
 - `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.
-- `src/setup/forget-browser.ts`: FULLY FORGET (1.24, conv. 133): `forgetInventory` (what the confirm screen names), the tab roll call (`otherAtlasTabs`, `installForgetPresence`), `forgetEverything` (browser storage first, its worlds' home last, then the vault and both storages, then a reload); the screen is `src/ui/forget-browser-modal.ts`.
+- `src/setup/forget-browser.ts`: FULLY FORGET (1.24, conv. 133): `forgetInventory` (what the confirm screen names), the tab roll call (`otherAtlasTabs`, `installForgetPresence`), `forgetEverything` (browser storage first, its worlds' home last, then the registry's copy (its writes stopped first, a copy that will not go stops the forget), the vault and both storages, the copy once more, then a reload); the screen is `src/ui/forget-browser-modal.ts`.
 - `src/setup/browser-world-move.ts`: Move to a folder (1.17, conv. 129): the registry journal, the moving lock, copy and verify, the one-save commit, the browser copy removed; `recoverBrowserMove` finishes a crashed move at boot and at open.
 - `src/setup/world-download.ts`: the download: `pickSaveTarget`, `downloadWorld` (push then hold for a linked world, two walks, `kept_download_at`).
 - `src/setup/world-file-open.ts`: open a world file: a new browser world through the make protocol (`chooseWhere` asked for a new world only, before any write), the same world refused, a cleared one restored under its own entry (`api` back from the registry, `review_first_sync`); with `asCopy`, a view-only copy beside the world (conv. 177).

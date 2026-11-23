@@ -31,6 +31,19 @@ async function setupAtlasRoot(page: Page, dirName: string = 'make-online-root') 
   await page.waitForSelector('[data-action="create-local"]');
 }
 
+/**
+ * After a reload the world in the address opens on its own, and a press
+ * that lands first is replaced when it does (Settings opened before it gives
+ * way to the world's Home). The elements search shows before the world is
+ * open, so this waits for the world itself.
+ */
+async function worldInAddressOpen(page: Page) {
+  await page.waitForFunction(() => {
+    const active = (window as any).__atlasTestApi?.getState().active;
+    return !!active && location.hash.includes(active.worldId);
+  });
+}
+
 async function createLocalWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
@@ -100,6 +113,7 @@ test('Signed in, Make online asks only the PIN and makes the world on the accoun
   });
   await page.reload();
   await page.waitForSelector('.atlas-shell');
+  await worldInAddressOpen(page);
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="world"]');
   await page.click('[data-action="make-online"]');
@@ -163,6 +177,7 @@ test('Create new on a copy whose ids keel refuses: the fix on the toast and in S
   // The stamps load into memory as a copied world's do.
   await page.reload();
   await page.waitForSelector('.atlas-shell');
+  await worldInAddressOpen(page);
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="world"]');
   await page.click('[data-action="make-online"]');

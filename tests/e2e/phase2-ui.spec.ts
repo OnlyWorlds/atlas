@@ -428,15 +428,18 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.click('[data-action="pick"]');
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
-  // 2. Wipe localStorage + IDB ONLY (keep OPFS — that's the disk).
+  // 2. Wipe localStorage + IDB ONLY (keep OPFS, that's the disk). The
+  // registry's landed copy goes too: it would bring the list back.
   await page.evaluate(async () => {
     localStorage.clear();
-    await new Promise<void>((res) => {
-      const req = indexedDB.deleteDatabase('atlas-handles');
-      req.onsuccess = () => res();
-      req.onerror = () => res();
-      req.onblocked = () => res();
-    });
+    for (const name of ['atlas-handles', 'atlas-registry-copy']) {
+      await new Promise<void>((res) => {
+        const req = indexedDB.deleteDatabase(name);
+        req.onsuccess = () => res();
+        req.onerror = () => res();
+        req.onblocked = () => res();
+      });
+    }
   });
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');

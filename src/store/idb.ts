@@ -1,9 +1,10 @@
 /**
  * Minimal promise-wrapped IndexedDB primitives.
  *
- * Atlas only uses IDB for the handle vault — persisting `FileSystemDirectoryHandle`
+ * The handle vault's IDB primitives: it persists `FileSystemDirectoryHandle`
  * references across reloads. World data lives in the folder; this module exists
- * solely so we don't drag a full IDB wrapper library into the bundle.
+ * so we don't drag a full IDB wrapper library into the bundle. The registry's
+ * landed copy (`src/registry/registry-copy.ts`) keeps its own few calls.
  */
 
 export interface IdbStoreSpec {

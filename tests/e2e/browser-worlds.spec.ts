@@ -108,14 +108,31 @@ async function goneKeepsItsRow(page: Page) {
 /** The registry lost (localStorage cleared), the browser storage kept: the world comes back. */
 async function lostRegistryReadopts(page: Page) {
   await boot(page);
-  await seedTwoBrowserWorlds(page);
-  await page.evaluate(() => localStorage.removeItem('atlas_worlds_registry'));
+  const seeded = await seedTwoBrowserWorlds(page);
+  // The registry's landed copy goes too, or it brings the list back and the
+  // re-adoption this tests never runs.
+  await page.evaluate(async () => {
+    localStorage.removeItem('atlas_worlds_registry');
+    await new Promise<void>((res) => {
+      const req = indexedDB.deleteDatabase('atlas-registry-copy');
+      req.onsuccess = () => res();
+      req.onerror = () => res();
+      req.onblocked = () => res();
+    });
+  });
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
   await expect.poll(() => page.evaluate(async () => {
     const { getState } = await import('/src/core/state.ts');
     return getState().registry.worlds.filter((w: any) => w.where === 'browser').map((w: any) => w.name).sort().join(',');
   })).toBe('Alpha,Beta');
+  // Re-adopted, not restored: the reconcile gives each world a new entry id.
+  const ids = await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    return getState().registry.worlds.map((w: any) => w.id as string);
+  });
+  expect(ids).not.toContain(seeded.a);
+  expect(ids).not.toContain(seeded.b);
 }
 
 test('a browser world opens from its path, and one whose storage is gone keeps its row', async ({ page }) => {

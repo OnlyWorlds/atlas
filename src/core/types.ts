@@ -978,6 +978,12 @@ export interface AccountWorldRow {
 export interface WorldsRegistry {
   version: number;
   worlds: WorldRegistryEntry[];
+  /**
+   * Set by every save on the value it stores (`saveRegistry`): above the
+   * stored number and at least the clock. The boot compares it with the
+   * registry's landed copy (`src/registry/registry-copy.ts`); absent counts 0.
+   */
+  saved_seq?: number;
   /** Global PIN for OW api access. */
   pin?: string;
   /**

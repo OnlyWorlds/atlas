@@ -5,9 +5,10 @@
  *
  * What goes, all of it this origin's alone (atlas.onlyworlds.com hosts only
  * Atlas): the worlds kept in this browser (OPFS), the remembered folders
- * (the handle vault, Atlas's one IndexedDB), and localStorage and
- * sessionStorage (the registry, the PIN, the account sign-in, settings,
- * the guide's notes, the tour). The app's own cached files stay: they are the app.
+ * (the handle vault), the registry's landed copy (an IndexedDB of its own),
+ * and localStorage and sessionStorage (the registry, the PIN, the account
+ * sign-in, settings, the guide's notes, the tour). The app's own cached
+ * files stay: they are the app.
  *
  * The order is the gate (craft: every failure leaves a state; name it):
  * 1. Another open Atlas tab would write its registry back after the clear,
@@ -18,10 +19,15 @@
  *    cleared, the registry still names every world, and a browser world
  *    whose directory went reads as cleared, the state Atlas already shows.
  *    The reverse order would leave directories the next boot re-adopts.
- * 4. Then the vault, then the two storages, then a reload with no hash.
+ * 4. Then the registry's copy (its writes stopped first; a copy that will
+ *    not go stops the forget), the vault, the two storages, and a reload
+ *    with no hash.
  */
 
-import { HANDLE_VAULT_DB } from '../core/constants';
+import { HANDLE_VAULT_DB, REGISTRY_COPY_DB } from '../core/constants';
+import {
+  COPY_DELETE_WAIT_MS, COPY_LANDED_WAIT_MS, deleteRegistryCopy, resumeRegistryCopyWrites, stopRegistryCopyWrites,
+} from '../registry/registry-copy';
 import { PlainError } from '../core/plain-error';
 import { BROWSER_HOME, isBrowserWorld } from '../core/browser-worlds';
 import type { WorldsRegistry } from '../core/types';
@@ -69,7 +75,8 @@ let presence: BroadcastChannel | null = null;
  * Every Atlas tab answers a forget's roll call, and reloads when another tab
  * has forgotten (its memory would otherwise write the registry back).
  */
-export function installForgetPresence(): () => void {
+export function installForgetPresence(deps: { reload?: () => void } = {}): () => void {
+  const reload = deps.reload ?? (() => location.replace(location.pathname));
   if (typeof BroadcastChannel === 'undefined' || presence) return () => {};
   presence = new BroadcastChannel(CHANNEL);
   const me = presence;
@@ -77,7 +84,12 @@ export function installForgetPresence(): () => void {
     const msg = e.data as { kind?: string; id?: string; from?: string } | null;
     if (!msg || msg.from === TAB) return;
     if (msg.kind === 'here?') me.postMessage({ kind: 'here', id: msg.id, from: TAB });
-    else if (msg.kind === 'forgotten') location.replace(location.pathname);
+    else if (msg.kind === 'forgotten') {
+      // This tab's copy goes too before it reloads: a write of its own still
+      // running, or a string waiting behind one, would make the copy again
+      // after the forget deleted it, and the next start would restore it.
+      void stopRegistryCopyWrites().then(() => deleteRegistryCopy()).catch(() => 'failed').finally(reload);
+    }
   };
   return () => { me.close(); if (presence === me) presence = null; };
 }
@@ -123,6 +135,8 @@ export async function forgetEverything(deps: {
   reload?: () => void;
   wait?: (ms: number) => Promise<void>;
   revoke?: (token: string, tokenId: string) => Promise<unknown>;
+  /** Tests: the bounds on the copy's write in flight and its delete. */
+  copyWaitMs?: { flight?: number; del?: number };
 } = {}): Promise<void> {
   // 3. OPFS first, every entry under the origin's root. The worlds' home goes
   // LAST: a failure on a stray entry then leaves every world where it was,
@@ -146,11 +160,25 @@ export async function forgetEverything(deps: {
     console.warn('[forget] removing browser storage failed:', err);
     throw new PlainError(FORGET_PARTIAL_LINE);
   }
-  // 4. The vault, then the storages.
+  // 4. The registry's copy first, then the vault, then the storages. Copy
+  // writes stop and the one in flight is waited out before the copy goes:
+  // a save during the revokes below would otherwise make a fresh copy, and
+  // the next start would restore everything just forgotten. A copy that
+  // will not go stops the forget before localStorage is cleared.
+  const copyGone = async (): Promise<boolean> => {
+    if (!(await stopRegistryCopyWrites(deps.copyWaitMs?.flight ?? COPY_LANDED_WAIT_MS))) return false;
+    const out = await deleteRegistryCopy(deps.copyWaitMs?.del ?? COPY_DELETE_WAIT_MS);
+    if (out !== 'deleted') console.warn('[forget] the copy of the list of worlds did not go:', out);
+    return out === 'deleted';
+  };
+  if (!(await copyGone())) {
+    resumeRegistryCopyWrites();
+    throw new PlainError(FORGET_PARTIAL_LINE);
+  }
   const names = new Set<string>([HANDLE_VAULT_DB]);
   try {
-    for (const d of (await indexedDB.databases?.()) ?? []) if (d.name) names.add(d.name);
-  } catch { /* databases() missing: the vault is Atlas's one database */ }
+    for (const d of (await indexedDB.databases?.()) ?? []) if (d.name && d.name !== REGISTRY_COPY_DB) names.add(d.name);
+  } catch { /* databases() missing: the vault is Atlas's one database besides the copy */ }
   for (const name of names) await deleteDatabase(name).catch(err => console.warn('[forget] could not delete', name, err));
   // 5. The keys Atlas minted for the browser worlds now gone are taken back
   // (#814), before the token that can revoke them, and before the registry
@@ -168,6 +196,9 @@ export async function forgetEverything(deps: {
   if (token && tokenId) await (deps.revoke ?? revokeAtlasToken)(token, tokenId).catch(() => {});
   localStorage.clear();
   sessionStorage.clear();
+  // Again, best effort: an Atlas tab opened during the revokes saves with its
+  // own copy writes running, and its copy would bring the list back.
+  await deleteRegistryCopy().catch(() => 'failed');
   // Closed after the post: a message already posted is still delivered, and
   // an open channel left behind receives every later roll call (in the
   // one-process test run it took the next test's and threw there).
