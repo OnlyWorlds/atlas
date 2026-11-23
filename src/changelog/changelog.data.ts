@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.16',
+    date: '2026-11-23',
+    theme: 'A page leaves out a link written with an id made by hand',
+    entries: [
+      {
+        id: 'page-text-hand-id-link-left-out',
+        title: 'A published page no longer keeps a link to an element it leaves out when that element\'s id was written by hand',
+        body: 'Atlas and onlyworlds.com give every element an id in one form. A world folder written by hand, or by another tool, can hold an id of its own, such as "wren-the-traitor". When a page\'s text linked to such an element and the page left that element out, hidden or simply not shown, the link stayed in the page\'s data with the id in it, where a link to an element with an ordinary id has always been taken out. It is now taken out the same way: the link becomes its label. In a world that holds ids like these, a page\'s text keeps a link only when it is the plain link Atlas itself writes to an element the page shows, so a link written another way (a type in capitals, an onlyworlds.com address) becomes its label there too. And where one of those ids has a space or a closing round bracket in it, or ends in a full stop or another closing mark, Atlas cannot tell where a link to it ends, so every link in that world\'s page text becomes its label. A world whose ids are all ordinary ones is published as before, with one case mended: a link to a hidden element whose id differs only in capitals from the id of an element the page shows is now taken out too.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.15',
     date: '2026-11-23',
     theme: 'Three sentences said one way',

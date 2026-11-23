@@ -242,6 +242,29 @@ export function findLooseAddressRuns(text: string): LooseAddressRun[] {
   return out;
 }
 
+/** A run that is a prefix and nothing after it (a text about addresses): it holds no id. */
+const PREFIX_ALONE = /^(?:ow:\/\/|(?:https?:\/\/)?(?:www\.)?onlyworlds\.com\/w\/)$/i;
+
+/** Is `text[start, end)` an address prefix in any case with nothing after it? */
+export function isPrefixAlone(text: string, start: number, end: number): boolean {
+  return end - start <= OW_SITE_PREFIX.length && PREFIX_ALONE.test(text.slice(start, end));
+}
+
+/**
+ * The share scrub's reader for a world holding hand ids (an id that is no
+ * id-form, which the address rules never read): is `text[start, end)` exactly
+ * the text prefix, one of `typeWords` as written, a slash and an id? Gives the
+ * id as written, whatever its shape, to the run's last character; null for
+ * any other run.
+ */
+export function plainRunId(text: string, start: number, end: number, typeWords: ReadonlySet<string>): string | null {
+  if (!text.startsWith(OW_TEXT_PREFIX, start)) return null;
+  const typeAt = start + OW_TEXT_PREFIX.length;
+  const slash = text.indexOf('/', typeAt);
+  if (slash === -1 || slash + 1 >= end || !typeWords.has(text.slice(typeAt, slash))) return null;
+  return text.slice(slash + 1, end);
+}
+
 /** What a rewrite gives back for one address: a new id, a new lens, either or neither. */
 export interface OwLinkRewrite {
   id?: string | null;
