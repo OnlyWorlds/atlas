@@ -11,6 +11,8 @@
  *    names only the fields its entry holds.
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   buildPagePayload, isCardSkipField, pageSharesOf, populatedFieldNames,
@@ -41,7 +43,7 @@ const served = {
   changed_by: MEMBER,
   changed_via: 'api',
   changed_client: 'some-tool/1.0',
-  doors: [{ door: 'api', at: '2026-07-15T08:00:00.000Z' }],
+  doors: { api: '2026-07-15T08:00:00.000Z' },
   hidden: false,
   x_served_trimmed: ['recipients'],
   local_updated_at: '2026-07-15T08:00:01.000Z',
@@ -67,14 +69,70 @@ const page = (blocks: unknown[]): Element => ({
   atlas_page_intent: 'reference', atlas_page_blocks: blocks, ...served,
 }) as unknown as Element;
 
-const SERVER_SAID = [...SERVER_STAMP_FIELDS, ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS];
+const SERVER_SAID = [...SERVER_STAMP_FIELDS, ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS, 'known_of'];
+
+/**
+ * The fields the SDK's own element type calls the server's: every property of
+ * `OwElementBase` whose doc says "server-managed" or "Served only". Read from
+ * the installed declarations, so a field the server starts to serve reds here
+ * on the SDK bump that brings it, before a Full pin can publish it.
+ */
+function sdkServerFields(): string[] {
+  const dts = readFileSync(resolve(__dirname, '../../node_modules/@onlyworlds/sdk/dist/index.d.ts'), 'utf8');
+  const start = dts.indexOf('interface OwElementBase {');
+  const body = dts.slice(start, dts.indexOf('\n}', start));
+  const out: string[] = [];
+  const member = /\/\*\*([\s\S]*?)\*\/\s*\n\s*([a-z_]+)\??:/g;
+  for (let m = member.exec(body); m; m = member.exec(body)) {
+    if (/server-managed|Served only/.test(m[1])) out.push(m[2]);
+  }
+  return out;
+}
 
 describe('what the server says about an element is never a card field', () => {
   it('the lists name every field a pulled file keeps beside its own', () => {
     for (const f of ['world', 'created_at', 'updated_at', 'change_seq', 'created_by', 'changed_by',
-      'changed_via', 'changed_client', 'doors', 'hidden', 'x_served_trimmed']) {
+      'changed_via', 'changed_client', 'doors', 'hidden', 'known_of', 'x_served_trimmed']) {
       expect(SERVER_SAID, f).toContain(f);
     }
+  });
+
+  it("every field the SDK's element type calls the server's is skipped", () => {
+    const fields = sdkServerFields();
+    // The reader finds what it looks for: these are in the declarations today.
+    for (const f of ['type', 'created_at', 'created_by', 'changed_via', 'doors', 'hidden', 'known_of', 'x_served_trimmed']) {
+      expect(fields, f).toContain(f);
+    }
+    for (const f of fields) expect(isCardSkipField(f), f).toBe(true);
+  });
+
+  it('a stub, as a guest or player holds it, sends no known_of through a Full pin', () => {
+    const elements = [...world(), el('a9000000-0000-0000-0000-000000000009', 'Seen once', { description: 'seen once', known_of: true })];
+    const pin = el('d9000000-0000-0000-0000-000000000009', '', { map_id: MAP, element_id: 'a9000000-0000-0000-0000-000000000009', x: 300, y: 300 }, 'pin');
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [pin.id], fullPinIds: [pin.id] },
+    ]), [...elements, pin]);
+    expect(p.elements['a9000000-0000-0000-0000-000000000009'].fields).toEqual({ description: 'seen once' });
+    expect(JSON.stringify(p)).not.toContain('known_of');
+  });
+
+  it("a published profile's key is no card field; a person's own x_ field is", () => {
+    const keys = ['x_room_of', 'x_report_answers', 'x_spine_depends_on', 'x_lens_leads_to', 'x_identity_key', 'x_charter_of', 'x_review_proposed', 'x_lens', 'x_record'];
+    for (const k of keys) expect(isCardSkipField(k), k).toBe(true);
+    const marked = el('a8000000-0000-0000-0000-000000000008', 'Marked', {
+      description: 'A room.', x_mood: 'calm', x_room_of: WORLD_ID, x_report_answers: [WREN], x_identity_key: 'being-7',
+    });
+    const pin = el('d8000000-0000-0000-0000-000000000008', '', { map_id: MAP, element_id: marked.id, x: 300, y: 300 }, 'pin');
+    expect(populatedCardFields(marked).sort()).toEqual(['description', 'x_mood']);
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [pin.id], fullPinIds: [pin.id] },
+      { id: 'b2', kind: 'element-card', elementId: marked.id, variant: 'full', fields: ['x_room_of', 'x_identity_key', 'x_mood'] },
+    ]), [...world(), marked, pin]);
+    expect(Object.keys(p.elements[marked.id].fields).sort()).toEqual(['description', 'x_mood']);
+    const json = JSON.stringify(p);
+    expect(json).not.toContain(WORLD_ID);
+    expect(json).not.toContain(WREN);
+    expect(json).not.toContain('being-7');
   });
 
   it('none is a card field; a field of the world still is', () => {
@@ -161,6 +219,71 @@ describe('a card leaves the payload with its element', () => {
     expect(fieldsOf('b2')).toEqual([]);
     expect(JSON.stringify(p)).not.toContain('x_never_filled');
     expect(JSON.stringify(p)).not.toContain('x_once_ticked');
+  });
+
+  it('a name every object answers to is no field: a card ticked for constructor or __proto__ names neither, and a field ticked twice is named once', () => {
+    const blocks = [
+      { id: 'b1', kind: 'element-card', elementId: ADA, variant: 'full',
+        fields: ['description', 'constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'description'] },
+    ];
+    const p = buildPagePayload(page(blocks), world());
+    expect((p.blocks[0] as { fields: string[] }).fields).toEqual(['description']);
+    expect(Object.keys(p.elements[ADA].fields)).toEqual(['description']);
+    const shares = pageSharesOf(page(blocks), world());
+    expect(shares.rows.flatMap(r => r.parts.flatMap(part => part.fields))).toEqual(['description']);
+  });
+
+  it('a card of an element named by such a name leaves the payload, and the list of what is shared still reads', () => {
+    const blocks = [
+      { id: 'b1', kind: 'element-card', elementId: 'constructor', variant: 'full', fields: ['description'] },
+      { id: 'b2', kind: 'element-card', elementId: '__proto__', variant: 'full', fields: ['description'] },
+      { id: 'b3', kind: 'collection', elementIds: ['toString', ADA] },
+      { id: 'b4', kind: 'element-card', elementId: ADA, variant: 'compact', fields: [] },
+    ];
+    const p = buildPagePayload(page(blocks), world());
+    expect(p.blocks.map(b => b.id)).toEqual(['b3', 'b4']);
+    expect(Object.keys(p.elements)).toEqual([ADA]);
+    expect(() => pageSharesOf(page(blocks), world())).not.toThrow();
+  });
+
+  it('a file that holds __proto__ as a key sends nothing of it, and the entry stays a plain object', () => {
+    const odd = JSON.parse(`{"id":"a7000000-0000-0000-0000-000000000007","type":"character","name":"Odd","description":"d","__proto__":["leak-me"]}`) as Element;
+    const pin = el('d7000000-0000-0000-0000-000000000007', '', { map_id: MAP, element_id: odd.id, x: 300, y: 300 }, 'pin');
+    expect(populatedFieldNames(odd)).toEqual(['description']);
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [pin.id], fullPinIds: [pin.id] },
+      { id: 'b2', kind: 'element-card', elementId: odd.id, variant: 'full', fields: ['description', '__proto__', 'length', 'join'] },
+    ]), [...world(), odd, pin]);
+    expect(Object.getPrototypeOf(p.elements[odd.id].fields)).toBe(Object.prototype);
+    expect((p.blocks.find(b => b.id === 'b2') as { fields: string[] }).fields).toEqual(['description']);
+    expect(JSON.stringify(p)).not.toContain('leak-me');
+  });
+
+  it("a card of a Pin or a Marker names its map and zone, never their ids, and nothing of a hidden one", () => {
+    const ZONE = 'c2000000-0000-0000-0000-000000000002';
+    const HIDDEN_MAP = 'c3000000-0000-0000-0000-000000000003';
+    const PIN_HID = 'd3000000-0000-0000-0000-000000000003';
+    const MARKER = 'd4000000-0000-0000-0000-000000000004';
+    const elements = [
+      ...world(),
+      el(ZONE, 'the shallows', {}, 'zone'),
+      el(HIDDEN_MAP, 'the vault', { hidden: true, image_url: 'https://img.example/vault.png', width: 10, height: 10 }, 'map'),
+      el(PIN_HID, 'vault pin', { map_id: HIDDEN_MAP, element_id: ADA, x: 1, y: 1 }, 'pin'),
+      el(MARKER, 'a marker', { map_id: MAP, zone_id: ZONE, x: 5, y: 5 }, 'marker'),
+    ];
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'element-card', elementId: PIN_ADA, variant: 'full', fields: ['map_id', 'element_id', 'x'] },
+      { id: 'b2', kind: 'element-card', elementId: PIN_HID, variant: 'full', fields: ['map_id', 'element_id'] },
+      { id: 'b3', kind: 'element-card', elementId: MARKER, variant: 'full', fields: ['map_id', 'zone_id'] },
+    ]), elements);
+    // A link names its target; `ref` only when the target is itself on the page.
+    expect(p.elements[PIN_ADA].fields.map_id).toEqual([{ text: 'the coast' }]);
+    expect(p.elements[PIN_ADA].fields.x).toBe(100);
+    expect(p.elements[PIN_HID].fields.map_id).toBeUndefined();
+    expect(p.elements[MARKER].fields.zone_id).toEqual([{ text: 'the shallows' }]);
+    const json = JSON.stringify(p);
+    for (const id of [MAP, HIDDEN_MAP, ZONE, ADA]) expect(json, id).not.toContain(id);
+    expect(json).not.toContain('the vault');
   });
 
   it('a page with every kind of block: no id of the world is on the wire but an included element', () => {

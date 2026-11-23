@@ -255,9 +255,10 @@ export const SERVER_MARK_FIELDS = ['hidden', 'x_served_trimmed'] as const;
 
 /**
  * keel's own record of an element beside who wrote it: the world it is in,
- * when it was made and last changed there, and its commit counter. Kept on
- * disk as a pull wrote them (`created_at` is on a file made here too), and
- * never content: with `SERVER_AUTHOR_FIELDS` and `SERVER_MARK_FIELDS` they are
+ * when it was made and last changed there, and its commit counter. On disk
+ * where a pull wrote them (`created_at` is on a file made here too;
+ * `change_seq` on older files only, a pull no longer writes it), and never
+ * content: with `SERVER_AUTHOR_FIELDS` and `SERVER_MARK_FIELDS` they are
  * what the server says about an element, which a published page never
  * carries (`isCardSkipField`).
  */

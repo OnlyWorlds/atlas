@@ -63,13 +63,13 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'full-pin-sends-no-server-record',
         title: 'A map pin set to Full no longer publishes when an element was made or who wrote it',
-        body: 'A pin set to Full sends every filled field of its element. That included what OnlyWorlds records beside an element: when it was made, a change counter and, in a world that syncs, the ids of the members who made it and last changed it and the door the last change came through. None of these is sent now, by a Full pin or by a card, and a card\'s field list no longer offers them. A page already published keeps what it was published with until you press Republish: if one of your published pages has a pin set to Full, republish it.',
+        body: 'A pin set to Full sends every filled field of its element. That included what OnlyWorlds records beside an element: when it was made and, in a world that syncs, the ids of the members who made it and last changed it, and the door and the software the last change came through. A file written by an older Atlas can also hold a change counter, and a world you read as a guest or player marks what you only know of. None of these is sent now, by a Full pin or by a card, and a card\'s field list no longer offers them. The same goes for the marks other OnlyWorlds tools keep on an element, such as the room or the report it belongs to: some hold ids, and none is sent or offered now. A field you added yourself still is. A page already published keeps what it was published with until you press Republish: if one of your published pages has a pin set to Full, or a card with one of these ticked, republish it.',
         tags: ['pages', 'privacy', 'fix'],
       },
       {
         id: 'left-out-card-leaves-page-data',
-        title: 'A card of a hidden, proposed or missing element no longer leaves its id in a published page\'s data',
-        body: 'A published page already drew nothing for a card whose element is hidden, proposed and not yet reviewed, or no longer in the world. The page\'s data, which anyone with its address can read, still held that card: the element\'s id and the names of the fields ticked on it. The card now leaves the published data with its element, and a card that stays names only the fields it sends. A page already published changes when you republish it.',
+        title: 'A card of a hidden or proposed element, or of one no longer in the world, no longer leaves its id in a published page\'s data',
+        body: 'A published page already drew nothing for a card whose element is hidden, proposed and not yet reviewed, or no longer in the world. The page\'s data, which anyone with its address can read, still held that card: the element\'s id and the names of the fields ticked on it. The card now leaves the published data with its element, and a card that stays names only the fields it sends. A card of a pin or a marker sent the ids of its map and zone as plain text: it now names them as any link does, and names nothing of a hidden one. A page already published changes when you republish it.',
         tags: ['pages', 'privacy', 'fix'],
       },
     ],
