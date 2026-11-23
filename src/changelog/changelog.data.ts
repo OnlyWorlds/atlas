@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.17',
+    date: '2026-11-23',
+    theme: 'Names written in any alphabet are found in your text',
+    entries: [
+      {
+        id: 'names-found-in-any-alphabet',
+        title: 'The writing room finds a name that begins or ends with a letter outside English, and finds every name of a big world',
+        body: 'The dotted hints and Link all look for the names of your elements in what you write. A name that began or ended with a letter outside English, such as Éowyn, Zoë or Οδυσσεύς, or with a mark, such as C++ (old), was never found, and now is. A name is no longer found inside a longer word that goes on with an accented letter or a mark, so Ana is not found inside Anaïs. A name that ends in a full stop is now found only where a space or the end of the text follows it. Atlas used to look for the first 2,000 names and aliases of a world only; there is now no limit. A name or alias longer than 200 characters is not looked for. The line in the Context tab that counts where an element is mentioned but not linked still reads names the old way, for now.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.16',
     date: '2026-11-23',
     theme: 'A page leaves out a link written with an id made by hand',

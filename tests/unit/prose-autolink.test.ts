@@ -2,8 +2,8 @@
  * Prose autolink kernel — the pure transforms behind the link-all
  * icon, selection linking, and the tree-level bulk over closed narratives.
  * The markdown and richtext halves are tested against the same rules the
- * live plugin enforces: first mention only, ambiguity skipped, case-sensitive
- * word-bounded match, existing links respected.
+ * live plugin enforces: first mention only, ambiguity skipped, whole names in
+ * any case (the SDK's `nameFinder`, conv. 197), existing links respected.
  */
 
 import { describe, it, expect } from 'vitest';

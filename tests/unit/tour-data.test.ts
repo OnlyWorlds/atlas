@@ -14,6 +14,7 @@ import {
 } from '../../src/tour/tour-data';
 import { buildTourWorldView } from '../../src/tour/tour-view';
 import { handsOnRefFor } from '../../src/tour/tour-engine';
+import { simpleCaseFold, trimAndFold } from '@onlyworlds/sdk';
 import { buildAutolinkIndex } from '../../src/core/prose-autolink';
 import type { Element } from '../../src/core/types';
 import bundle from '../../src/demo/hyperion-world.json';
@@ -289,6 +290,50 @@ describe('the charts act', () => {
   });
 });
 
+/**
+ * THE AMBIGUITY GUARD's reading: every name or alias two or more of the
+ * scanned elements hold (folded with the SDK's `trimAndFold`, three code
+ * points at least) that stands as a whole word in `story` (folded the same
+ * way; a whole word by the finder's own edges, no letter, mark, decimal digit
+ * or underscore on either side, in any script) where no span the real index's
+ * `find` answers overlaps it. Each is a surface form that can never link.
+ */
+function blockedSurfaceForms(elements: Element[], story: string): string[] {
+  const held = new Map<string, Map<string, string>>();
+  for (const el of elements) {
+    if (typeof el.id !== 'string' || el.id === '' || ['narrative', 'pin', 'marker', 'map'].includes(el.type)) continue;
+    const names = [el.name, ...(Array.isArray(el.atlas_aliases) ? el.atlas_aliases : [])];
+    for (const name of names) {
+      if (typeof name !== 'string') continue;
+      const key = trimAndFold(name);
+      if ([...key].length < 3) continue;
+      const ids = held.get(key) ?? new Map<string, string>();
+      ids.set(el.id, `${el.type}:${el.name}`);
+      held.set(key, ids);
+    }
+  }
+  const answered = buildAutolinkIndex(elements).find(story);
+  const folded = simpleCaseFold(story);
+  const inAWord = /[\p{L}\p{M}\p{Nd}_]/u;
+  const wordAt = (i: number): boolean => i >= 0 && i < folded.length && inAWord.test(String.fromCodePoint(folded.codePointAt(i)!));
+  const wordBefore = (i: number): boolean => {
+    if (i <= 0) return false;
+    const low = folded.charCodeAt(i - 1);
+    return low >= 0xdc00 && low <= 0xdfff && i >= 2 ? wordAt(i - 2) : wordAt(i - 1);
+  };
+  const blocked: string[] = [];
+  for (const [key, ids] of held) {
+    if (ids.size < 2) continue;
+    for (let at = folded.indexOf(key); at !== -1; at = folded.indexOf(key, at + 1)) {
+      const end = at + key.length;
+      if (wordBefore(at) || wordAt(end)) continue;
+      if (answered.some(f => f.start < end && f.end > at)) continue;
+      blocked.push(`"${story.slice(at, end)}" -> ${[...ids.values()].join(' + ')}`);
+    }
+  }
+  return blocked;
+}
+
 describe('the writing beat', () => {
   const chapterName = TOUR_CHAPTER_REF.slice(TOUR_CHAPTER_REF.indexOf(':') + 1);
 
@@ -327,31 +372,19 @@ describe('the writing beat', () => {
   });
 
   it('every surface form in the sentence resolves to exactly ONE element', () => {
-    // THE AMBIGUITY GUARD. autolink and bulk-link both skip any key with 2+
-    // candidates (prose-autolink: `cands.length !== 1`), silently. This caught
+    // THE AMBIGUITY GUARD. autolink and bulk-link both skip a name two
+    // elements share (the SDK finder never answers one), silently. This caught
     // the real collision that shipped in the bundle: a character NAMED
     // "Steinway" beside the "Steinway" alias on the Consul’s piano meant that
     // word could never link, and nothing anywhere would have said so.
     //
-    // Runs the REAL index over the REAL sentence rather than restating the
-    // rules here, so it tracks prose-autolink instead of my memory of it.
+    // The index's `find` never answers a shared name, so it cannot show one:
+    // the guard folds the names itself, with the SDK's own fold and the
+    // finder's own word edges (conv. 197), and asks `find` only which spans
+    // it does answer, so a shared name standing inside a longer one that
+    // still links ("Prelude" in "Rachmaninov's Prelude") is not a block.
     const chapter = bundleElement(chapterName);
-    const index = buildAutolinkIndex(bundle.elements as unknown as Element[]);
-    expect(index.scanner).not.toBeNull();
-    // Mirror the REAL matcher: its own flags (case-insensitive)
-    // and a folded key lookup. Restating 'g' here measured a matcher the app
-    // no longer has.
-    const scanner = new RegExp(index.scanner!.source, index.scanner!.flags);
-    const story = chapter.story as string;
-
-    const blocked: string[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = scanner.exec(story)) !== null) {
-      const cands = index.byName.get(m[0].toLowerCase());
-      if (cands && cands.length > 1) {
-        blocked.push(`"${m[0]}" -> ${cands.map(c => `${c.type}:${c.displayName}`).join(' + ')}`);
-      }
-    }
+    const blocked = blockedSurfaceForms(bundle.elements as unknown as Element[], chapter.story as string);
     expect(blocked, `ambiguous surface forms can never link:\n  ${blocked.join('\n  ')}`)
       .toEqual([]);
   });
@@ -364,18 +397,9 @@ describe('the writing beat', () => {
     const present = elementsOnDiskAt('the-writing');
     const chapter = bundleElement(chapterName);
     const index = buildAutolinkIndex(present);
-    expect(index.scanner).not.toBeNull();
-    // Mirror the REAL matcher: its own flags (case-insensitive)
-    // and a folded key lookup. Restating 'g' here measured a matcher the app
-    // no longer has.
-    const scanner = new RegExp(index.scanner!.source, index.scanner!.flags);
-
-    const linkable = new Set<string>();
-    let m: RegExpExecArray | null;
-    while ((m = scanner.exec(chapter.story as string)) !== null) {
-      const cands = index.byName.get(m[0].toLowerCase());
-      if (cands && cands.length === 1) linkable.add(cands[0].id);
-    }
+    expect(index.ids.size).toBeGreaterThan(0);
+    // The REAL finder: every span it answers is one element's, never a shared name's.
+    const linkable = new Set(index.find(chapter.story as string).map(f => f.candidate.id));
     expect(linkable.size).toBe(TOUR_WRITING_LINKABLE);
   });
 

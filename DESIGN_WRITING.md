@@ -1,6 +1,6 @@
 # Atlas — Writing Design
 
-**Version**: 3.5 (2026-11-14): 1.124.6, an `ow://` link glued to a word before it is prose (#48). v3.4 (2026-11-14): 1.124.2, an `ow://` link in prose is read by the OnlyWorlds address rules through `core/ow-links.ts` (conventions #48, #50; DESIGN_LAWS conv. 189). v3.3 (2026-09-04) — find bar "Link to element" at both tiers, find in the compiled view, unlinked mentions in the element preview, the label law extended to read-only renders (conventions #49b, #49e). v3.2 (2026-05-24): context pane promoted to tool-global
+**Version**: 3.6 (2026-11-23): 1.125.17, element names in prose are found by the SDK's `nameFinder` (#53; DESIGN_LAWS conv. 197). v3.5 (2026-11-14): 1.124.6, an `ow://` link glued to a word before it is prose (#48). v3.4 (2026-11-14): 1.124.2, an `ow://` link in prose is read by the OnlyWorlds address rules through `core/ow-links.ts` (conventions #48, #50; DESIGN_LAWS conv. 189). v3.3 (2026-09-04) — find bar "Link to element" at both tiers, find in the compiled view, unlinked mentions in the element preview, the label law extended to read-only renders (conventions #49b, #49e). v3.2 (2026-05-24): context pane promoted to tool-global
 **Status**: v1 + v1.5 + v2 batch all shipped. Then the writing-context pane came to the right tab, was polished (Featured/Planned, click-recenter, reading-mode redesign), and was promoted to a tool-global Context tab — see `DESIGN_SHELL.md` "The context pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
 **Related**: `DESIGN_SHELL.md` (Rooms model, **the context pane**), `ATLAS_FIELDS.md` (atlas-specific fields), `DESIGN_HOME.md`, `DESIGN_SHARING.md`
 
@@ -347,7 +347,7 @@ Big-picture context-pane work moved into `DESIGN_SHELL.md` "The context pane" �
 
 - **#52** (v1.5 polish): Any override of `.material-symbols-outlined` (font-size, color, etc.) MUST be scoped under a parent class for two-class specificity (0,2,0). The package's `.material-symbols-outlined { font-size: 24px }` rule is single-class (0,1,0) and load-order decides the tie — non-deterministic. Pattern: `.atlas-foo-parent .my-icon { font-size: Npx }` (e.g. `.atlas-link-chip .atlas-link-chip-remove`). Bitten twice (the room-nav chip, then link-chip-remove); locking in as a hard rule.
 
-- **#53** (v2 batch): First-mention auto-link decorations are CASE-SENSITIVE matches against a name + alias index, with `\\b...\\b` word boundaries. Suppression rules stack: minimum 3 characters per key, ambiguous names (≥2 candidates for the same key) suppressed entirely, candidate ids already chipped in the doc skipped (first-mention rule), and the `@` mention picker takes priority (decorations don't gate Tab handling while the picker is visible). The index is rebuilt only when `state.data.elements` reference swaps — no per-tick re-build. See `writing-workspace-autolink.ts` and tests/unit/writing-workspace-autolink.test.ts.
+- **#53** (v2 batch; the finder since 1.125.17, DESIGN_LAWS conv. 197): First-mention auto-link decorations, Link all, "Link mentions in all scenes", Link on one Potentials row and Named in the text all find element names with ONE reader, the SDK's `nameFinder` (case `'folded'`), held by the index `buildAutolinkIndex` builds in `core/prose-autolink.ts` (`find(text)` and `ids`). The finder's rules: a whole name only, the character on each side not a letter, combining mark, decimal digit or underscore in any script (so "Éowyn", "Zoë" and "C++ (old)" are found, and "Ana" is not found inside "Anaïs"); case compared by simple case folding; a name trimmed of white space and three code points at least; the longest name where several start together; a name or alias two elements share never answered, nor anything inside it; nothing read inside a markdown link or an address, also when one is typed as plain text in the editor. Atlas keeps around it: the elements scanned (not a narrative, pin, marker or map, and a string id), each found by `name` and every string in `atlas_aliases`, one longer than 200 code points passed over (the finder's work is the text's length times the longest name's); candidate ids already chipped in the doc skipped (first-mention rule); `only`; the writer's span as the label (#49b); and the `@` mention picker takes priority (decorations don't gate Tab handling while the picker is visible). There is no cap on the number of names. The index is rebuilt only when `state.data.elements` reference swaps, no per-tick re-build. The context pane's "Mentioned, unlinked" count and its Link all still use the find bar's term scanner (`unlinked-mentions.ts`), not the finder. See `writing-workspace-autolink.ts`, tests/unit/writing-workspace-autolink.test.ts and tests/unit/names-by-finder.test.ts.
 
 ## Autolink design (v2 batch, Bout 9)
 
@@ -357,13 +357,13 @@ The autolink plugin is a ProseMirror plugin that watches the prose for prose-lev
 
 Writer types: `"the goblin Drizzle waved cheerfully"`.
 
-If "Drizzle" matches an element (case-sensitive, ≥3 chars, unambiguous, not yet chipped in this doc, `@` picker not open), the word gets a **subtle dotted cyan underline**. Hovering the underline reveals "Tab to link as character" (or whatever type). Pressing Tab with the cursor adjacent → text becomes a real ElementChip and the underline disappears.
+If "Drizzle" matches an element (any case, a whole name, ≥3 chars, unambiguous, not yet chipped in this doc, `@` picker not open), the word gets a **subtle dotted cyan underline**. Hovering the underline reveals "Tab to link as character" (or whatever type). Pressing Tab with the cursor adjacent → text becomes a real ElementChip and the underline disappears.
 
 Subsequent mentions of "Drizzle" in the same narrative get NO underline (first-mention rule).
 
 ### Why these rules
 
-- **Case-sensitive**: proper nouns are uppercase; common nouns aren't. Without this, "the" matching an element named "The" would underline every "the".
+- **Any case, the writer's text kept**: "the consul" links to "Consul" (case compared by simple case folding), and the label is what the writer typed (#49b). A whole name only, so "drizzling" is not "Drizzle".
 - **Min 3 chars**: kills "Al", "Bo", "Jo" — short names are too noisy without context.
 - **Ambiguity suppression**: if two characters share a name, the writer needs to pick explicitly with `@`. No silent default.
 - **First-mention only**: per-narrative rule, matches Loreteller's universal pattern from research. Re-decoration on every mention would be visual noise.
@@ -371,11 +371,11 @@ Subsequent mentions of "Drizzle" in the same narrative get NO underline (first-m
 
 ### Performance
 
-The index is a `Map<string, AutolinkCandidate[]>` from name/alias → candidates. A combined `\\b(key1|key2|...)\\b` regex is compiled once; keys sorted longest-first so multi-word names ("Mira Halloway") greedy-match before their sub-words.
+The index holds the SDK's `nameFinder` over the world's names (#53): a trie walked from each place a word can start, longest name first, no pattern that backtracks.
 
-Doc walk on every transaction is cheap at OW scale (~hundreds of elements, ~thousands of words). One regex pass per text node. Already-chipped ids collected in a single descendants walk per re-decoration.
+Doc walk on every transaction: one `find` per text node. Already-chipped ids collected in a single descendants walk per re-decoration; the index's `ids` are made once with it. On a 20,000-word document and a world of 5,000 elements with two aliases each a keystroke costs about what the old pattern cost capped at 2,000 names (1.125.17's measurement).
 
-If a world grows to tens of thousands of elements, switch to Aho-Corasick or a trie. Not needed in v1.
+The finder's work is the text's length times the longest name's, so a name over 200 code points is not looked for. With names of exactly 200 code points a text that repeats a name's start costs tens to a few hundred milliseconds a keystroke (tests/unit/name-finder-perf.test.ts holds the ceiling); a finder linear whatever the names (Aho-Corasick) would remove the cut.
 
 ---
 
