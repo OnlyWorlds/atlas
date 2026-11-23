@@ -172,10 +172,39 @@ describe('a failed pick leaves the prior world as it was', () => {
   it('a throw after the picked world took its place leaves the person there', async () => {
     const { store } = await openW1();
     flags.throwAttach = true;
-    await activateWorld('w2', toastStub);
+    expect(await activateWorld('w2', toastStub)).toBe(false);
     expect(getState().active?.worldId).toBe('w2');
     expect(getActiveStore()).not.toBe(store);
     expect(window.location.hash).toBe('#/w/w2/writing');
+    // The picked world's store is the active one now: it stays open.
+    expect(opened.find((s) => s.handleName === 'k-w2')?.closed).toBe(false);
+  });
+
+  it('a pick from the first screen with nothing open: a failure goes back there, a later throw stays', async () => {
+    failOpen.add('k-w2');
+    expect(await activateWorld('w2', toastStub)).toBe(false);
+    expect(window.location.hash).toBe('#/');
+    expect(getActiveStore()).toBeNull();
+    failOpen.clear();
+    failMeta.add('k-w2');
+    expect(await activateWorld('w2', toastStub)).toBe(false);
+    expect(window.location.hash).toBe('#/');
+    expect(opened.find((s) => s.handleName === 'k-w2')?.closed).toBe(true);
+    failMeta.clear();
+    flags.throwAttach = true;
+    expect(await activateWorld('w2', toastStub)).toBe(false);
+    expect(getState().active?.worldId).toBe('w2');
+    expect(window.location.hash).toMatch(/^#\/w\/w2/);
+  });
+
+  it('a take-over accepted, then a throw before its store takes the place: that store is closed', async () => {
+    const { store, adaId } = await openW1();
+    lockHeld.add('k-w2');
+    failMeta.add('k-w2');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    expect(await activateWorld('w2', toastStub)).toBe(false);
+    expectW1AsItWas(store, adaId);
+    expect(opened.filter((s) => s.handleName === 'k-w2').map((s) => s.closed)).toEqual([true]);
   });
 
   it('the prior world taken by another tab meanwhile stays parked, its list not drawn as this tab\'s', async () => {
