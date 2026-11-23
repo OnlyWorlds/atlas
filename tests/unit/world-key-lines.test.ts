@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { OwV2Error } from '../../src/sync/ow-v2-client-adapter';
-import { keyRefusalHere, keyRefusalLine, keyRefusalOf, keyRefusalPill, seatRefusalLine } from '../../src/sync/world-key-lines';
+import { clearedKeyRefusalLine, keyRefusalHere, keyRefusalLine, keyRefusalOf, keyRefusalPill, seatRefusalLine } from '../../src/sync/world-key-lines';
 import type { KeyRefusal } from '../../src/core/types';
 
 const err = (status: number, code: string, param: string | null = null) =>
@@ -53,6 +53,31 @@ describe('the lines', () => {
     expect(seatRefusalLine('key_revoked', { paused: false })).toBe('This seat\'s key was renewed or revoked on onlyworlds.com.');
     expect(seatRefusalLine('key_unknown')).toMatch(/may have removed it/);
     for (const r of reasons) expect(seatRefusalLine(r)).not.toMatch(/new key|unlink/i);
+  });
+
+  it('a cleared world\'s refused key: what happened and the ways back for each kind, never Retry or Unlink', () => {
+    const kinds = ['account', 'read', 'seat'] as const;
+    for (const code of ['key_revoked', 'invalid_credentials']) {
+      for (const k of kinds) {
+        const line = clearedKeyRefusalLine(err(401, code), k)!;
+        expect(line).toMatch(/so Atlas could not download it again\. Nothing changed\./);
+        expect(line).toMatch(/remove it from your list and open it again /);
+        expect(line).toMatch(/world file of it/);
+        expect(line).not.toMatch(/try again|retry|unlink|feedback|invite|—/i);
+      }
+    }
+    // A key keel no longer knows: the world deleted or the person removed, so a new way in is only an "if".
+    expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'account')).toMatch(/If you can still open it on onlyworlds\.com/);
+    expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'read')).toMatch(/If it is still shared with you/);
+    // A world file restores on the refused key: an account or read world takes a new key in Settings, a seat cannot.
+    expect(clearedKeyRefusalLine(err(401, 'key_revoked'), 'seat')).toMatch(/Or open a world file of it instead, though then it cannot sync again\.$/);
+    for (const k of ['account', 'read'] as const) expect(clearedKeyRefusalLine(err(401, 'key_revoked'), k)).toMatch(/A world file of it brings it back too\.$/);
+    expect(clearedKeyRefusalLine(err(401, 'key_revoked'), 'seat')).toMatch(/^This seat's key was renewed or revoked/);
+    expect(clearedKeyRefusalLine(err(401, 'invalid_credentials'), 'read')).toMatch(/deleted there, or you were removed from it/);
+    // Not about the key: the caller's general line words it.
+    for (const e of [err(401, 'invalid_credentials', 'API-Pin'), err(403, 'permission_error'), err(500, 'server_error'), new Error('x')]) {
+      expect(clearedKeyRefusalLine(e, 'account')).toBeNull();
+    }
   });
 
   it('the unknown key names what makes keel forget one', () => {

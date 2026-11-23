@@ -27,6 +27,8 @@ interface Keel {
   releasePreview: () => void;
   /** Set: keel answers the seat's key 401, as for a seat removed on onlyworlds.com. */
   refuseKey: boolean;
+  /** Set: the world reads, then its element lists answer 401, as for a seat removed mid-download. */
+  refuseLists: boolean;
   /** Set: the element lists wait until it resolves (a download someone can cancel or reload through). */
   listGate: Promise<void> | null;
 }
@@ -35,7 +37,7 @@ const READ_KEY = 'ow_r_' + 'R'.repeat(32);
 
 async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean; player?: boolean } = {}): Promise<Keel> {
   const now = '2026-10-10T00:00:00.000Z';
-  const keel: Keel = { previews: 0, joins: [], releasePreview: () => {}, refuseKey: false, listGate: null };
+  const keel: Keel = { previews: 0, joins: [], releasePreview: () => {}, refuseKey: false, refuseLists: false, listGate: null };
   let release!: () => void;
   const held = new Promise<void>(r => { release = r; });
   keel.releasePreview = release;
@@ -76,6 +78,9 @@ async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean
       return route.fulfill({ json: { id: WORLD_ID, name: 'Moppetopia', updated_at: now } });
     }
     if (keel.listGate) await keel.listGate;
+    if (keel.refuseLists) {
+      return route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Invalid API key.', param: null } } });
+    }
     const type = path.split('/').filter(Boolean)[0];
     const data = type === 'character'
       ? [{ id: 'c0000000-0000-4000-8000-000000000001', type: 'character', name: 'Admiral Fluffington', updated_at: now, created_at: now }]
@@ -406,6 +411,26 @@ test('a held seat keel no longer takes says so before any download, and offers R
   await expect(page.locator('[data-held-seat]')).toHaveCount(0);
   expect(await heldRecord(page)).toBeNull();
   expect(keel.joins).toHaveLength(0);
+});
+
+test('a seat keel stops taking during its download says so, keeps nothing, and offers Remove, not Retry', async ({ page }) => {
+  await freshBoot(page);
+  const keel = await mockKeel(page);
+  keel.refuseLists = true;
+  await page.goto('about:blank');
+  await page.goto(`/#/join/${CODE}`);
+  keel.releasePreview();
+  const modal = page.locator('[data-modal="join-world"]');
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal.locator('[data-role="error"]')).toHaveText('OnlyWorlds no longer takes the seat kept for Moppetopia: it was removed on onlyworlds.com, or the world is gone. Remove it from your list.');
+  await expect(modal.locator('[data-action="open"]')).toBeHidden();
+  expect(keel.joins).toHaveLength(1);
+  expect(await heldRecord(page)).not.toBeNull();
+  await modal.locator('[data-action="remove-held"]').click();
+  await expect(modal).toHaveCount(0);
+  expect(await heldRecord(page)).toBeNull();
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
 });
 
 test('the held world landing by another door (here, the account list\'s key) drops the record and says the seat is spare', async ({ page }) => {

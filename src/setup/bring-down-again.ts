@@ -37,6 +37,7 @@ import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './a
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { atlasProducer } from '../core/provenance';
 import { readsWithoutPin } from '../core/key-scope';
+import { clearedKeyRefusalLine } from '../sync/world-key-lines';
 
 /**
  * The world.json id this entry was made with. Every `handle_key` is
@@ -124,7 +125,11 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
     landing = await landAndOpen(make, down.dir, store);
   } catch (err) {
     await abandonLanding(landing);
-    return abandonBrowserMake(store, make, err, 'downloading the world');
+    // A refused key is refused again on every retry: its line says so, and the ways back.
+    // A read key Atlas minted from the account (a guest's, a member's with no PIN) came from onlyworlds.com, not a link.
+    const kind = isSeatWorld(entry) ? 'seat' : readOnly && !entry.api.key_mint ? 'read' : 'account';
+    const keyLine = clearedKeyRefusalLine(err, kind);
+    return abandonBrowserMake(store, make, keyLine ? new PlainError(keyLine) : err, 'downloading the world');
   }
 
   // The commit: the restored entry, saved strictly, while the world that was

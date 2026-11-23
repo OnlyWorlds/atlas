@@ -17,6 +17,8 @@ import { setActiveStore, getActiveStore } from '../../src/core/active-store';
 import { FakeDirHandle } from '../fixtures/fake-fs';
 import { BROWSER_HOME, setOpfsRootForTests } from '../../src/core/browser-worlds';
 import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
+import { http, HttpResponse } from 'msw';
+import { problemFor } from '../../src/core/problems';
 
 const TEST_BASE = 'https://test-ow.local/api/v2';
 
@@ -127,6 +129,38 @@ describe('bring it down again', () => {
     await expect(bringDownAgain('w1')).rejects.toBeTruthy();
     expect(getState().registry.worlds).toEqual([cleared()]);
     expect([...home()!.children.keys()]).toEqual([]);
+  });
+
+  // A refused key is refused on every retry: the line says what happened and the row's ways back, never
+  // the unexpected-refusal ask for feedback, and nothing stays (1.125.11).
+  const refusedKeyRows: Array<[string, Partial<WorldRegistryEntry>, string, RegExp]> = [
+    ['an account world', {}, 'key_revoked', /^This world's key was revoked on onlyworlds\.com, so Atlas could not download it again\. Nothing changed\. To bring it back, remove it from your list and open it again from onlyworlds\.com\. A world file of it brings it back too\.$/],
+    ['an account world', {}, 'invalid_credentials', /^OnlyWorlds no longer knows this world's key, .* The world was deleted there, or you were removed from it\. If you can still open it on onlyworlds\.com, /],
+    // A guest's read key, minted from the account: its way back is the account's, never a link.
+    ['a guest\'s account world', { api: { ...cleared().api!, read_only: true, key_mint: { id: 'm1', tail: 'abcd' } } }, 'key_revoked', /open it again from onlyworlds\.com\. A world file of it brings it back too\.$/],
+    ['a read-key world', { api: { ...cleared().api!, read_only: true } }, 'key_revoked', /revoked on onlyworlds\.com, .*by a new link or key from whoever shared it\. A world file of it brings it back too\.$/],
+    ['a seat world', { api: { ...cleared().api!, api_key: 'ow_w_seatgone'.padEnd(37, 'k'), seat: { role: 'editor' } } }, 'invalid_credentials', /^OnlyWorlds no longer accepts this world's seat, .* The owner may have removed it\. .*by a new link from whoever made the seat\. Or open a world file/],
+  ];
+  for (const [kind, over, code, line] of refusedKeyRows) {
+    it(`${kind} whose key keel refuses (${code}) says so and its ways back, keeping nothing`, async () => {
+      putRegistry({ ...defaultRegistry(), pin: '1234', worlds: [cleared(over)] });
+      mswServer.use(http.all(`${TEST_BASE}/*`, () =>
+        HttpResponse.json({ error: { type: 'authentication_error', code, message: code, param: null } }, { status: 401 })));
+      const err = await bringDownAgain('w1').then(() => null, (e: unknown) => e);
+      const said = problemFor(err, { doing: 'downloading the world', where: 'browser', inline: true, worldId: 'w1', noPin: true });
+      expect(said.sentence).toMatch(line);
+      expect(said.sentence).not.toMatch(/feedback|did not allow|try again/i);
+      expect(said.report).toBe(false);
+      expect(getState().registry.worlds).toEqual([cleared(over)]);
+      expect([...home()!.children.keys()]).toEqual([]);
+    });
+  }
+
+  it('a refusal that is not about the key keeps its own line', async () => {
+    mswServer.use(http.all(`${TEST_BASE}/*`, () =>
+      HttpResponse.json({ error: { type: 'api_error', code: 'server_error', message: 'boom', param: null } }, { status: 500 })));
+    const err = await bringDownAgain('w1').then(() => null, (e: unknown) => e);
+    expect(problemFor(err, { doing: 'downloading the world', where: 'browser', inline: true, worldId: 'w1', noPin: true }).kind).toBe('server');
   });
 
   it('another tab restoring the same row meanwhile: nothing commits, this directory goes', async () => {
