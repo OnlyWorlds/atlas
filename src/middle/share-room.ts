@@ -42,7 +42,10 @@ import {
 import { renderBlockView, renderPayloadPage, populatedCardFields, setBuilderCharts } from './share-page-render';
 import { mountAgentMarkSlot } from './element-agent-mark';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { buildPagePayload, leftOutPageLine, pageNotPublishedLine } from '../core/share-payload';
+import {
+  buildPagePayload, leftOutPageLine, pageNotPublishedLine, pageSharesOf,
+  type PageShares, type ShareRow, type SharePart, type ShareClauses,
+} from '../core/share-payload';
 import {
   SharingClient, SharingApiError, sharingErrorMessage,
   isValidSlug, suggestSlug, publicUrlFor, type SharedPageRow,
@@ -59,7 +62,25 @@ import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
-import { missingLabel, nameOrUnnamed, ownName, quotedName } from '../core/type-words';
+import { missingLabel, nameOrUnnamed, ownName, quotedName, typeNameStart } from '../core/type-words';
+
+/** An attribute value inside a double-quoted selector. */
+function attrValue(v: string): string {
+  return v.replace(/["\\]/g, (c) => `\\${c}`);
+}
+
+/** "A", "A and B", "A, B and C". */
+function andList(items: readonly string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/** World text as an isolated run: a name read right to left never reorders the line around it. */
+function bdi(text: string): HTMLElement {
+  const el = document.createElement('bdi');
+  el.textContent = text;
+  return el;
+}
 
 /** A page as a confirm names it: its own name in quotes, or the unnamed page ("The unnamed page" at a line's start). */
 function pageInLine(page: Element | undefined, start = false): string {
@@ -101,6 +122,28 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (proposedNote.textContent !== (line ?? '')) proposedNote.textContent = line ?? '';
     proposedNote.hidden = line === null;
   }
+  // What the next Publish or Republish sends (1.125.13), in the Publish section.
+  // Built with the section; kept in step on every data tick and when the
+  // charts load, by replacing only its own node (never the section: the
+  // address input keeps its text and focus). Cleared at every buildDetail.
+  let sharesList: HTMLElement | null = null;
+  let sharesSig = '';
+  function syncSharesList(page: Element): void {
+    const node = sharesList;
+    if (!node || !node.isConnected) return;
+    const shares = pageSharesOf(page, getState().data.elements, pageCharts);
+    const sig = JSON.stringify(shares);
+    if (sig === sharesSig) return;
+    // A press that had the focus keeps it, when its part is still there.
+    const focused = node.contains(document.activeElement) ? (document.activeElement as HTMLElement) : null;
+    const fresh = renderSharesList(page.id, shares);
+    node.replaceWith(fresh);
+    sharesList = fresh;
+    sharesSig = sig;
+    if (focused?.dataset.pressKey) {
+      fresh.querySelector<HTMLElement>(`[data-press-key="${attrValue(focused.dataset.pressKey)}"]`)?.focus();
+    }
+  }
   /** A proposed or hidden page is not published (conv. 168, conv. 170): said, and nothing sent. */
   function refuseProposedPage(page: Element): boolean {
     const line = pageNotPublishedLine(page);
@@ -125,6 +168,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const folder = getActiveStore();
     pageCharts = folder ? await folder.readCharts() : [];
     setBuilderCharts(pageCharts);
+    // What a chart block sends changes here with no data tick.
+    const shown = mountedView && mountedView !== 'list' ? elOf(mountedView) : undefined;
+    if (shown) syncSharesList(shown);
     // Chart blocks freeze from pageCharts — force a block rebuild once warm so a
     // page opened directly (URL) with a chart block doesn't stay "chart not
     // found". renderBlocks bypasses render()'s same-elements skip-optimization.
@@ -1068,6 +1114,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         const target = elOf((pin as Record<string, unknown>).element_id as string);
         const row = document.createElement('label');
         row.className = 'atlas-share-card-edit-fieldrow';
+        row.dataset.pinId = pin.id; // "Edit map" in what the page shares lands here
         const included = block.pinIds.includes(pin.id);
         const cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -1215,12 +1262,16 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const el = elOf(id);
       const chip = document.createElement('span');
       chip.className = 'atlas-share-card-chip atlas-share-collection-member';
+      // "Edit collection" in what the page shares focuses this chip, never its ×.
+      chip.dataset.elementId = id;
+      chip.tabIndex = -1;
       // A chip alone: its own name or the unnamed form; one not in the world says it is missing (a collection holds any type).
       chip.append(el ? nameOrUnnamed(el, { start: true }) : missingLabel('element'));
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'atlas-share-collection-member-x';
       x.title = 'Remove from collection';
+      x.setAttribute('aria-label', `Remove ${el ? nameOrUnnamed(el) : missingLabel('element')} from the collection`);
       x.textContent = '×';
       x.addEventListener('click', () => {
         void saveMembers(block.elementIds.filter(m => m !== id));
@@ -1259,6 +1310,41 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     doneRow.appendChild(done);
     wrap.appendChild(doneRow);
     return wrap;
+  }
+
+  /**
+   * Open one block's editor: the one path for a click on the block, its "Edit
+   * block" control and the presses in what the page shares. Commits whatever
+   * is open first (a text block's pending words land), then opens the block.
+   * `focus`: 'none' (a click: the pointer is where it is); 'editor' (Edit block:
+   * a heading and a text block focus their own editor, the rest land on a text
+   * box when they have one, else on Done, never on a control that removes, as a
+   * held Enter would repeat onto it); or a function picking the control to
+   * focus, for a press from the Publish section, which also brings the editor
+   * into view (the section sits above the blocks).
+   */
+  async function openBlockEditor(
+    pageId: string,
+    blockId: string,
+    focus: 'none' | 'editor' | ((editor: HTMLElement) => HTMLElement | null | undefined),
+  ): Promise<void> {
+    await commitOpenEdit(pageId);
+    const page = elOf(pageId);
+    const block = page ? blocksOf(page).find(b => b.id === blockId) : undefined;
+    if (!block) { renderBlocks(pageId); return; } // gone meanwhile: nothing to open
+    editingBlockId = block.id;
+    renderBlocks(pageId);
+    if (focus === 'none') return;
+    const editor = blocksHost?.querySelector<HTMLElement>(`[data-block-id="${attrValue(block.id)}"]`);
+    if (!editor) return;
+    if (focus === 'editor') {
+      if (block.kind === 'heading' || block.kind === 'prose') return;
+      (editor.querySelector<HTMLElement>('input:not([type]), input[type="text"], input[type="search"], textarea')
+        ?? editor.querySelector<HTMLElement>('.atlas-share-block-done'))?.focus();
+      return;
+    }
+    editor.scrollIntoView?.({ block: 'start' });
+    (focus(editor) ?? editor.querySelector<HTMLElement>('.atlas-share-block-done'))?.focus({ preventScroll: true });
   }
 
   /** Rebuild the block stack UI (display + at most one inline editor). */
@@ -1336,20 +1422,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         content.classList.add('is-editable');
         content.title = 'Click to edit';
         const openEditor = (focusEditor: boolean): void => {
-          void (async () => {
-            await commitOpenEdit(pageId);
-            editingBlockId = block.id;
-            renderBlocks(pageId);
-            // From the Edit button, focus goes into the editor it opened, never the page:
-            // a heading and a prose block focus their own editor; the rest land on a text
-            // box when they have one, else on Done, never on a control that removes
-            // (a held Enter would repeat onto it).
-            if (focusEditor && block.kind !== 'heading' && block.kind !== 'prose') {
-              const editor = blocksHost?.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(block.id)}"]`);
-              (editor?.querySelector<HTMLElement>('input:not([type]), input[type="text"], input[type="search"], textarea')
-                ?? editor?.querySelector<HTMLElement>('.atlas-share-block-done'))?.focus();
-            }
-          })();
+          void openBlockEditor(pageId, block.id, focusEditor ? 'editor' : 'none');
         };
         content.addEventListener('click', () => openEditor(false));
         row.appendChild(content);
@@ -1725,6 +1798,165 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     return section;
   }
 
+  // ---- what this page shares (1.125.13) ------------------------------------------
+
+  /** The list as the section first draws it; `syncSharesList` keeps it in step. */
+  function buildSharesList(page: Element): HTMLElement {
+    const shares = pageSharesOf(page, getState().data.elements, pageCharts);
+    sharesSig = JSON.stringify(shares);
+    sharesList = renderSharesList(page.id, shares);
+    return sharesList;
+  }
+
+  /**
+   * What the next Publish or Republish sends, never what is live: a row per
+   * element that sends a field or its picture, one part per block that sends
+   * it, each with a press to that block's editor; then the elements sent by
+   * name and kind only, then what else goes out. Words are drafts for the words
+   * pass; field labels are the picker's (`humanizeFieldName`).
+   */
+  function renderSharesList(pageId: string, shares: PageShares): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-share-shares';
+    wrap.dataset.role = 'share-shares';
+    const head = document.createElement('h3');
+    head.className = 'atlas-share-field-label atlas-share-shares-head';
+    head.textContent = 'What this page shares';
+    wrap.appendChild(head);
+
+    if (shares.rows.length > 0) {
+      const rows = document.createElement('ul');
+      rows.className = 'atlas-share-shares-rows';
+      for (const row of shares.rows) rows.appendChild(renderShareRow(pageId, row));
+      wrap.appendChild(rows);
+    }
+
+    if (shares.nameOnly.length > 0) {
+      const line = document.createElement('p');
+      line.className = 'atlas-share-section-hint atlas-share-shares-names';
+      line.dataset.role = 'share-shares-name-only';
+      line.append('Shared by name and kind only: ');
+      const shown = shares.nameOnly.slice(0, 3);
+      shown.forEach((name, i) => {
+        if (i > 0) line.append(i === shown.length - 1 && shares.nameOnly.length <= 3 ? ' and ' : ', ');
+        line.appendChild(bdi(name));
+      });
+      if (shares.nameOnly.length > 3) line.append(` and ${shares.nameOnly.length - 3} more`);
+      line.append('.');
+      wrap.appendChild(line);
+    }
+
+    const elseLine = renderSharesElse(shares.clauses);
+    if (elseLine) wrap.appendChild(elseLine);
+
+    if (shares.rows.length === 0 && shares.nameOnly.length === 0 && !elseLine) {
+      const none = document.createElement('p');
+      none.className = 'atlas-share-section-hint';
+      none.textContent = 'Nothing from the world, only what is written on the page itself.';
+      wrap.appendChild(none);
+    }
+    return wrap;
+  }
+
+  function renderShareRow(pageId: string, row: ShareRow): HTMLElement {
+    const li = document.createElement('li');
+    li.className = 'atlas-share-shares-row';
+    li.dataset.elementId = row.elementId;
+    const who = document.createElement('div');
+    who.className = 'atlas-share-shares-who';
+    who.appendChild(bdi(row.name));
+    const kind = document.createElement('span');
+    kind.className = 'atlas-share-shares-kind';
+    kind.textContent = typeNameStart(row.type);
+    who.append(' ', kind);
+    li.appendChild(who);
+
+    const parts = document.createElement('ul');
+    parts.className = 'atlas-share-shares-parts';
+    for (const part of row.parts) parts.appendChild(renderSharePart(pageId, row, part));
+    if (row.also.length > 0) {
+      const also = document.createElement('li');
+      also.className = 'atlas-share-shares-part';
+      also.dataset.partKind = 'also';
+      also.textContent = `Also sent: ${andList(row.also.map(humanizeFieldName))}`;
+      parts.appendChild(also);
+    }
+    li.appendChild(parts);
+    return li;
+  }
+
+  function renderSharePart(pageId: string, row: ShareRow, part: SharePart): HTMLElement {
+    const li = document.createElement('li');
+    li.className = 'atlas-share-shares-part';
+    li.dataset.partKind = part.kind;
+    li.dataset.blockId = part.blockId;
+    const what = document.createElement('span');
+    what.className = 'atlas-share-shares-what';
+    if (part.kind === 'card') what.append('Card: ');
+    else if (part.kind === 'map') what.append('Pin on ', bdi(part.mapTitle ?? ''), ': ');
+    else what.append('Collection: ');
+    const items = part.fields.map(humanizeFieldName);
+    if (part.picture) items.push('its picture');
+    what.append(andList(items));
+    // A member always sends its picture: the remedy is leaving the collection.
+    if (part.kind === 'collection') what.append(' (remove it from the collection to stop sending its picture)');
+    li.appendChild(what);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-btn-ghost atlas-share-shares-edit';
+    btn.dataset.pressKey = `${row.elementId} ${part.kind} ${part.blockId}`;
+    const name = row.name;
+    if (part.kind === 'card') {
+      btn.textContent = 'Edit card';
+      btn.setAttribute('aria-label', `Edit the card for ${name}`);
+    } else if (part.kind === 'map') {
+      btn.textContent = 'Edit map';
+      btn.setAttribute('aria-label', `Edit the map ${part.mapTitle ?? ''} where ${name} is pinned`);
+    } else {
+      btn.textContent = 'Edit collection';
+      btn.setAttribute('aria-label', `Edit the collection that holds ${name}`);
+    }
+    btn.addEventListener('click', () => {
+      void openBlockEditor(pageId, part.blockId, (editor) => {
+        // A card: its first checkbox (the picture toggle when shown, else the
+        // first field). A map: this element's own pin, never "change…" (it
+        // rebinds the map). A collection: this element's chip, never a × (it
+        // removes a member at once).
+        if (part.kind === 'card') return editor.querySelector<HTMLElement>('input[type="checkbox"]');
+        if (part.kind === 'map') {
+          for (const pinId of part.pinIds ?? []) {
+            const cb = editor.querySelector<HTMLElement>(`[data-pin-id="${attrValue(pinId)}"] input[type="checkbox"]`);
+            if (cb) return cb;
+          }
+          return null;
+        }
+        return editor.querySelector<HTMLElement>(`.atlas-share-collection-member[data-element-id="${attrValue(row.elementId)}"]`);
+      });
+    });
+    li.appendChild(btn);
+    return li;
+  }
+
+  /** What else goes out, one sentence per carrier the payload holds; null when it holds none. */
+  function renderSharesElse(c: ShareClauses): HTMLElement | null {
+    const line = document.createElement('p');
+    line.className = 'atlas-share-section-hint atlas-share-shares-else';
+    line.dataset.role = 'share-shares-else';
+    const said: Array<string | Node> = [];
+    if (c.maps) said.push('Maps share their picture and the names of their pins and zones.');
+    if (c.links) said.push(`Links share the names of what they point to${c.linksOffPage ? ', also elements not on the page' : ''}.`);
+    if (c.charts) said.push('Charts share the names and dates of the elements they draw, also ones not on the page; a republish can add more.');
+    for (const circle of c.circles) {
+      const span = document.createElement('span');
+      span.append(bdi(circle.knower), ` shares what it knows (${circle.entries} ${circle.entries === 1 ? 'entry' : 'entries'}).`);
+      said.push(span);
+    }
+    if (said.length === 0) return null;
+    said.forEach((s, i) => { if (i > 0) line.append(' '); line.append(s); });
+    return line;
+  }
+
   /** The Publish section of the detail view (three states; see DESIGN_SHARING). */
   function buildPublishSection(page: Element): HTMLElement {
     const section = document.createElement('section');
@@ -1811,6 +2043,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         section.appendChild(stale);
       }
 
+      section.appendChild(buildSharesList(page));
       const actions = document.createElement('div');
       actions.className = 'atlas-share-publish-actions';
       const repub = document.createElement('button');
@@ -1846,6 +2079,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       ? 'Revoked. Republishing restores this address with the current composition.'
       : 'Publish a frozen snapshot at an address of its own. Only what the blocks include is shared.';
     section.appendChild(hint);
+    section.appendChild(buildSharesList(page));
 
     const row = document.createElement('div');
     row.className = 'atlas-share-publish-row';
@@ -2091,6 +2325,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   // ---- detail view ----------------------------------------------------------------
 
   function buildDetail(pageId: string): void {
+    sharesList = null;
+    sharesSig = '';
     const worldId = wid()!;
     const page = elOf(pageId);
     if (!page || !isPageNarrative(page)) {
@@ -2353,6 +2589,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     pageTitleHandle?.sync(page.name || '');
     pageAgentMark?.sync(page);
     syncProposedNote(page);
+    syncSharesList(page);
 
     if (previewMode) return; // static reader view — rebuilt on toggle, not per tick
     if (editingBlockId) {

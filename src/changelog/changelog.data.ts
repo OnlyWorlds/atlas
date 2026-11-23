@@ -62,9 +62,9 @@ export const CHANGELOG: ChangelogRelease[] = [
     entries: [
       {
         id: 'publish-says-what-it-shares',
-        title: 'A pin on a map that does not show on a published page no longer sends its element',
-        body: 'A pin on a map with no published image, on a hidden map, or with no place on its map still sent its element\'s description, and for a Full pin every filled field, though the page never showed that pin. Such a pin now sends nothing.',
-        tags: ['fix'],
+        title: 'Before you publish a page, it lists what it shares, and a pin that does not show sends nothing',
+        body: 'The Publish section now lists each element the page sends more than a name for, with the fields and picture each card, map pin or collection sends and a button to that block, so a description a new card shows by default, or every field of a Full pin, is in plain sight before Publish or Republish. A pin on a map with no published image, on a hidden map, or with no place on its map used to send its element\'s description, and for a Full pin every filled field, though the page never showed it; it now sends nothing.',
+        tags: ['pages', 'privacy', 'fix'],
       },
     ],
   },

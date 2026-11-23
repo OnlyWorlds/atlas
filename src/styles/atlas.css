@@ -13273,6 +13273,74 @@ a.atlas-share-map-pin { cursor: pointer; }
   white-space: nowrap;
 }
 
+/* What this page shares (1.125.13): above the address input, or above Republish. */
+.atlas-share-shares {
+  margin: 8px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+}
+
+.atlas-share-shares-head {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.atlas-share-shares-rows,
+.atlas-share-shares-parts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.atlas-share-shares-row + .atlas-share-shares-row {
+  margin-top: 8px;
+}
+
+.atlas-share-shares-who {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.atlas-share-shares-kind {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-shares-part {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.atlas-share-shares-what {
+  flex: 1 1 14em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlas-share-shares-edit {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.atlas-share-shares-names,
+.atlas-share-shares-else {
+  margin: 8px 0 0;
+}
+
+/* The chip "Edit collection" lands on: seen, though it holds no control of its own. */
+.atlas-share-collection-member:focus {
+  outline: 2px solid var(--atlas-accent);
+  outline-offset: 1px;
+}
+
 /* ---- Notes overlay (src/ui/notes-overlay.ts) — per-world freeform notes ---- */
 
 .atlas-notes-panel {

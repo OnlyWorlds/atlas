@@ -137,6 +137,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'stack blocks: headings, text, cards, collections, maps, charts, circles',
       'preview exactly what a visitor will see',
       'publish a page at its own address when the world is online',
+      'see what each card, map pin and collection shares before you publish, with a button to that block',
       'copy any page as JSON to use elsewhere',
     ],
   },
