@@ -26,7 +26,6 @@ import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { showProblem } from '../../ui/problem-fixes';
 import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
-import type { AutolinkIndex } from '../../core/prose-autolink';
 import { currentLore, pageLore } from '../../core/parlor-room';
 import { readerLinksOf } from './context-pane-graph';
 import { findOwLinks, namedId, type HeldId } from '../../core/ow-links';
@@ -423,7 +422,6 @@ function rowButtonOf(outer: HTMLElement): HTMLElement {
 }
 
 interface NamedCache {
-  index: AutolinkIndex;
   byId: Map<string, Element>;
   stories: Map<string, Element[]>;
 }
@@ -434,22 +432,22 @@ const namedCache = new WeakMap<readonly Element[], NamedCache>();
  * autolink kernel's own first-mention pass over the stored story, so the list
  * agrees with what "Link all" would chip. Unambiguous names only; an element
  * already linked anywhere in the text is not named here. Cached per elements
- * array: the pane redraws often and the index walks the whole world, so it is
- * built once for each array, never once for each story.
+ * array: the pane redraws often. The index itself is the kernel's one for
+ * this array, shared with the editor's hints (`buildAutolinkIndex`).
  */
 export function namedInText(narrative: Element, elements: readonly Element[]): Element[] {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (!story) return [];
   let perArray = namedCache.get(elements);
   if (!perArray) {
-    perArray = { index: buildAutolinkIndex(elements), byId: new Map(elements.map(e => [e.id, e])), stories: new Map() };
+    perArray = { byId: new Map(elements.map(e => [e.id, e])), stories: new Map() };
     namedCache.set(elements, perArray);
   }
   const key = `${narrative.id}\u0000${story}`;
   const hit = perArray.stories.get(key);
   if (hit) return hit;
   const { byId } = perArray;
-  const { linked } = autolinkMarkdown(story, perArray.index);
+  const { linked } = autolinkMarkdown(story, buildAutolinkIndex(elements));
   const out = linked
     .map(c => byId.get(c.id))
     .filter((e): e is Element => !!e && e.id !== narrative.id);
