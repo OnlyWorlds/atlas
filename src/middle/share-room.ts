@@ -64,6 +64,14 @@ import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
 import { missingLabel, nameOrUnnamed, ownName, quotedName, typeNameStart } from '../core/type-words';
 
+/** What a Full pin shares, in the words the Publish list's rows use. A Full pin sends every filled-in field but
+ * what `isCardSkipField` keeps back: the server's stamps and author fields, its marks, `known_of`, the profile keys
+ * (`isProfileField`; a key of another tool's own, `x_mytool_note`, is sent). */
+const FULL_PIN_LEAVES = 'except when and by whom it was written, who knows of it, and the marks OnlyWorlds tools keep on it, such as reviews and reports';
+export const FULL_PIN_HINT = `Included pins share their element's name, type, description and image on the published page. Turn on Full for a pin to share every filled-in field of that element, ${FULL_PIN_LEAVES}. Before you publish, the page lists every field it sends.`;
+export const FULL_PIN_ON = `Sharing every filled-in field of this element, ${FULL_PIN_LEAVES}. Click to share only name, type, description and image`;
+export const FULL_PIN_OFF = `Sharing name, type, description and image. Click to share every filled-in field of this element, ${FULL_PIN_LEAVES}`;
+
 /**
  * The first element under `root` matching `selector` whose `data-<key>` is
  * exactly `value`. Matched by its data, never by a value written into a
@@ -1104,7 +1112,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const labelRow = document.createElement('div');
       labelRow.className = 'atlas-share-field-label';
       labelRow.textContent = 'Visible pins';
-      labelRow.title = 'Included pins share their element\'s name, type, description and image on the published page. Turn on Full for a pin to share every populated field of that element.';
+      labelRow.title = FULL_PIN_HINT;
       // Visible, not tooltip-only: the full toggle went unfound in the
       // release smoke (Titus). One line states the disclosure rule.
       const disclosureHint = document.createElement('p');
@@ -1158,9 +1166,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           fullBtn.className = 'atlas-share-pin-full-toggle' + (isFull ? ' is-on' : '');
           fullBtn.setAttribute('aria-pressed', isFull ? 'true' : 'false');
           fullBtn.textContent = 'Full';
-          fullBtn.title = isFull
-            ? 'Sharing every populated field of this element. Click to share only name, type, description and image'
-            : 'Sharing name, type, description and image. Click to share every populated field of this element';
+          fullBtn.title = isFull ? FULL_PIN_ON : FULL_PIN_OFF;
           fullBtn.addEventListener('click', (e) => {
             e.preventDefault(); // inside a <label> — don't toggle the checkbox
             const curr = block.fullPinIds ?? [];
