@@ -8,7 +8,7 @@
  * mirror, and the no-derive rule — page mentions never write element fields).
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, BrowserContext } from '@playwright/test';
 
 async function freshBoot(page: Page) {
   await page.goto('/');
@@ -808,4 +808,40 @@ test('a page that arrived with only its story opens with that text, and a new bl
   const saved = await getPage(page);
   expect(saved.story).toBe('The Kid, for crossing the river.\n\n# Reward');
   expect(saved.atlas_page_blocks[0]).toMatchObject({ kind: 'prose', markdown: 'The Kid, for crossing the river.' });
+});
+
+async function fullPageIconIsAnIcon(page: Page, context: BrowserContext) {
+  await setupWorld(page);
+  await createElement(page, 'character', { name: 'Ireena' });
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await page.click('.atlas-share-block-add-btn:has-text("+ element")');
+  await page.locator('.atlas-picker-row', { hasText: 'Ireena' }).click();
+  await page.click('.atlas-share-block-done');
+  await expect(page.locator('.atlas-share-block[data-block-kind="element-card"]')).toBeVisible();
+
+  const [tab] = await Promise.all([context.waitForEvent('page'), page.click('[data-action="full-preview"]')]);
+  await tab.waitForLoadState('load');
+  await expect(tab.locator('.atlas-share-card-name')).toHaveText('Ireena');
+  // The ink of the icon's word in the font the page gives it: one glyph in the
+  // icon font (about 24 px), the whole word in a fallback font (about 60).
+  const icon = tab.locator('.atlas-share-card .material-symbols-outlined').first();
+  await expect(icon).toBeVisible();
+  await expect.poll(() => icon.evaluate(async (el) => {
+    await document.fonts.ready;
+    const s = getComputedStyle(el);
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    ctx.font = `${s.fontSize} ${s.fontFamily}`;
+    return Math.round(ctx.measureText(el.textContent!.trim()).width / parseFloat(s.fontSize) * 100) / 100;
+  }), { timeout: 10_000 }).toBeLessThan(1.5);
+  await tab.close();
+}
+
+// A blob: tab resolves no root-relative font; Chromium and Firefox fail and mend differently (measured 2026-11-24).
+test('Full page draws a card\'s icon as an icon, not the first letters of its word', async ({ page, context }) => {
+  await fullPageIconIsAnIcon(page, context);
+});
+
+test('@firefox Full page draws a card\'s icon as an icon, not the first letters of its word', async ({ page, context }) => {
+  await fullPageIconIsAnIcon(page, context);
 });

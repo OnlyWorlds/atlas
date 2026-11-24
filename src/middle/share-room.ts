@@ -27,6 +27,7 @@ import { getState, subscribe } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange } from '../core/router';
 import { getActiveStore } from '../core/active-store';
+import { previewStyles } from './preview-css';
 import { getEditorSettings } from '../registry/registry';
 import { isSeatWorld, pinWhoOf, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import { rateWaitOf } from '../sync/rate-wait';
@@ -1522,12 +1523,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   function openFullPagePreview(page: Element): void {
     const payload = buildPagePayload(page, getState().data.elements, pageCharts);
     const pageEl = renderPayloadPage(payload);
-    let css = '';
-    for (const sheet of Array.from(document.styleSheets)) {
-      try {
-        for (const rule of Array.from(sheet.cssRules)) css += rule.cssText + '\n';
-      } catch { /* cross-origin — covered by the copied <link>s below */ }
-    }
+    // Addresses made whole: a blob: tab resolves no root-relative font (preview-css.ts).
+    const css = previewStyles(document);
     const fontLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preconnect"]'))
       .filter(l => l.href.includes('fonts.googleapis') || l.href.includes('fonts.gstatic'))
       .map(l => l.outerHTML).join('');

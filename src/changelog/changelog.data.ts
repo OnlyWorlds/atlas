@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.23',
+    date: '2026-11-24',
+    theme: 'Full page draws its icons',
+    entries: [
+      {
+        id: 'full-page-icons',
+        title: 'Full page shows a card\'s icon, and the page\'s own font',
+        body: 'In Pages, Full page opens the page in a tab of its own. That tab could not find Atlas\'s icon and text fonts, so a card\'s person icon showed as the letters "pe" and the text fell back to another font. It now loads both, in every browser.',
+        tags: ['sharing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.22',
     date: '2026-11-24',
     theme: 'The + says what it makes',
