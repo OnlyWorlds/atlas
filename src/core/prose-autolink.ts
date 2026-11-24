@@ -293,7 +293,9 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
  */
 export function unlinkMarkdown(story: string): { story: string; unlinked: number } {
   if (!story) return { story, unlinked: 0 };
-  const re = /\[([^\]]*)\]\(([^)\s]*)\)/g;
+  // A label holds no bracket (`autolinkMarkdown` writes none), so an unmatched `[` earlier in the text is never
+  // read as the start of the link and stays where it was.
+  const re = /\[([^[\]]*)\]\(([^)\s]*)\)/g;
   let n = 0;
   const out = story.replace(re, (all, label: string, href: string) => {
     const link = readOwHref(href);

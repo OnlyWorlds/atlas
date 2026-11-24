@@ -60,12 +60,22 @@ describe('the markdown path passes over a label it cannot carry', () => {
     });
   }
 
-  it('a safe alias after the first mention is not reached: the finder gives one mention per element', () => {
+  it('a safe alias after the passed-over mention is linked, and the round trip still holds', () => {
     const story = 'Kira [the elder] came; later Kira left.';
-    const index = buildAutolinkIndex([el(1, 'Kira [the elder]', { aliases: ['Kira'] })]);
+    const index = buildAutolinkIndex([el(1, 'Kira [the elder]', { atlas_aliases: ['Kira'] })]);
     const r = autolinkMarkdown(story, index);
-    expect(r.linked).toEqual([]);
-    expect(r.story).toBe(story);
+    expect(r.linked.map(c => c.id)).toEqual([idOf(1)]);
+    expect(r.story).toBe(`Kira [the elder] came; later [Kira](ow://character/${idOf(1)}) left.`);
+    expect(unlinkMarkdown(r.story).story).toBe(story);
+  });
+
+  it('an unmatched [ earlier in the text stays where it was when the link is taken back', () => {
+    const story = 'a [b Éowyn c';
+    const r = autolinkMarkdown(story, buildAutolinkIndex([el(2, 'Éowyn')]));
+    expect(r.story).toBe(`a [b [Éowyn](ow://character/${idOf(2)}) c`);
+    const back = unlinkMarkdown(r.story);
+    expect(back.unlinked).toBe(1);
+    expect(back.story).toBe(story);
   });
 
   it('passes over one unsafe name and still links the others in the same story', () => {
