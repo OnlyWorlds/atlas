@@ -254,18 +254,28 @@ function mapAct(kind: 'create-map' | 'pin-map', el: Element, c: StrandContext, t
   // own the link placed nothing and said not how, and on a narrow window the map drawer covers that button.
   // A place already pinned on this map is not readied again (one pin per element and map).
   if (map.pinned || worldIsViewOnly()) return;
-  patchSlice('ui', { ...getState().ui, pinPlacement: { elementId: el.id } });
-  // Readied here, it is let go when the address leaves this map and place (Back, another page): an armed
-  // placement keeps the crosshair, and a folder world notices no outside edit while one is armed (the
-  // 1.121.0 contract gate's G10, why this act once never readied). The banner's Cancel and Esc still work.
+  readied?.abort(); // a press before: its placement is replaced, its watch goes with it
+  const placement = { elementId: el.id };
+  patchSlice('ui', { ...getState().ui, pinPlacement: placement });
+  // Readied here, it is let go when the address leaves this map and place (Back, another page) or the
+  // window loses focus (another app may edit the folder): an armed placement keeps the crosshair, and a
+  // folder world notices no outside edit while one is armed (the 1.121.0 contract gate's G10, why this
+  // act once never readied). Only this press's placement is let go, never one armed since (+pin, a re-key).
+  // The banner's Cancel and Esc still work.
   const at = mapHash(c.worldId, map.id, el.id);
-  const leave = (): void => {
-    if (window.location.hash === at) return;
-    window.removeEventListener('hashchange', leave);
-    if (getState().ui.pinPlacement?.elementId === el.id) patchSlice('ui', { ...getState().ui, pinPlacement: null });
+  const watch = new AbortController();
+  readied = watch;
+  const letGo = (): void => {
+    watch.abort();
+    if (readied === watch) readied = null;
+    if (getState().ui.pinPlacement === placement) patchSlice('ui', { ...getState().ui, pinPlacement: null });
   };
-  window.addEventListener('hashchange', leave);
+  window.addEventListener('hashchange', () => { if (window.location.hash !== at) letGo(); }, { signal: watch.signal });
+  window.addEventListener('blur', letGo, { signal: watch.signal });
 }
+
+/** The watch on the placement Pin it on a map readied last, until it is let go. */
+let readied: AbortController | null = null;
 
 /**
  * A link inside a line: navigation (the element's page as its box's title opens it, the writing room

@@ -65,11 +65,11 @@ export interface LineFacts {
 
 /**
  * Where a line's link goes: the element's page, the writing room on the story, the timeline in Charts,
- * or the location's map acts. Each only navigates or opens a dialog.
+ * or the location's map acts. Each navigates or opens a dialog; Pin it on a map also readies the pin.
  */
 export type LineLink = 'page' | 'writing' | 'charts' | 'create-map' | 'pin-map';
 
-/** A run of words, or a link the box draws as a button that only navigates or opens a dialog. */
+/** A run of words, or a link the box draws as a button that navigates or opens a dialog, writing nothing. */
 export type LinePiece = { text: string } | { link: LineLink; text: string };
 
 const lower = (label: string | undefined, fallback: string): string => pluralize((label ?? '').trim().toLowerCase() || fallback);

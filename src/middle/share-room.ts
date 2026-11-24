@@ -1524,7 +1524,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const payload = buildPagePayload(page, getState().data.elements, pageCharts);
     const pageEl = renderPayloadPage(payload);
     // Addresses made whole: a blob: tab resolves no root-relative font (preview-css.ts).
-    const css = previewStyles(document);
+    // No stylesheet text may close the <style> it is written into.
+    const css = previewStyles(document).replace(/<\/(style)/gi, '<\\/$1');
     const fontLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preconnect"]'))
       .filter(l => l.href.includes('fonts.googleapis') || l.href.includes('fonts.gstatic'))
       .map(l => l.outerHTML).join('');

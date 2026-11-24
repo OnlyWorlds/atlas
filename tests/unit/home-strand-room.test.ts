@@ -212,6 +212,19 @@ describe('the line above each filled box (W3)', () => {
     window.location.hash = `#/w/${W}`;
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     expect(getState().ui.pinPlacement).toBeNull();
+    // The window losing focus lets it go too (another app may edit the folder), and only the placement
+    // this press set: one armed since by another hand stays.
+    draw();
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="pin-map"]')!.click();
+    expect(getState().ui.pinPlacement).toEqual({ elementId: L });
+    window.dispatchEvent(new Event('blur'));
+    expect(getState().ui.pinPlacement).toBeNull();
+    draw();
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="pin-map"]')!.click();
+    patchSlice('ui', { ...getState().ui, pinPlacement: { elementId: C } });
+    window.dispatchEvent(new Event('blur'));
+    expect(getState().ui.pinPlacement).toEqual({ elementId: C });
+    patchSlice('ui', { ...getState().ui, pinPlacement: null });
     world([...whole(), el('map', M, { name: 'The Coast' }), el('pin', P, { map_id: M, element_id: L, x: 5, y: 5 })]);
     draw();
     box('location').querySelector<HTMLButtonElement>('[data-strand-key="location:room"]')!.click();
@@ -219,7 +232,7 @@ describe('the line above each filled box (W3)', () => {
     expect(getState().ui.pinPlacement).toBeNull();
   });
 
-  it('each link lands where it says and only navigates: Pin it on a map, Charts (the rail undated, its place dated), the writing room, their page', () => {
+  it('each link lands where it says and writes nothing: Pin it on a map, Charts (the rail undated, its place dated), the writing room, their page', () => {
     world([...whole(), el('map', M, { name: 'The Coast' })]);
     draw();
     const before = JSON.stringify(getState().data.elements);
