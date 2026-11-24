@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'full-pin-says-what-it-shares',
         title: 'A pin\'s Full switch on a page says what it shares',
-        body: 'Turning on Full for a pin on a page shares more of that element than its name, type, description and image. The switch used to say it shared every field of the element. A Full pin leaves out when and by whom an element was written, the marks OnlyWorlds tools keep on it, such as reviews and reports, and Atlas\'s own working fields, such as alternate names, and the switch and the hint above the pins now say so. Before you publish, the page lists every field it sends.',
+        body: 'Turning on Full for a pin on a page shares more of that element than its name, type, description and image. The switch used to say it shared every field of the element. A Full pin leaves out when and by whom an element was written, the marks OnlyWorlds tools keep on it (such as reviews and reports) and Atlas\'s own working fields (such as alternate names). The switch and the hint above the pins now say so. Before you publish, the page lists every field it sends.',
         tags: ['sharing', 'fix'],
       },
     ],
