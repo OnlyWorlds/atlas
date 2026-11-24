@@ -845,3 +845,28 @@ test('Full page draws a card\'s icon as an icon, not the first letters of its wo
 test('@firefox Full page draws a card\'s icon as an icon, not the first letters of its word', async ({ page, context }) => {
   await fullPageIconIsAnIcon(page, context);
 });
+
+test('on a phone every action of a page and every block to add can be pressed', async ({ page }) => {
+  await setupWorld(page);
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
+  // Made at desktop size (a phone reaches Pages through the menu), read at a phone's.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const reach = page.locator('.atlas-share-detail-header button, .atlas-share-block-add-btn');
+  await expect(page.locator('[data-action="open-publish"]')).toBeVisible();
+  const rows = await reach.evaluateAll((els) => els.map((b) => {
+    const r = b.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return { name: (b.getAttribute('aria-label') || b.textContent || '').trim(), right: r.right, lands: !!hit && (hit === b || b.contains(hit)) };
+  }));
+  const vw = await page.evaluate(() => document.documentElement.clientWidth);
+  expect(rows.length).toBeGreaterThanOrEqual(12);
+  for (const r of rows) {
+    expect(r.right, r.name).toBeLessThanOrEqual(vw);
+    expect(r.lands, r.name).toBe(true);
+  }
+  // The words step out of sight, never out of the name a screen reader hears.
+  await expect(page.locator('[data-action="open-publish"]')).toHaveAccessibleName(/Publish/);
+  await expect(page.locator('.atlas-share-delete')).toHaveAccessibleName('Delete this page');
+});

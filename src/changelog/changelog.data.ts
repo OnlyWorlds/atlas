@@ -58,13 +58,19 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.125.23',
     date: '2026-11-24',
-    theme: 'Full page draws its icons',
+    theme: 'Pages on a phone, and Full page draws its icons',
     entries: [
+      {
+        id: 'page-actions-on-a-phone',
+        title: 'On a phone, Publish and every other page action can be pressed',
+        body: 'On a narrow screen the row above a page ran past the edge, so Publish and Delete could not be reached. Below 760 pixels its buttons now show their icons alone and keep their names for a screen reader and on hover, and the buttons that add a block wrap onto more lines.',
+        tags: ['pages', 'layout', 'fix'],
+      },
       {
         id: 'full-page-icons',
         title: 'Full page shows a card\'s icon, and the page\'s own font',
         body: 'In Pages, Full page opens the page in a tab of its own. That tab could not find Atlas\'s icon and text fonts, so a card\'s person icon showed as the letters "pe" and the text fell back to another font. It now loads both, in every browser.',
-        tags: ['sharing', 'fix'],
+        tags: ['pages', 'fix'],
       },
     ],
   },
