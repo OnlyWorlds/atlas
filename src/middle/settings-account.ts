@@ -74,7 +74,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
           <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">Show</button>
         </div>
       </label>
-      <p class="atlas-settings-hint" data-role="pin-hint">One World PIN for all your worlds, the one on your onlyworlds.com account: chosen when you made your first world there, or in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
+      <p class="atlas-settings-hint" data-role="pin-hint">One World PIN for all your worlds. It belongs to your onlyworlds.com account: chosen with your first world there, and changed in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
       <p class="atlas-settings-hint" data-role="pin-state" role="status"${reg.pin ? '' : ' hidden'}>${escapeText(pinStateLine(reg))}</p>
       ${reg.account_token ? '' : renderEmailField(reg)}
     </section>
@@ -133,10 +133,10 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
         <div class="atlas-settings-pin-row">
           <input class="atlas-input" type="password" name="account-password" data-draft placeholder="Password"
                  autocomplete="current-password" aria-label="Password" />
-          <button type="submit" class="atlas-btn-primary" data-action="account-sign-in-password">Sign in</button>
+          <button type="submit" class="atlas-btn-primary" data-action="account-sign-in-password"${signingIn === 'password' ? ' disabled' : ''}>${signingIn === 'password' ? 'Signing in…' : 'Sign in'}</button>
         </div>
       </form>
-      <div class="atlas-modal-error" data-role="account-token-error" hidden></div>
+      <div class="atlas-modal-error" data-role="account-token-error"${signInError ? '' : ' hidden'}>${escapeText(signInError)}</div>
       <p class="atlas-settings-hint">Your worlds appear in the sidebar, and each opens without a key to copy. Atlas keeps a token of its own for this browser, never your password. ${noAccountYetHtml()}</p>
       <details class="atlas-account-token-alt" data-role="account-token-alt">
         <summary>I have an account token</summary>
@@ -144,7 +144,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
           <input class="atlas-input" type="password" name="account-token" data-draft
                  placeholder="ow_a_..."
                  autocomplete="off" spellcheck="false" aria-label="Account token" />
-          <button type="button" class="atlas-btn-primary" data-action="account-sign-in">Sign in</button>
+          <button type="button" class="atlas-btn-primary" data-action="account-sign-in"${signingIn === 'token' ? ' disabled' : ''}>${signingIn === 'token' ? 'Checking…' : 'Sign in'}</button>
         </div>
         <p class="atlas-settings-hint">Made on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-tokens" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under Account tokens.</p>
       </details>
@@ -267,6 +267,11 @@ export function wireAccountTab(toasts: ToastManager): void {
   wireAccountTokenBlock(toasts);
 }
 
+/** A sign-in in flight, by its door: the tab's redraw draws its button busy until it ends. */
+let signingIn: 'password' | 'token' | null = null;
+/** What the sign-in last said went wrong, drawn with the tab, so a redraw keeps it until the next try. */
+let signInError = '';
+
 function wireAccountTokenBlock(toasts: ToastManager): void {
   const block = document.querySelector<HTMLElement>('.atlas-settings [data-role="account-token-block"]');
   if (!block) return;
@@ -274,9 +279,12 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
   wireOnlyWorldsSignIn(block, toasts);
   const signInBtn = block.querySelector<HTMLButtonElement>('[data-action="account-sign-in"]');
   const tokenInput = block.querySelector<HTMLInputElement>('input[name="account-token"]');
-  const errorEl = block.querySelector<HTMLElement>('[data-role="account-token-error"]');
+  // Found at the moment it is used: a redraw of the tab replaces the line wired here (the 1.125.21 gate's S2).
+  const errorLine = (): HTMLElement | null => document.querySelector<HTMLElement>('.atlas-settings [data-role="account-token-error"]');
 
   const showError = (msg: string): void => {
+    signInError = msg;
+    const errorEl = errorLine();
     if (!errorEl) return;
     errorEl.textContent = msg;
     errorEl.hidden = false;
@@ -294,7 +302,10 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       showError('Enter your email or username and your password.');
       return;
     }
+    signInError = '';
+    const errorEl = errorLine();
     if (errorEl) errorEl.hidden = true;
+    signingIn = 'password';
     passwordBtn.disabled = true;
     passwordBtn.textContent = 'Signing in…';
     void (async () => {
@@ -303,6 +314,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
         minted = await signInWithPassword(loginInput.value, passwordInput.value);
       } catch (err) {
         console.warn('[settings] password sign-in refused');
+        signingIn = null;
         showError(passwordSignInLine(err));
         passwordBtn.disabled = false;
         passwordBtn.textContent = 'Sign in';
@@ -324,7 +336,10 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       showError('Account tokens start with ow_a_: this looks like a different kind of key.');
       return;
     }
+    signInError = '';
+    const errorEl = errorLine();
     if (errorEl) errorEl.hidden = true;
+    signingIn = 'token';
     signInBtn.disabled = true;
     signInBtn.textContent = 'Checking…';
     await completeSignIn(token, () => {
@@ -345,12 +360,14 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     } catch (err) {
       console.warn('[settings] sign-in failed:', err);
       if (tokenId) void revokeAtlasToken(token, tokenId);
+      signingIn = null;
       showError(signInErrorLine(err));
       onRefused();
       return;
     }
     // The settings panel re-renders from the registry patch; the block flips
     // to the signed-in state on that pass.
+    signingIn = null;
     void keepSignIn(token, username, toasts, tokenId);
   };
 

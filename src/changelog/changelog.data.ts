@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'sign-in-fields-kept',
         title: 'The sign-in keeps your email and password when you type the World PIN after them',
-        body: 'In Settings, under OnlyWorlds, typing your email or username and password and then your World PIN emptied the two sign-in fields as soon as you left the PIN. They now keep what you typed until you sign in. The line under the World PIN also says where it comes from: you chose it on onlyworlds.com with your first world there, or in Account settings.',
+        body: 'In Settings, under OnlyWorlds, typing your email or username and password and then your World PIN emptied the two sign-in fields as soon as you left the PIN. They now keep what you typed until you sign in. A pasted account token is kept the same way, and a sign-in under way stays under way. The line under the World PIN also says where the PIN comes from: it belongs to your onlyworlds.com account, chosen with your first world there and changed in Account settings.',
         tags: ['onboarding', 'fix'],
       },
     ],

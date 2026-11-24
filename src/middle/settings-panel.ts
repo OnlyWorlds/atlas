@@ -159,7 +159,11 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     wireTabHandlers(tab, toasts, activeWorld);
     for (const input of root.querySelectorAll<HTMLInputElement>('input[data-draft]')) {
       const kept = drafts.get(input.name);
-      if (kept && !input.value) input.value = kept;
+      if (kept && !input.value) {
+        input.value = kept;
+        // A pasted token sits in its fold: kept, the fold stays open with its Sign in (the 1.125.21 gate's S1).
+        input.closest('details')?.setAttribute('open', '');
+      }
     }
   }
 
