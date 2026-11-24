@@ -828,15 +828,31 @@ test('north is up: a pin by the schema\'s bottom-left numbers draws where the st
       const r = label?.getBoundingClientRect();
       return r ? { top: r.top, left: r.left, width: r.width } : null;
     };
-    return { north: top('Northreach'), mid: top('Midfield'), south: top('Southmoor') };
+    // What the runner's one failure (0.20) needs next time: each label's
+    // density-layer margins and transform beside its pin's own box (the
+    // failure's picture showed Northreach's label far from its pin).
+    const why = Array.from(c.querySelectorAll('.leaflet-2d-pin-label')).map((l) => {
+      const el = l as HTMLElement;
+      const r = el.getBoundingClientRect();
+      const pin = Array.from(c.querySelectorAll('img.leaflet-marker-icon'))
+        .find(i => (i as HTMLImageElement).alt.includes(el.textContent ?? '\u0000')) as HTMLElement | undefined;
+      const pr = pin?.getBoundingClientRect();
+      return {
+        name: el.textContent, top: Math.round(r.top), left: Math.round(r.left),
+        margin: `${el.style.marginLeft} ${el.style.marginTop}`, transform: el.style.transform,
+        culled: el.classList.contains('atlas-label-culled'),
+        pin: pr ? `${Math.round(pr.left)},${Math.round(pr.top)}` : null,
+      };
+    });
+    return { north: top('Northreach'), mid: top('Midfield'), south: top('Southmoor'), why };
   });
   expect({ n: !!tops.north, m: !!tops.mid, s: !!tops.south }).toEqual({ n: true, m: true, s: true });
   // North is up (the old top-down storage drew it at the bottom)...
   expect(tops.north!.top).toBeLessThan(tops.south!.top);
   // ...and y 1000 sits halfway between y 1600 and y 400.
   const midFrac = (tops.mid!.top - tops.north!.top) / (tops.south!.top - tops.north!.top);
-  expect(midFrac).toBeGreaterThan(0.4);
-  expect(midFrac).toBeLessThan(0.6);
+  expect(midFrac, JSON.stringify(tops.why)).toBeGreaterThan(0.4);
+  expect(midFrac, JSON.stringify(tops.why)).toBeLessThan(0.6);
 
   // WRITE: a click just above the north label, off to its side, stores a y
   // north of centre (the old conversion stored the mirror, south of 1000).
