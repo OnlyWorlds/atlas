@@ -88,6 +88,20 @@ describe('New world on OnlyWorlds', () => {
     expect(getState().registry.pin_state).toBe('proved');
   });
 
+  it('the address names the new world once it is made, as Create a world does', async () => {
+    window.location.hash = '#/';
+    await create('1234');
+    await vi.waitFor(() => expect(getState().registry.worlds[0]?.state).toBe('api-linked'));
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/w/local-new'));
+  });
+
+  it('a create keel refuses leaves the address where it was', async () => {
+    window.location.hash = '#/';
+    const body = await create('9999');
+    await vi.waitFor(() => expect(body.querySelector<HTMLElement>('[data-role="error"]')!.hidden).toBe(false));
+    expect(window.location.hash).toBe('#/');
+  });
+
   it("a seat's secret kept as the PIN is never marked proved by a create that never sent it", async () => {
     patchSlice('registry', { ...getState().registry, pin: 'ow_s_seatsecretlong0001' });
     await create('ow_s_seatsecretlong0001');
