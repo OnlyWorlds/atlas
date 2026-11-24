@@ -147,11 +147,20 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     // list), so the part is the markup itself, plus the world entry the
     // handlers capture at render.
     if (!gate.changed([html, activeWorld])) return;
+    // A field marked `data-draft` (the sign-in's login, password and token) holds what is typed and not yet sent;
+    // the rebuild keeps it, as a save elsewhere on the tab (the World PIN's) redraws the whole tab once focus has
+    // left the typing (a person who typed their login, then the PIN, found both sign-in fields empty).
+    const drafts = new Map<string, string>();
+    for (const input of root.querySelectorAll<HTMLInputElement>('input[data-draft]')) if (input.value) drafts.set(input.name, input.value);
     root.innerHTML = html;
 
     wireTabClicks();
     wireReplayChip();
     wireTabHandlers(tab, toasts, activeWorld);
+    for (const input of root.querySelectorAll<HTMLInputElement>('input[data-draft]')) {
+      const kept = drafts.get(input.name);
+      if (kept && !input.value) input.value = kept;
+    }
   }
 
   /**

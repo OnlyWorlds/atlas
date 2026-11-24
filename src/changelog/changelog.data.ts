@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.21',
+    date: '2026-11-24',
+    theme: 'Signing in keeps what you typed',
+    entries: [
+      {
+        id: 'sign-in-fields-kept',
+        title: 'The sign-in keeps your email and password when you type the World PIN after them',
+        body: 'In Settings, under OnlyWorlds, typing your email or username and password and then your World PIN emptied the two sign-in fields as soon as you left the PIN. They now keep what you typed until you sign in. The line under the World PIN also says where it comes from: you chose it on onlyworlds.com with your first world there, or in Account settings.',
+        tags: ['onboarding', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.20',
     date: '2026-11-24',
     theme: 'A new world on OnlyWorlds gets its address',

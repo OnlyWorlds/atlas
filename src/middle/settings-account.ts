@@ -74,7 +74,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
           <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">Show</button>
         </div>
       </label>
-      <p class="atlas-settings-hint" data-role="pin-hint">One World PIN for all your worlds. You set it on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
+      <p class="atlas-settings-hint" data-role="pin-hint">One World PIN for all your worlds, the one on your onlyworlds.com account: chosen when you made your first world there, or in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
       <p class="atlas-settings-hint" data-role="pin-state" role="status"${reg.pin ? '' : ' hidden'}>${escapeText(pinStateLine(reg))}</p>
       ${reg.account_token ? '' : renderEmailField(reg)}
     </section>
@@ -128,10 +128,10 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
       ${owButton ? '' : '<span>Sign in to OnlyWorlds</span>'}
       ${owButton}
       <form class="atlas-account-password" data-role="account-password-form" novalidate>
-        <input class="atlas-input" type="text" name="account-login" placeholder="Email or username"
+        <input class="atlas-input" type="text" name="account-login" data-draft placeholder="Email or username"
                autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Email or username" />
         <div class="atlas-settings-pin-row">
-          <input class="atlas-input" type="password" name="account-password" placeholder="Password"
+          <input class="atlas-input" type="password" name="account-password" data-draft placeholder="Password"
                  autocomplete="current-password" aria-label="Password" />
           <button type="submit" class="atlas-btn-primary" data-action="account-sign-in-password">Sign in</button>
         </div>
@@ -141,7 +141,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
       <details class="atlas-account-token-alt" data-role="account-token-alt">
         <summary>I have an account token</summary>
         <div class="atlas-settings-pin-row">
-          <input class="atlas-input" type="password" name="account-token"
+          <input class="atlas-input" type="password" name="account-token" data-draft
                  placeholder="ow_a_..."
                  autocomplete="off" spellcheck="false" aria-label="Account token" />
           <button type="button" class="atlas-btn-primary" data-action="account-sign-in">Sign in</button>
