@@ -167,8 +167,17 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   createBtn.type = 'button';
   createBtn.className = 'atlas-create-btn';
   createBtn.setAttribute('data-action', 'create-element');
-  createBtn.title = 'New element';
-  createBtn.innerHTML = '<span class="material-symbols-outlined">add</span>';
+  // Its word on screen, and a name that says which kind it makes (a creator's walk found an unlabelled +,
+  // with the list's one filter silently choosing the kind): `nameCreate` keeps both true as the filter moves.
+  createBtn.innerHTML = '<span class="material-symbols-outlined">add</span><span class="atlas-create-word">New</span>';
+  const nameCreate = (): void => {
+    const filters = getState().ui.elementFilters;
+    const one = filters?.size === 1 ? [...filters][0] : null;
+    const said = one ? `New ${typeName(one)}` : 'New element';
+    createBtn.setAttribute('aria-label', said);
+    createBtn.title = said;
+  };
+  nameCreate();
   // Whatever's typed in the search field rides into the create modal as the
   // name: searched-for-it-and-it's-missing flows straight into
   // making it, and the empty-world "Create an element…" placeholder keeps
@@ -187,6 +196,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       initialType: getState().ui.elementFilters?.size === 1
         ? [...getState().ui.elementFilters][0]
         : undefined,
+      // ...and the dialog says so, until another kind is picked.
+      typeFromFilter: getState().ui.elementFilters?.size === 1,
       // The search text became the element's name — clear the filter so the
       // new element isn't the only visible row (Titus).
       afterCreate: () => {
@@ -623,6 +634,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     const origin = readOrigin();
     filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom, origin.proposedOnly, origin.hideAids);
+    nameCreate();
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Titus-blessed 2026-07-20). Outside the tour: all types.
