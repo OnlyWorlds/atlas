@@ -61,8 +61,25 @@ test('the + says New and the kind it makes; New element says why a kind is chose
   await expect(why).toHaveText(/^An object, since the list shows only objects\./);
   await modal.locator('[data-action="cancel"]').click();
 
-  // No filter: no line, the plain name.
+  // A typed type that is none: no type chosen, so the line goes (the gate's SHOULD).
   await page.locator('[data-filter-type="object"]').click();
+  await page.locator('[data-filter-type="location"]').click();
+  await plus.click();
+  await expect(why).toBeVisible();
+  await modal.locator('input[name="element-type"]').fill('zzz');
+  await expect(why).toBeHidden();
+  await modal.locator('[data-action="cancel"]').click();
+  await page.locator('[data-filter-type="location"]').click();
+
+  // A type New element cannot make (Zones are made on a map): the + names none, and no line (the gate's MUST).
+  await page.locator('[data-filter-type="zone"]').click();
+  await expect(plus).toHaveAttribute('aria-label', 'New element');
+  await plus.click();
+  await expect(why).toBeHidden();
+  await modal.locator('[data-action="cancel"]').click();
+  await page.locator('[data-filter-type="zone"]').click();
+
+  // No filter: no line, the plain name.
   await expect(plus).toHaveAttribute('aria-label', 'New element');
   await plus.click();
   await expect(why).toBeHidden();

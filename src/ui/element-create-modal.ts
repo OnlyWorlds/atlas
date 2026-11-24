@@ -44,6 +44,11 @@ import { forPointer } from '../core/pointer';
  */
 const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map'];
 
+/** Whether New element can make this type (a Pin, Marker or Zone is made on a map, never here). */
+export function isCreatableType(type: ElementType): boolean {
+  return CREATE_TYPES.includes(type);
+}
+
 export interface ElementCreateOptions {
   /** Pre-select a type (otherwise defaults to 'character'). */
   initialType?: ElementType;
@@ -560,6 +565,8 @@ export class ElementCreateModal extends BaseModal {
    *  field was emptied after a miss. Create stays off until a type is picked. */
   private showNoType(typed: string | null): void {
     this.noType = true;
+    // No type chosen: the filter's line no longer says why one is.
+    if (this.fromFilter) this.fromFilter.hidden = true;
     this.typeButtons.forEach(btn => btn.classList.remove('active'));
     this.typeHint.textContent = typed
       ? `No type called "${typed}". Pick one below.`
