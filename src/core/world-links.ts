@@ -20,7 +20,7 @@
  */
 import { worldGraph } from '@onlyworlds/sdk';
 import type { Element } from './types';
-import { diskRenamesFor } from '../store/disk-link-names';
+import { diskRenamesFor, isStraySpelling } from '../store/disk-link-names';
 
 export interface WorldLink { target: string; field: string }
 
@@ -71,7 +71,7 @@ function withoutStraySpellings(el: Element): Element {
   const renames = diskRenamesFor(el.type);
   if (renames.length === 0) return el;
   const r = el as unknown as Record<string, unknown>;
-  const strays = renames.filter(({ schema, disk }) => schema in r && str(r[disk]) !== null);
+  const strays = renames.filter(({ schema }) => schema in r && isStraySpelling(el, schema));
   if (strays.length === 0) return el;
   const copy = { ...r };
   for (const { schema } of strays) delete copy[schema];

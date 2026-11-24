@@ -25,6 +25,7 @@
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from './types';
 import { SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SERVER_STAMP_FIELDS, isProfileField } from './constants';
 import { relationFieldsFor } from '../editor/field-schema';
+import { isStraySpelling } from '../store/disk-link-names';
 import {
   blocksOf, pageIntentOf, parsePageTheme,
   type PageBlock, type PageIntent, type ElementCardBlock, type CircleBlock,
@@ -154,6 +155,15 @@ export function isCardSkipField(name: string): boolean {
   return CARD_SKIP_FIELDS.has(name) || name.startsWith('atlas_') || name === 'image_media_id' || isProfileField(name);
 }
 
+/**
+ * A field a card can offer and send for this element: no skipped name, and no
+ * stray spelling of a pin's or marker's link (`isStraySpelling`), so a file
+ * holding `map` beside `map_id` offers and sends the one map Atlas reads.
+ */
+export function isCardFieldOf(el: Element, name: string): boolean {
+  return !isCardSkipField(name) && !isStraySpelling(el, name);
+}
+
 /** Does this object hold the key itself? Never `in` or a bare lookup: a world file can tick `constructor`, or card an element by that id. */
 function holdsKey(obj: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
@@ -173,7 +183,7 @@ export function isPopulatedValue(value: unknown): boolean {
 export function populatedFieldNames(el: Element): string[] {
   const out: string[] = [];
   for (const [key, value] of Object.entries(el)) {
-    if (isCardSkipField(key)) continue;
+    if (!isCardFieldOf(el, key)) continue;
     if (isPopulatedValue(value)) out.push(key);
   }
   return out;
@@ -846,7 +856,7 @@ export function projectElementEntry(
     entry.image_url = imageUrl;
   }
   for (const field of fieldNames) {
-    if (isCardSkipField(field)) continue; // defensive — UI never offers these
+    if (!isCardFieldOf(el, field)) continue; // defensive — UI never offers these
     const raw = rec[field];
     if (!isPopulatedValue(raw)) continue;
     const kind = relationKindOf(el.type, field);

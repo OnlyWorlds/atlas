@@ -13,9 +13,13 @@ describe('the Full pin says what it sends', () => {
       expect(t).toContain('every filled-in field');
       expect(t).toContain('leaving out when and by whom it was written, the marks OnlyWorlds tools keep on it (such as reviews and reports), and Atlas\'s own working fields (such as alternate names)');
     }
-    expect(FULL_PIN_HINT).toContain('Before you publish, the Publish list names every field it sends.');
+    expect(FULL_PIN_HINT).toContain('Before you publish, the list of what this page shares names every field it sends.');
+    for (const t of [FULL_PIN_HINT, FULL_PIN_ON, FULL_PIN_OFF, FULL_PIN_SHOWN_HINT]) {
+      expect(t).not.toContain('Publish list');
+      expect(t.endsWith('.'), t).toBe(true);
+    }
     expect(FULL_PIN_SHOWN_HINT).not.toMatch(/whole profile|populated/);
-    expect(FULL_PIN_SHOWN_HINT).toContain('the Publish list names each field');
+    expect(FULL_PIN_SHOWN_HINT).toContain('the list of what this page shares names each field');
   });
 
   it('"when and by whom it was written" is kept back', () => {

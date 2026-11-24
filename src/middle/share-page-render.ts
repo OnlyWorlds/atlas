@@ -22,7 +22,7 @@ import type { Element } from '../core/types';
 import type { PageBlock, ElementCardBlock, CollectionBlock, PageTheme } from '../core/sharing';
 import { PAGE_THEME_FONTS } from '../core/sharing';
 import {
-  isCardSkipField, isPopulatedValue as isPopulated, freezeCircleBlock, freezeMapBlock,
+  isCardFieldOf, isPopulatedValue as isPopulated, freezeCircleBlock, freezeMapBlock,
   projectElementEntry, populatedFieldNames,
   type PagePayload, type PayloadElementEntry, type RelationToken,
   type PayloadCircleBlock, type PayloadMapBlock,
@@ -49,12 +49,7 @@ export function setBuilderCharts(charts: ChartConfig[]): void { builderCharts = 
  * subset that is still populated.
  */
 export function populatedCardFields(el: Element): string[] {
-  const out: string[] = [];
-  for (const [key, value] of Object.entries(el)) {
-    if (isCardSkipField(key)) continue;
-    if (isPopulated(value)) out.push(key);
-  }
-  return out;
+  return populatedFieldNames(el);
 }
 
 /** Render one field value: ids resolve to element names; arrays join as chips. */
@@ -157,7 +152,7 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
   }
 
   if (block.variant === 'full' && block.fields.length > 0) {
-    const usable = block.fields.filter(f => !isCardSkipField(f) && isPopulated((el as Record<string, unknown>)[f]));
+    const usable = block.fields.filter(f => isCardFieldOf(el, f) && isPopulated((el as Record<string, unknown>)[f]));
     const fieldsWrap = buildCardFields(
       usable,
       f => (el as Record<string, unknown>)[f],

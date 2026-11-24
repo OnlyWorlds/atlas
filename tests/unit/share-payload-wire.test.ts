@@ -304,7 +304,8 @@ describe('a card leaves the payload with its element', () => {
       el(HIDDEN_MAP, 'the vault', { hidden: true, image_url: 'https://img.example/vault.png', width: 10, height: 10 }, 'map'),
       el(BOTH, 'both pin', { map: HIDDEN_MAP, map_id: MAP, element_id: ADA, x: 1, y: 1 }, 'pin'),
     ];
-    expect(populatedCardFields(elements[elements.length - 1])).toContain('map');
+    expect(populatedCardFields(elements[elements.length - 1])).not.toContain('map');
+    expect(populatedCardFields(elements[elements.length - 1])).toContain('map_id');
     const p = buildPagePayload(page([
       { id: 'b1', kind: 'element-card', elementId: BOTH, variant: 'full', fields: ['map', 'map_id'] },
       { id: 'b2', kind: 'collection', elementIds: [BOTH] },
@@ -356,5 +357,67 @@ describe('a card leaves the payload with its element', () => {
       if (included.has(e.id)) continue;
       expect(json, `the id of ${(e as { name?: string }).name || e.id}`).not.toContain(e.id);
     }
+  });
+});
+
+describe("a pin or marker file holding both spellings of a link: the card reads the one Atlas reads", () => {
+  const OTHER_MAP = 'c4000000-0000-0000-0000-000000000004';
+  const ZONE_A = 'c5000000-0000-0000-0000-000000000005';
+  const ZONE_B = 'c6000000-0000-0000-0000-000000000006';
+  const PIN = 'd7000000-0000-0000-0000-000000000007';
+  const MARK = 'd8000000-0000-0000-0000-000000000008';
+  const PIN_TO_MARK = 'd9000000-0000-0000-0000-000000000009';
+  const both = (): Element[] => [
+    ...world(),
+    el(OTHER_MAP, 'the reef', { image_url: 'https://img.example/reef.png', width: 10, height: 10 }, 'map'),
+    el(ZONE_A, 'the shallows', {}, 'zone'),
+    el(ZONE_B, 'the deeps', {}, 'zone'),
+    el(PIN, 'both pin', { map: OTHER_MAP, map_id: MAP, element_id: ADA, x: 1, y: 1 }, 'pin'),
+    el(MARK, 'both marker', { map: OTHER_MAP, map_id: MAP, zone: ZONE_B, zone_id: ZONE_A, x: 5, y: 5 }, 'marker'),
+    el(PIN_TO_MARK, '', { map_id: MAP, element_id: MARK, x: 300, y: 300 }, 'pin'),
+  ];
+  const byId = (els: Element[], id: string) => els.find(e => e.id === id)!;
+
+  it('the checklist offers one map and one zone, the ones Atlas reads', () => {
+    const els = both();
+    expect(populatedCardFields(byId(els, PIN)).filter(f => f.startsWith('map'))).toEqual(['map_id']);
+    expect(populatedCardFields(byId(els, MARK)).filter(f => /^(map|zone)/.test(f))).toEqual(['map_id', 'zone_id']);
+    expect(populatedFieldNames(byId(els, MARK)).filter(f => /^(map|zone)/.test(f))).toEqual(['map_id', 'zone_id']);
+  });
+
+  it('a card that ticked both before sends only the one Atlas reads, and its line names one', () => {
+    const els = both();
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'element-card', elementId: MARK, variant: 'full', fields: ['map', 'map_id', 'zone', 'zone_id'] },
+    ]), els);
+    expect(Object.keys(p.elements[MARK].fields).sort()).toEqual(['map_id', 'zone_id']);
+    expect(p.elements[MARK].fields.map_id).toEqual([{ text: 'the coast' }]);
+    expect(p.elements[MARK].fields.zone_id).toEqual([{ text: 'the shallows' }]);
+    expect(JSON.stringify(p)).not.toContain('the reef');
+    expect(JSON.stringify(p)).not.toContain('the deeps');
+    const line = pageSharesOf(page([
+      { id: 'b1', kind: 'element-card', elementId: MARK, variant: 'full', fields: ['map', 'map_id', 'zone', 'zone_id'] },
+    ]), els).rows.find(r => r.elementId === MARK);
+    expect(line?.parts.flatMap(part => part.fields).sort()).toEqual(['map_id', 'zone_id']);
+    expect(line?.also).toEqual([]);
+  });
+
+  it('a Full pin on a marker sends one map and one zone', () => {
+    const els = both();
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [PIN_TO_MARK], fullPinIds: [PIN_TO_MARK] },
+    ]), els);
+    const fields = Object.keys(p.elements[MARK]?.fields ?? {});
+    expect(fields.filter(f => /^(map|zone)/.test(f)).sort()).toEqual(['map_id', 'zone_id']);
+  });
+
+  it("an empty Atlas spelling leaves the file's other spelling the link, offered and sent", () => {
+    const BARE = 'da000000-0000-0000-0000-00000000000a';
+    const els = [...both(), el(BARE, 'half pin', { map: OTHER_MAP, map_id: '', element_id: ADA, x: 1, y: 1 }, 'pin')];
+    expect(populatedCardFields(byId(els, BARE))).toContain('map');
+    const p = buildPagePayload(page([
+      { id: 'b1', kind: 'element-card', elementId: BARE, variant: 'full', fields: ['map'] },
+    ]), els);
+    expect(p.elements[BARE].fields.map).toEqual([{ text: 'the reef' }]);
   });
 });
