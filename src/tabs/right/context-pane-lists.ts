@@ -421,29 +421,37 @@ function rowButtonOf(outer: HTMLElement): HTMLElement {
   return outer.matches('.atlas-context-pane-row') ? outer : outer.querySelector<HTMLElement>('.atlas-context-pane-row') ?? outer;
 }
 
-const namedCache = new WeakMap<readonly Element[], Map<string, Element[]>>();
+interface NamedCache {
+  byId: Map<string, Element>;
+  stories: Map<string, Element[]>;
+}
+const namedCache = new WeakMap<readonly Element[], NamedCache>();
 
 /**
  * The elements a narrative's text names but does not link (#24): the
  * autolink kernel's own first-mention pass over the stored story, so the list
  * agrees with what "Link all" would chip. Unambiguous names only; an element
  * already linked anywhere in the text is not named here. Cached per elements
- * array: the pane redraws often and the index walks the whole world.
+ * array: the pane redraws often. The index itself is the kernel's one for
+ * this array, shared with the editor's hints (`buildAutolinkIndex`).
  */
 export function namedInText(narrative: Element, elements: readonly Element[]): Element[] {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (!story) return [];
   let perArray = namedCache.get(elements);
-  if (!perArray) { perArray = new Map(); namedCache.set(elements, perArray); }
+  if (!perArray) {
+    perArray = { byId: new Map(elements.map(e => [e.id, e])), stories: new Map() };
+    namedCache.set(elements, perArray);
+  }
   const key = `${narrative.id}\u0000${story}`;
-  const hit = perArray.get(key);
+  const hit = perArray.stories.get(key);
   if (hit) return hit;
-  const byId = new Map(elements.map(e => [e.id, e]));
-  const { linked } = autolinkMarkdown(story, buildAutolinkIndex(elements as Element[]));
+  const { byId } = perArray;
+  const { linked } = autolinkMarkdown(story, buildAutolinkIndex(elements));
   const out = linked
     .map(c => byId.get(c.id))
     .filter((e): e is Element => !!e && e.id !== narrative.id);
-  perArray.set(key, out);
+  perArray.stories.set(key, out);
   return out;
 }
 

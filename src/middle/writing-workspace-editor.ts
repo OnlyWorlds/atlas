@@ -233,9 +233,7 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
       Extension.create({
         name: 'atlasAutolink',
         addProseMirrorPlugins: () => {
-          const initialIndex: AutolinkIndex = opts.autolinkSeed
-            ? buildAutolinkIndex(opts.autolinkSeed.elements)
-            : { byName: new Map(), scanner: null };
+          const initialIndex: AutolinkIndex = buildAutolinkIndex(opts.autolinkSeed?.elements ?? []);
           return [createAutolinkPlugin(initialIndex)];
         },
       }) as any,

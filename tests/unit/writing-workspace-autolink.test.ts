@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildAutolinkIndex } from '../../src/middle/writing-workspace-autolink';
+import type { AutolinkIndex } from '../../src/middle/writing-workspace-autolink';
+import { candidateIds } from '../../src/core/prose-autolink';
 import type { Element } from '../../src/core/types';
 
 function mk(partial: Partial<Element> & { id: string; type: Element['type']; name: string }): Element {
@@ -9,25 +11,27 @@ function mk(partial: Partial<Element> & { id: string; type: Element['type']; nam
   } as Element;
 }
 
+/** What the index answers in a text: each found span as `text@start>id`. */
+function found(idx: AutolinkIndex, text: string): string[] {
+  return idx.find(text).map(f => `${text.slice(f.start, f.end)}@${f.start}>${f.candidate.id}`);
+}
+
 describe('buildAutolinkIndex', () => {
   it('returns an empty index for no elements', () => {
     const idx = buildAutolinkIndex([]);
-    expect(idx.byName.size).toBe(0);
-    expect(idx.scanner).toBeNull();
+    expect(idx.ids.size).toBe(0);
+    expect(idx.find('Drizzle and anything else')).toEqual([]);
   });
 
-  it('indexes element names CASE-INSENSITIVELY', () => {
+  it('finds element names CASE-INSENSITIVELY', () => {
     // Titus: prose that writes "the consul" should link to the
     // element named "Consul" without anyone registering a lowercase alias.
-    // Keys are folded; the writer's own casing is restored at promotion time
-    // from the matched text, never from the key.
+    // The writer's own casing is the span found, never the name.
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'Drizzle' }),
     ]);
-    expect(idx.byName.get('drizzle')).toBeTruthy();
-    expect(idx.byName.get('drizzle')![0].displayName).toBe('Drizzle');
-    // The folded key is the ONLY key — callers must fold before lookup.
-    expect(idx.byName.get('Drizzle')).toBeUndefined();
+    expect(found(idx, 'drizzle and DRIZZLE and Drizzle')).toEqual(['drizzle@0>c1', 'DRIZZLE@12>c1', 'Drizzle@24>c1']);
+    expect(idx.find('the drizzle')[0].candidate.displayName).toBe('Drizzle');
   });
 
   it('skips names shorter than 3 chars', () => {
@@ -36,27 +40,26 @@ describe('buildAutolinkIndex', () => {
       mk({ id: 'c2', type: 'character', name: 'Bo' }),
       mk({ id: 'c3', type: 'character', name: 'Cal' }),
     ]);
-    expect(idx.byName.get('al')).toBeUndefined();
-    expect(idx.byName.get('bo')).toBeUndefined();
-    expect(idx.byName.get('cal')).toBeTruthy();
+    expect(found(idx, 'Al, Bo and Cal.')).toEqual(['Cal@11>c3']);
+    expect([...idx.ids]).toEqual(['c3']);
   });
 
-  it('indexes atlas_aliases alongside name', () => {
+  it('finds atlas_aliases alongside name', () => {
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'Lyra', atlas_aliases: ['Lady Vareth', 'the duchess'] }),
     ]);
-    expect(idx.byName.get('lyra')).toBeTruthy();
-    expect(idx.byName.get('lady vareth')).toBeTruthy();
-    expect(idx.byName.get('the duchess')).toBeTruthy();
-    expect(idx.byName.get('lyra')![0].displayName).toBe('Lyra');
+    expect(found(idx, 'Lyra, Lady Vareth, the duchess.')).toEqual(['Lyra@0>c1', 'Lady Vareth@6>c1', 'the duchess@19>c1']);
+    expect(idx.find('Lady Vareth')[0].candidate.displayName).toBe('Lyra');
   });
 
-  it('marks ambiguous names with multiple candidates', () => {
+  it('answers nothing for a name two elements share', () => {
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'John' }),
       mk({ id: 'c2', type: 'character', name: 'John' }),
     ]);
-    expect(idx.byName.get('john')!.length).toBe(2);
+    expect(idx.find('John left.')).toEqual([]);
+    // Both are still elements the index holds: an address naming either is named against them.
+    expect([...idx.ids].sort()).toEqual(['c1', 'c2']);
   });
 
   it('excludes narrative, pin, marker, map types from the index', () => {
@@ -67,44 +70,78 @@ describe('buildAutolinkIndex', () => {
       mk({ id: 'mp1', type: 'map', name: 'World Map' }),
       mk({ id: 'c1', type: 'character', name: 'Drizzle' }),
     ]);
-    expect(idx.byName.get('book one')).toBeUndefined();
-    expect(idx.byName.get('pin alpha')).toBeUndefined();
-    expect(idx.byName.get('marker alpha')).toBeUndefined();
-    expect(idx.byName.get('world map')).toBeUndefined();
-    expect(idx.byName.get('drizzle')).toBeTruthy();
+    expect(found(idx, 'Book One, Pin Alpha, Marker Alpha, World Map, Drizzle')).toEqual(['Drizzle@46>c1']);
+    expect([...idx.ids]).toEqual(['c1']);
   });
 
-  it('compiles a scanner regex that matches indexed names with word boundaries', () => {
+  it('finds whole names only: "Drizzle" is not found inside "drizzling" or "Drizzles"', () => {
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'Drizzle' }),
     ]);
-    expect(idx.scanner).toBeTruthy();
-    // Word boundary: matches "Drizzle" surrounded by spaces / punctuation, not inside "Drizzles".
-    expect('the Drizzle ran'.match(idx.scanner!)).not.toBeNull();
-    expect('drizzling'.match(idx.scanner!)).toBeNull();
-    expect('Drizzles'.match(idx.scanner!)).toBeNull();
+    // Matches "Drizzle" surrounded by spaces / punctuation, not inside "Drizzles".
+    expect(found(idx, 'the Drizzle ran')).toEqual(['Drizzle@4>c1']);
+    expect(idx.find('drizzling')).toEqual([]);
+    expect(idx.find('Drizzles')).toEqual([]);
   });
 
-  it('scanner sorts longer keys first so multi-word matches win greedily', () => {
+  it('the longer name wins where several start at one place', () => {
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'Mira' }),
       mk({ id: 'c2', type: 'character', name: 'Mira Halloway' }),
     ]);
-    // First match scanning "Mira Halloway came" should be the longer key.
-    // Scanner's own flags — restating 'g' would drop the case-insensitivity
-    // the index now depends on.
-    const re = new RegExp(idx.scanner!.source, idx.scanner!.flags);
-    const m = re.exec('Mira Halloway came home');
-    expect(m).not.toBeNull();
-    expect(m![0]).toBe('Mira Halloway');
+    expect(found(idx, 'Mira Halloway came home')).toEqual(['Mira Halloway@0>c2']);
   });
 
   it('dedupes aliases that equal the canonical name', () => {
     const idx = buildAutolinkIndex([
       mk({ id: 'c1', type: 'character', name: 'Lyra', atlas_aliases: ['Lyra', 'Ly'] }),
     ]);
-    // 'Lyra' should appear with one candidate (not two), 'Ly' filtered as < 3 chars.
-    expect(idx.byName.get('lyra')!.length).toBe(1);
-    expect(idx.byName.get('ly')).toBeUndefined();
+    // 'Lyra' is one element's (never read as shared with itself), 'Ly' filtered as < 3 chars.
+    expect(found(idx, 'Lyra and Ly.')).toEqual(['Lyra@0>c1']);
+  });
+
+  it('a name that is not a string is passed over, never thrown on; an element with no string id is not scanned', () => {
+    const idx = buildAutolinkIndex([
+      { id: 'c1', type: 'character', name: 5 } as unknown as Element,
+      { id: 'c2', type: 'character', name: 'Kira', atlas_aliases: [7, 'the scout'] } as unknown as Element,
+      { type: 'character', name: 'Nobody' } as unknown as Element,
+      { id: '', type: 'character', name: 'Empty' } as unknown as Element,
+    ]);
+    expect(found(idx, 'Kira, the scout, Nobody, Empty.')).toEqual(['Kira@0>c2', 'the scout@6>c2']);
+    expect([...idx.ids]).toEqual(['c2']);
+  });
+
+  it('a name is counted after the SDK\'s trim: padding neither makes it long enough nor too long', () => {
+    const idx = buildAutolinkIndex([
+      mk({ id: 'c1', type: 'character', name: '  Al  ' }),
+      mk({ id: 'c2', type: 'character', name: '　Iron Gate\u0085' }),
+      mk({ id: 'c3', type: 'character', name: ` ${'K' + 'a'.repeat(199)}\t\t` }),
+    ]);
+    expect([...idx.ids]).toEqual(['c2', 'c3']);
+    expect(found(idx, 'The Iron Gate.')).toEqual(['Iron Gate@4>c2']);
+  });
+
+  it('one index for each elements array: the same array gives the same index, a new array a new one', () => {
+    // An elements array is never changed in place (a change is a new array), so the
+    // editor's plugin, Named in the text and bulk link share one build of it.
+    const world = [mk({ id: 'c1', type: 'character', name: 'Drizzle' })];
+    const first = buildAutolinkIndex(world);
+    expect(buildAutolinkIndex(world)).toBe(first);
+    const next = [...world, mk({ id: 'c2', type: 'character', name: 'Kira' })];
+    const second = buildAutolinkIndex(next);
+    expect(second).not.toBe(first);
+    expect(found(second, 'Kira')).toEqual(['Kira@0>c2']);
+    expect(buildAutolinkIndex(world)).toBe(first);
+  });
+
+  it('ids holds an element only for a name the finder keeps (3 to 200 code points)', () => {
+    const idx = buildAutolinkIndex([
+      mk({ id: 'c1', type: 'character', name: 'Al' }),
+      mk({ id: 'c2', type: 'character', name: 'K' + 'a'.repeat(200) }),
+      mk({ id: 'c3', type: 'character', name: 'K' + 'a'.repeat(199) }),
+    ]);
+    expect([...idx.ids]).toEqual(['c3']);
+    // Held on the index, never rebuilt: it is asked on every keystroke.
+    expect(candidateIds(idx)).toBe(idx.ids);
   });
 });

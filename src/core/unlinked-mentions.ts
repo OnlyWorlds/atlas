@@ -11,7 +11,8 @@
  * write, so a stale cache is impossible and idle ticks cost nothing).
  *
  * The match rule is the find bar's, whole-word and case-insensitive, over
- * name ∪ aliases with the autolink kernel's minimum key length; text inside
+ * name ∪ aliases of at least `MIN_NAME_CHARS`, a minimum that now governs this
+ * path alone (the hints and link-all take the SDK finder's own); text inside
  * an existing link is never counted. The same terms feed `bulkLinkTerm`, so
  * the count and the link agree by construction.
  */
