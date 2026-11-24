@@ -200,6 +200,25 @@ describe('the line above each filled box (W3)', () => {
     expect(memory.askFocus).toEqual({ worldId: W, key: 'line:location:create-map' });
   });
 
+  it('Pin it on a map readies the pin on the map it opens, as the page\'s pin button does; a place already pinned there is not readied again', () => {
+    world([...whole(), el('map', M, { name: 'The Coast' })]);
+    draw();
+    const before = JSON.stringify(getState().data.elements);
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="pin-map"]')!.click();
+    expect(window.location.hash).toBe(`#/w/${W}/map/${M}/element/${L}`);
+    expect(getState().ui.pinPlacement).toEqual({ elementId: L });
+    expect(JSON.stringify(getState().data.elements)).toBe(before);
+    // The address leaving the map and place lets it go (the 1.121.0 contract gate's G10).
+    window.location.hash = `#/w/${W}`;
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(getState().ui.pinPlacement).toBeNull();
+    world([...whole(), el('map', M, { name: 'The Coast' }), el('pin', P, { map_id: M, element_id: L, x: 5, y: 5 })]);
+    draw();
+    box('location').querySelector<HTMLButtonElement>('[data-strand-key="location:room"]')!.click();
+    expect(window.location.hash).toBe(`#/w/${W}/map/${M}/element/${L}`);
+    expect(getState().ui.pinPlacement).toBeNull();
+  });
+
   it('each link lands where it says and only navigates: Pin it on a map, Charts (the rail undated, its place dated), the writing room, their page', () => {
     world([...whole(), el('map', M, { name: 'The Coast' })]);
     draw();

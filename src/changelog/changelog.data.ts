@@ -61,6 +61,12 @@ export const CHANGELOG: ChangelogRelease[] = [
     theme: 'Pages on a phone, and Full page draws its icons',
     entries: [
       {
+        id: 'pin-it-readies-the-pin',
+        title: 'Pin it on a map gets the pin ready, so the next press on the map places it',
+        body: 'On Home\'s Strand tab, Pin it on a map opened the map beside the place\'s page and placed nothing; the way on was a small pin button by the place\'s name, which on a phone sits under the map. It now readies the pin as that button does: the map says "Click the map to place" and the place\'s name, and one press or tap on the map puts it there. Cancel or Esc stops it, and leaving the map lets it go.',
+        tags: ['home', 'maps', 'onboarding'],
+      },
+      {
         id: 'page-actions-on-a-phone',
         title: 'On a phone, Publish and every other page action can be pressed',
         body: 'On a narrow screen the row above a page ran past the edge, so Publish and Delete could not be reached. Below 760 pixels its buttons now show their icons alone and keep their names for a screen reader and on hover, and the buttons that add a block wrap onto more lines.',

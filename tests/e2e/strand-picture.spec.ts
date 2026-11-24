@@ -278,7 +278,7 @@ for (const tag of ['', ' @firefox']) {
       await expect.poll(() => p.evaluate(() => {
         const ui = (window as any).__atlasTestApi.getState().ui;
         return [ui.rightTabs[ui.rightActiveIndex]?.mapId ?? null, ui.pinPlacement ?? null];
-      })).toEqual([MAP, null]);
+      })).toEqual([MAP, { elementId: L }]); // Pin it readies the pin; the next press on the map places it
     };
     // [the control's key, its words, where it lands, what is there, the key the focus is on after Back].
     // A door in a box's menu (1.122.0's amendment) is pressed through its menu, and Back focuses the menu's
@@ -318,10 +318,12 @@ for (const tag of ['', ' @firefox']) {
       await act.click();
       await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(hash);
       await landed(page);
-      // The act never armed placement or wrote: the placing class is off.
-      expect(await page.evaluate(() => document.body.classList.contains('atlas-placing'))).toBe(false);
+      // Only Pin it readies a placement (the placing class on); no act writes.
+      expect(await page.evaluate(() => document.body.classList.contains('atlas-placing')), key).toBe(label === 'Pin it on a map');
       await page.goBack();
       await expect(page.locator('.atlas-world-home')).toBeVisible();
+      // Leaving the map lets a readied placement go: no crosshair, nothing armed behind Home.
+      expect(await page.evaluate(() => [document.body.classList.contains('atlas-placing'), (window as any).__atlasTestApi.getState().ui.pinPlacement ?? null]), `after Back from ${key}`).toEqual([false, null]);
       await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
       if (back) await expect(page.locator(`[data-role="home-strand"] [data-strand-key="${back}"]`), `Back after ${key}`).toBeFocused();
       // The line's link opened its room: on return the line is gone.
@@ -690,6 +692,23 @@ test('on a phone, the location\'s line opens its page with the map in its drawer
   })).toBe(MAP);
   await page.goBack();
   await expect(page.locator('[data-role="home-strand"] [data-strand-key="line:location:pin-map"]')).toBeFocused();
+});
+
+test('on a phone, Pin it on a map readies the pin: the map says so, and a tap on it places the place', async ({ page }) => {
+  await wholeStrand(page, { map: true });
+  await page.locator('[data-role="home-strand"] [data-strand-key="line:location:pin-map"]').click();
+  await expect(page.locator('body.atlas-drawer-right-open')).toHaveCount(1);
+  // The page's own pin button sits under the drawer here; the map itself says what the next tap does.
+  const hint = page.locator('.atlas-right .atlas-map-placement-hint');
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('Click the map to place Saltmere Quay');
+  await page.waitForTimeout(600); // the drawer slides in: measure where it stops
+  const map = page.locator('.atlas-right .atlas-map-canvas-container');
+  const b = (await map.boundingBox())!;
+  await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height * 0.6);
+  await expect.poll(() => page.evaluate((L) => (window as any).__atlasTestApi.getState().data.elements
+    .filter((e: any) => e.type === 'pin' && e.element_id === L).map((e: any) => e.map_id), L)).toEqual([MAP]);
+  await expect(hint).toHaveCount(0);
 });
 });
 
