@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'full-pin-hints-name-the-list',
         title: 'The hints about a Full pin name the list they point at',
-        body: 'The hints beside a map\'s pins sent you to "the Publish list", which the page heads What this page shares. They now say the list of what this page shares, and the Full switch\'s two hover texts end in a full stop.',
+        body: 'The hints beside a map\'s pins sent you to "the Publish list", which the page heads What this page shares, or What a republish shares once the page is live. They now say the list of what this page shares, and the Full switch\'s two hover texts end in a full stop.',
         tags: ['sharing', 'fix'],
       },
     ],
