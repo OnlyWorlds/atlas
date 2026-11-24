@@ -87,6 +87,9 @@ describe('a name with a mark at its edge is found before a space or the end', ()
   it('C++ (old)', () => {
     expectEveryPath([el(1, 'C++ (old)')], 'We wrote C++ (old) code.', ['C++ (old)@9']);
   });
+  it('C++ alone, the changelog\'s example', () => {
+    expectEveryPath([el(1, 'C++')], 'We wrote C++ code.', ['C++@9']);
+  });
   it('Co. in "Acme Co. sold"', () => {
     expectEveryPath([el(1, 'Co.')], 'Acme Co. sold', ['Co.@5']);
   });

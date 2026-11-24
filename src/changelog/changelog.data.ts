@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.19',
+    date: '2026-11-24',
+    theme: 'A pin from another tool shares one map',
+    entries: [
+      {
+        id: 'pin-file-one-map',
+        title: 'A pin or marker from another tool shares one map on a page, the one Atlas shows it on',
+        body: 'A pin or marker file written by another tool can name its map twice, once under each spelling of the field, and a marker can name its zone twice. When the two named different maps or zones, a card on a page offered both and a Full pin shared both, so a published card could name a map Atlas never placed the pin on. A card and a Full pin now share only the map and zone Atlas reads.',
+        tags: ['sharing', 'fix'],
+      },
+      {
+        id: 'full-pin-hints-name-the-list',
+        title: 'The hints about a Full pin name the list they point at',
+        body: 'The hints beside a map\'s pins sent you to "the Publish list", which the page heads What this page shares, or What a republish shares once the page is live. They now say the list of what this page shares, and the Full switch\'s two hover texts end in a full stop.',
+        tags: ['sharing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.18',
     date: '2026-11-24',
     theme: 'The Full switch on a pin says what it shares',
@@ -63,7 +82,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'full-pin-says-what-it-shares',
         title: 'A pin\'s Full switch on a page says what it shares',
-        body: 'Turning on Full for a pin on a page shares more of that element than its name, type, description and image. The switch used to say it shared every field of the element. A Full pin leaves out when and by whom an element was written, the marks OnlyWorlds tools keep on it (such as reviews and reports) and Atlas\'s own working fields (such as alternate names). The switch and the hint above the pins now say so. Before you publish, the page lists every field it sends.',
+        body: 'Turning on Full for a pin on a page shares more of that element than its name, type, description and image. The switch used to say it shared every field of the element. A Full pin leaves out when and by whom an element was written, the marks OnlyWorlds tools keep on it (such as reviews and reports) and Atlas\'s own working fields (such as alternate names). The Full switch and the Visible pins label say so when you hover them. Before you publish, the page lists every field it sends.',
         tags: ['sharing', 'fix'],
       },
     ],
@@ -76,7 +95,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'names-found-in-any-alphabet',
         title: 'The writing room finds a name that begins or ends with a letter outside English, and no longer stops after the first 2,000 names',
-        body: 'As you write, Atlas puts a dotted underline under an element\'s name the first time it appears, and the link button in the editor\'s corner, Link mentions in the tree\'s menu and Link on a Potentials row turn such names into links. A name that began or ended with a letter outside English, such as Éowyn, Zoë or Οδυσσεύς, or with punctuation, such as C++ (old), was never found, and now is. A name is now found only as a whole word, no longer where a letter, a digit or an underscore touches either end of it: Ana is not found inside Anaïs, .NET inside ASP.NET, or St. inside St.Kilda. A name that ends in a full stop, such as Co., is found when a space, punctuation or the end of the text follows it. A name with a square bracket or a backslash in it, such as Kira [the elder], is linked in the scene you have open. In some scenes that are not open, Link mentions leaves it unlinked, and a Potentials row may not show it as in the text: Atlas writes only the links that Unlink can remove again. Atlas used to look for only the first 2,000 names and aliases of a world; it now looks for all of them, except a name or alias longer than 200 characters. In a script written without spaces, such as Chinese or Japanese, a name is found only where a space, punctuation or an edge of the text stands on each side of it. The "Mentioned, unlinked" line in the Web tab, with its own Link all button, the Featured mark, and the check that keeps an element in a scene\'s cast after you unlink it still read names the old way.',
+        body: 'As you write, Atlas puts a dotted underline under an element\'s name the first time it appears, and the link button in the editor\'s corner, Link mentions in the tree\'s menu and Link on a Potentials row turn such names into links. A name that began or ended with a letter outside English, such as Éowyn, Zoë or Οδυσσεύς, or with punctuation, such as C++, was never found, and now is. A name is now found only as a whole word, no longer where a letter, a digit or an underscore touches either end of it: Ana is not found inside Anaïs, .NET inside ASP.NET, or St. inside St.Kilda. A name that ends in a full stop, such as Co., is found when a space, punctuation or the end of the text follows it. A name with a square bracket or a backslash in it, such as Kira [the elder], is linked in the scene you have open. In some scenes that are not open, Link mentions leaves it unlinked, and a Potentials row may not show it as in the text: Atlas writes only the links that Unlink can remove again. Atlas used to look for only the first 2,000 names and aliases of a world; it now looks for all of them, except a name or alias longer than 200 characters. In a script written without spaces, such as Chinese or Japanese, a name is found only where a space, punctuation or an edge of the text stands on each side of it. The "Mentioned, unlinked" line in the Web tab, with its own Link all button, the Featured mark, and the check that keeps an element in a scene\'s cast after you unlink it still read names the old way.',
         tags: ['writing', 'fix'],
       },
     ],

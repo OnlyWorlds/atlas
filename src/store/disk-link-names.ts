@@ -45,6 +45,19 @@ export function diskRenamesFor(type: ElementType): Rename[] {
 }
 
 /**
+ * Is `name` a stray spelling on this body: the schema name of a link whose
+ * Atlas spelling also holds a value (`map` beside a filled `map_id`, `zone`
+ * beside a filled `zone_id`)? In memory Atlas's spelling is the link
+ * (`spatialMapOf`, `spatialOtherOf`), so every reader of the body's links and
+ * fields passes the stray over; an empty Atlas spelling leaves the other the link.
+ */
+export function isStraySpelling(el: Element, name: string): boolean {
+  const r = el as unknown as Record<string, unknown>;
+  return diskRenamesFor(el.type).some(({ schema, disk }) =>
+    schema === name && typeof r[disk] === 'string' && r[disk] !== '');
+}
+
+/**
  * Bring a body just read from disk to the in-memory spelling, IN PLACE, and
  * report which spelling the file used. Fill-only: a file carrying `map_id`
  * keeps it and a stray `map` beside it is left alone; a file carrying only

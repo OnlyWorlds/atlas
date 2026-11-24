@@ -64,15 +64,15 @@ import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
 import { missingLabel, nameOrUnnamed, ownName, quotedName, typeNameStart } from '../core/type-words';
 
-/** What a Full pin shares, in the words the Publish list's rows use. A Full pin sends every filled-in field but
+/** What a Full pin shares, in the words the rows of what a page shares use. A Full pin sends every filled-in field but
  * what `isCardSkipField` keeps back: the server's stamps and author fields, its marks, `known_of`, the profile keys
  * (`isProfileField`; a key of another tool's own, `x_mytool_note`, is sent). */
 const FULL_PIN_LEAVES = 'leaving out when and by whom it was written, the marks OnlyWorlds tools keep on it (such as reviews and reports), and Atlas\'s own working fields (such as alternate names)';
-export const FULL_PIN_HINT = `Included pins share their element's name, type, description and image on the published page. Turn on Full for a pin to share every filled-in field of that element, ${FULL_PIN_LEAVES}. Before you publish, the Publish list names every field it sends.`;
-export const FULL_PIN_ON = `Sharing every filled-in field of this element, ${FULL_PIN_LEAVES}. Click to share only name, type, description and image`;
+export const FULL_PIN_HINT = `Included pins share their element's name, type, description and image on the published page. Turn on Full for a pin to share every filled-in field of that element, ${FULL_PIN_LEAVES}. Before you publish, the list of what this page shares names every field it sends.`;
+export const FULL_PIN_ON = `Sharing every filled-in field of this element, ${FULL_PIN_LEAVES}. Click to share only name, type, description and image.`;
 /** The hint drawn above a map block's pins: short, so it points at the switch and the list rather than repeat them. */
-export const FULL_PIN_SHOWN_HINT = 'Checked pins share name, type, description and image. Click Full on a pin to share more of its element: the switch says what, and the Publish list names each field.';
-export const FULL_PIN_OFF = `Sharing name, type, description and image. Click to share every filled-in field of this element, ${FULL_PIN_LEAVES}`;
+export const FULL_PIN_SHOWN_HINT = 'Checked pins share name, type, description and image. Click Full on a pin to share more of its element: the switch says what, and the list of what this page shares names each field.';
+export const FULL_PIN_OFF = `Sharing name, type, description and image. Click to share every filled-in field of this element, ${FULL_PIN_LEAVES}.`;
 
 /**
  * The first element under `root` matching `selector` whose `data-<key>` is
