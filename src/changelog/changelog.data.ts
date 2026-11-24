@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.20',
+    date: '2026-11-24',
+    theme: 'A new world on OnlyWorlds gets its address',
+    entries: [
+      {
+        id: 'new-online-world-address',
+        title: 'After New world on OnlyWorlds, the address names the new world',
+        body: 'Making a world with New world on OnlyWorlds opened it, but the address in the browser stayed on the first screen\'s. Reloading the page then, or copying the address, did not lead back to the new world. The address now names the world as soon as it opens.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.19',
     date: '2026-11-24',
     theme: 'A pin from another tool shares one map',

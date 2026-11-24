@@ -26,6 +26,7 @@ import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields, PIN_RE
 import { wireOnlyWorldsSignIn } from './onlyworlds-sign-in-button';
 import { notePinState } from '../registry/pin-proof';
 import { isSeatSecret } from '../core/seat';
+import { navigate, worldHash } from '../core/router';
 // view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 export class NewApiWorldModal extends BaseModal {
@@ -180,6 +181,9 @@ export class NewApiWorldModal extends BaseModal {
 
         this.toasts.success(`${entry.name} created online`);
         this.hide();
+        // The address names the world, as Create a world's does: Home showed
+        // it under `#/`, so a reload or a copied address carried no world.
+        navigate(worldHash(entry.id));
       } catch (err) {
         progressEl.hidden = true;
         console.warn('[new-api-world] create failed:', err);
