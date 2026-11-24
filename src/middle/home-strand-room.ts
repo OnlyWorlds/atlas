@@ -260,8 +260,9 @@ function mapAct(kind: 'create-map' | 'pin-map', el: Element, c: StrandContext, t
   // Readied here, it is let go when the address leaves this map and place (Back, another page) or the
   // window loses focus (another app may edit the folder): an armed placement keeps the crosshair, and a
   // folder world notices no outside edit while one is armed (the 1.121.0 contract gate's G10, why this
-  // act once never readied). Only this press's placement is let go, never one armed since (+pin, a re-key).
-  // The banner's Cancel and Esc still work.
+  // act once never readied). Only this press's own placement object is let go, never one armed since by
+  // +pin. A re-key moves an armed placement to the new id as a new object (rekey-run.ts), so that one is
+  // left armed as +pin's is after a re-key: the banner's Cancel and Esc let it go.
   const at = mapHash(c.worldId, map.id, el.id);
   const watch = new AbortController();
   readied = watch;

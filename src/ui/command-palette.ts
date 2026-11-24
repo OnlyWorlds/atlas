@@ -491,7 +491,7 @@ export async function reloadFromDisk(): Promise<void> {
   const { changes, skipped } = scan;
   if (skipped) {
     // Never "nothing changed" when it did not look.
-    const why = skipped === 'rekey' ? 'ids are being updated' : skipped === 'busy' ? 'the world is busy (loading, the tour, a map edit, or a pin waiting for its place on the map: Esc lets it go)' : 'no world is open';
+    const why = skipped === 'rekey' ? 'ids are being updated' : skipped === 'busy' ? 'the world is busy (loading, the tour, a map edit, or a pin you have yet to place; Cancel on the map or Esc drops it)' : 'no world is open';
     toastManager.info(`Atlas could not check the folder just now: ${why}.`);
     return;
   }

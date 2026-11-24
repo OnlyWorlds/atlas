@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'page-actions-on-a-phone',
         title: 'On a phone, Publish and every other page action can be pressed',
-        body: 'On a narrow screen the row above a page ran past the edge, so Publish and Delete could not be reached. Where the page has little room, as on a phone, its buttons now show their icons alone and keep their names for a screen reader and on hover, so the page's name has room too, and the buttons that add a block wrap onto more lines.',
+        body: 'On a narrow screen the row above a page ran past the edge, so Publish and Delete could not be reached. Where the page has little room, as on a phone, its buttons now show their icons alone and keep their names for a screen reader and on hover, so the page\'s name has room too, and the buttons that add a block wrap onto more lines.',
         tags: ['pages', 'layout', 'fix'],
       },
       {
