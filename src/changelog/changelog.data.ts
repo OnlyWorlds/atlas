@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.22',
+    date: '2026-11-24',
+    theme: 'The + says what it makes',
+    entries: [
+      {
+        id: 'create-button-named',
+        title: 'The + beside the element list says New, and New element says why a type is chosen',
+        body: 'The + beside Search elements now shows the word New, and a screen reader hears what it makes: New element, or New location when the list shows only locations. When the list\'s filter chose the type, New element says so under the types ("A location, since the list shows only locations"), until you pick another.',
+        tags: ['onboarding', 'accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.125.21',
     date: '2026-11-24',
     theme: 'Signing in keeps what you typed',
@@ -63,7 +76,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'sign-in-fields-kept',
         title: 'The sign-in keeps your email and password when you type the World PIN after them',
-        body: 'In Settings, under OnlyWorlds, typing your email or username and password and then your World PIN emptied the two sign-in fields as soon as you left the PIN. They now keep what you typed until you sign in. A pasted account token is kept the same way, and a sign-in under way stays under way. The line under the World PIN also says where the PIN comes from: it belongs to your onlyworlds.com account, chosen with your first world there and changed in Account settings.',
+        body: 'In Settings, under OnlyWorlds, typing your email or username and password and then your World PIN emptied the two sign-in fields as soon as you left the PIN. They now keep what you typed until you sign in. A pasted account token is kept the same way, a sign-in under way stays under way, and a refused sign-in stays said. The line under the World PIN also says where the PIN comes from: it belongs to your onlyworlds.com account, chosen with your first world there and changed in Account settings.',
         tags: ['onboarding', 'fix'],
       },
     ],

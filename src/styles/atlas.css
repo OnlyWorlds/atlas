@@ -1404,8 +1404,9 @@ button.atlas-map-tree-name {
 /* Slim icon create button next to the search input — quiet by default, cyan on hover. */
 .atlas-create-btn {
   flex: 0 0 auto;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
+  gap: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1428,6 +1429,10 @@ button.atlas-map-tree-name {
   font-size: 18px;
   color: inherit;
 }
+
+/* The + says its word (a creator's walk found it unlabelled). */
+.atlas-create-btn:has(.atlas-create-word) { padding: 0 7px 0 3px; }
+.atlas-create-word { font-size: 12px; line-height: 1; }
 
 /* Uniform compound-icon create button family. Used by world
    sidebar "+ new local / api / link", map index "+ new map", and any

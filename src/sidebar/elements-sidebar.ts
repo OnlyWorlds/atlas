@@ -22,6 +22,7 @@ import { reservedRowHint } from '../core/taxonomy';
 import { styleRowHint } from '../core/world-styles';
 import { ToastManager } from '../ui/toast-manager';
 import { openCreateDoor } from '../ui/create-element-door';
+import { isCreatableType } from '../ui/element-create-modal';
 import { isQuietRef, isTourFlagActive } from '../tour/tour-flag';
 import { MUTED_TAIL_TYPES, saveMutedTypes } from '../core/type-mutes';
 import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
@@ -167,8 +168,23 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   createBtn.type = 'button';
   createBtn.className = 'atlas-create-btn';
   createBtn.setAttribute('data-action', 'create-element');
-  createBtn.title = 'New element';
-  createBtn.innerHTML = '<span class="material-symbols-outlined">add</span>';
+  // Its word on screen, and a name that says which kind it makes (a creator's walk found an unlabelled +,
+  // with the list's one filter silently choosing the kind): `nameCreate` keeps both true as the filter moves.
+  createBtn.innerHTML = '<span class="material-symbols-outlined">add</span><span class="atlas-create-word">New</span>';
+  // The one type the list's filter shows, when New element can make it (a Pin, Marker or Zone it
+  // cannot: then the + is New element and the dialog opens on its own default).
+  const filterKind = (): ElementType | null => {
+    const filters = getState().ui.elementFilters;
+    const one = filters?.size === 1 ? [...filters][0] : null;
+    return one && isCreatableType(one) ? one : null;
+  };
+  const nameCreate = (): void => {
+    const one = filterKind();
+    const said = one ? `New ${typeName(one)}` : 'New element';
+    createBtn.setAttribute('aria-label', said);
+    createBtn.title = said;
+  };
+  nameCreate();
   // Whatever's typed in the search field rides into the create modal as the
   // name: searched-for-it-and-it's-missing flows straight into
   // making it, and the empty-world "Create an element…" placeholder keeps
@@ -184,9 +200,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // A single active type filter carries into the modal as the preselected
       // category (Titus) — filtering to characters then hitting + means
       // "another character" far more often than not.
-      initialType: getState().ui.elementFilters?.size === 1
-        ? [...getState().ui.elementFilters][0]
-        : undefined,
+      initialType: filterKind() ?? undefined,
+      // ...and the dialog says so, until another kind is picked.
+      typeFromFilter: filterKind() !== null,
       // The search text became the element's name — clear the filter so the
       // new element isn't the only visible row (Titus).
       afterCreate: () => {
@@ -623,6 +639,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     const origin = readOrigin();
     filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom, origin.proposedOnly, origin.hideAids);
+    nameCreate();
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Titus-blessed 2026-07-20). Outside the tour: all types.

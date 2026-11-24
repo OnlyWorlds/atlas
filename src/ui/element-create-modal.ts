@@ -22,7 +22,7 @@ import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { reportGesture } from './guide-note';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { aTypeName, typeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { setSidebarModePref } from '../core/ui-prefs';
@@ -44,9 +44,19 @@ import { forPointer } from '../core/pointer';
  */
 const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map'];
 
+/** Whether New element can make this type (a Pin, Marker or Zone is made on a map, never here). */
+export function isCreatableType(type: ElementType): boolean {
+  return CREATE_TYPES.includes(type);
+}
+
 export interface ElementCreateOptions {
   /** Pre-select a type (otherwise defaults to 'character'). */
   initialType?: ElementType;
+  /**
+   * `initialType` came from the element list's one filter: a line under the kinds says so, until
+   * another kind is picked (a creator's walk took the preselected kind for a silent default).
+   */
+  typeFromFilter?: boolean;
   /** Pre-fill the name field. */
   initialName?: string;
   /**
@@ -159,6 +169,7 @@ export class ElementCreateModal extends BaseModal {
   // so, and Create stays off until a type is picked.
   private noType = false;
   private typeHint!: HTMLElement;
+  private fromFilter: HTMLElement | null = null;
 
   constructor(toasts: ToastManager, opts: ElementCreateOptions = {}) {
     super();
@@ -268,6 +279,7 @@ export class ElementCreateModal extends BaseModal {
           </div>
           <div class="atlas-modal-hint atlas-modal-hint-warn atlas-create-type-hint" data-role="type-hint" hidden></div>
           <div class="atlas-create-type-grid" data-role="type-grid"></div>
+          <div class="atlas-modal-hint" data-role="type-from-filter" hidden></div>
         </div>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
@@ -296,6 +308,11 @@ export class ElementCreateModal extends BaseModal {
     const grid = body.querySelector<HTMLElement>('[data-role="type-grid"]')!;
     this.renderTypeGrid(grid);
     this.typeInput.value = typeName(this.selected);
+    this.fromFilter = body.querySelector<HTMLElement>('[data-role="type-from-filter"]');
+    if (this.fromFilter && this.opts.typeFromFilter && this.opts.initialType === this.selected && !this.opts.lockAll) {
+      this.fromFilter.textContent = `${aTypeName(this.selected, { start: true })}, since the list shows only ${typeName(this.selected, { many: true })}. Pick another type above to change it.`;
+      this.fromFilter.hidden = false;
+    }
     this.updateGhost();
     this.updateDateLabel(body);
 
@@ -548,6 +565,8 @@ export class ElementCreateModal extends BaseModal {
    *  field was emptied after a miss. Create stays off until a type is picked. */
   private showNoType(typed: string | null): void {
     this.noType = true;
+    // No type chosen: the filter's line no longer says why one is.
+    if (this.fromFilter) this.fromFilter.hidden = true;
     this.typeButtons.forEach(btn => btn.classList.remove('active'));
     this.typeHint.textContent = typed
       ? `No type called "${typed}". Pick one below.`
@@ -567,6 +586,8 @@ export class ElementCreateModal extends BaseModal {
 
   private setType(type: ElementType): void {
     this.clearNoType();
+    // The filter's line is true only for the kind it named.
+    if (this.fromFilter && type !== this.selected) this.fromFilter.hidden = true;
     this.selected = type;
     this.typeButtons.forEach((btn, t) => btn.classList.toggle('active', t === type && !this.opts.lockAll));
     this.updateDateLabel();
