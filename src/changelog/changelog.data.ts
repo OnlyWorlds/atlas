@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.25',
+    date: '2026-11-25',
+    theme: 'Publish says what comes first',
+    entries: [
+      {
+        id: 'publish-says-why-first',
+        title: 'Publish on a world that is not online says why, where it lands',
+        body: 'A page publishes from a world on onlyworlds.com. On a world kept only in this browser or a folder, Publish now says so when you point at it, and pressing it takes you to that reason, set as a step rather than small print, with Make online ready to press. Before, it opened the page\'s theme settings and the reason sat under them in small grey text.',
+        tags: ['pages', 'onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.125.24',
     date: '2026-11-25',
     theme: 'The newest OnlyWorlds SDK',

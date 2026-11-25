@@ -2022,7 +2022,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // State 1 — local-only world: publishing needs api credentials.
     if (!entry?.api?.api_key) {
       const hint = document.createElement('p');
-      hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
+      hint.className = 'atlas-share-section-hint atlas-share-publish-hint is-first-step';
       if (isPartialSlice(getState().active?.meta)) {
         // One Character's view never goes online (folder spec §4.2), so there is no Make online to point at.
         hint.append('Publishing a page needs an online world, and this copy is one view of a world, which can\'t go online.');
@@ -2497,9 +2497,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     publishBtn.className = 'atlas-share-preview-toggle atlas-share-publish-cta';
     publishBtn.dataset.action = 'open-publish';
     const pubNow = pagePubOf(page);
-    publishBtn.title = pubNow && !pubNow.revoked
-      ? 'Publish settings: republish or take the live page down'
-      : 'Publish this page at an address of its own';
+    // A world in this browser or a folder only cannot publish yet: the button says so before the press, and the
+    // press lands on the reason with the focus on its way on (Make online), not on the theme settings above it.
+    const notOnline = !getState().registry.worlds.find(w => w.id === worldId)?.api?.api_key;
+    publishBtn.title = notOnline
+      ? 'Publishing a page needs an online world first'
+      : pubNow && !pubNow.revoked
+        ? 'Publish settings: republish or take the live page down'
+        : 'Publish this page at an address of its own';
     publishBtn.innerHTML = `<span class="material-symbols-outlined">public</span> <span class="atlas-share-action-word">${pubNow && !pubNow.revoked ? 'Published' : 'Publish'}</span>`;
     publishBtn.addEventListener('click', () => {
       void (async () => {
@@ -2507,7 +2512,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         if (previewMode) previewMode = false;
         metaExpanded = true;
         buildDetail(pageId);
-        root.querySelector('[data-role="publish-section"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        const section = root.querySelector<HTMLElement>('[data-role="publish-section"]');
+        section?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        if (notOnline) section?.querySelector<HTMLElement>('.atlas-share-publish-hint a')?.focus({ preventScroll: true });
       })();
     });
     // Publish and delete write the world; not on a view-only one (conv. 149).
