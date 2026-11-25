@@ -54,14 +54,15 @@ for (const theme of ['dark', 'light'] as const) {
 
     const s = await look(page, start);
     const d = await look(page, demo);
-    expect(s).toMatchObject({ ...LADDER[theme].entry, h: 36, radius: '6px', size: '14px', weight: '600' });
-    expect(d).toMatchObject({ ...LADDER[theme].standard, h: 36, radius: '6px', size: '14px', weight: '500' });
+    // Lato has 400, 700 and 900 only (1.125.30): the entry rung is 700, the standard 400.
+    expect(s).toMatchObject({ ...LADDER[theme].entry, h: 36, radius: '6px', size: '14px', weight: '700' });
+    expect(d).toMatchObject({ ...LADDER[theme].standard, h: 36, radius: '6px', size: '14px', weight: '400' });
     // The two doors used to share one wash (1.61): they must not read alike.
     expect(s.bg).not.toBe(d.bg);
-    // The line of links under them is the Link rung: weight 500 (1.66.1).
+    // The line of links under them is the Link rung: weight 500 (1.66.1), 400 in Lato (1.125.30).
     const link = '.atlas-landing-more-link';
     await expect(page.locator(link).first()).toBeVisible();
-    expect((await look(page, link)).weight).toBe('500');
+    expect((await look(page, link)).weight).toBe('400');
   });
 }
 

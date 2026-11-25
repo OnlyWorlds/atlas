@@ -5,7 +5,7 @@
  *
  * The preview is a `blob:` document, which has no path of its own, so a
  * root-relative `url("/assets/…woff2")` resolves to nothing: the icon font
- * and Open Sans never load, and an icon draws as the first letters of its
+ * and the text face never load, and an icon draws as the first letters of its
  * ligature word ("pe" for person). A `<base>` cures Chromium only; Firefox
  * asks for no font under one, and asks for both once each address is whole
  * (measured on the live host, both engines).

@@ -44,7 +44,7 @@ const METHOD = 'That file is not a world Atlas can open: it is locked with a pas
 const NAME = 'That file is not a world Atlas can open: one of its file names is not allowed in a world.';
 const MARKER = 'That file says it is something other than an OnlyWorlds world.';
 // The SDK's from 4.204.0 (folder spec 4.8); a folder's own refusal is `misnamedSentence`.
-const NAME_CASE = 'That file is not a world Atlas can open: it holds world.json, elements/ or spatial/ in other capitals, where the folder format names them in small letters.';
+const NAME_CASE = 'That file is not a world Atlas can open: it holds world.json, elements/ or spatial/ in other capitals, where the folder format names them in small letters. To open it, unzip it, write that name in small letters, then zip it again or open the folder.';
 // The writer refuses a name or a collision as the reader would; when Atlas writes, the names are this world's own.
 const WRITE_NAME = 'This world holds a file whose name cannot go in a world file, so no file was made.';
 const WRITE_COLLISION = 'This world holds two files whose names differ only in capitals or accents, so no file was made.';
