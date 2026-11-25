@@ -100,9 +100,11 @@ describe('findUnlinkedMentions reads names as the hints do', () => {
   });
 
   it('passes over a name a markdown label cannot hold, in the count and in the write', () => {
-    for (const name of ['Kira [the elder]', '[Old] Kira', 'Kira\\', 'Ki]ra']) {
+    for (const [name, story] of [
+      ['Kira [the elder]', 'Then Kira [the elder] came.'], ['[Old] Kira', 'Then [Old] Kira came.'],
+      ['Kira\\', 'Then Kira\\ came.'], ['Ki]ra', 'Then Ki]ra came.'], ['Kira', 'Then wow!Kira came.'],
+    ]) {
       const subject = el('u1', 'character', name);
-      const story = `Then ${name} came.`;
       const world: Element[] = [subject, el('u2', 'narrative', 'Scene U', { story })];
       expect(findUnlinkedMentions(subject, world).total).toBe(0);
       const out = linkSpansMarkdown(story, elementSpans(subject)!, { id: 'u1', type: 'character' }, MENTIONS_MARKDOWN);

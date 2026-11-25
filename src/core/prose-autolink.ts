@@ -288,6 +288,16 @@ function escapeRegexLiteral(text: string): string {
 /** A label the markdown link form cannot carry and give back unescaped. */
 const MARKDOWN_UNSAFE_LABEL = /[[\]\\]/;
 
+/**
+ * Whether the markdown path must leave the span `[from, to)` of `story` as
+ * text: a label holding `[`, `]` or a backslash (conv. 197), or a span right
+ * after `!`, where `[label](address)` would be read as an image ("wow!Kira"
+ * written as `wow![Kira](ow://…)`). Count and write read this one rule.
+ */
+function markdownCannotLinkAt(story: string, from: number, to: number): boolean {
+  return MARKDOWN_UNSAFE_LABEL.test(story.slice(from, to)) || (from > 0 && story[from - 1] === '!');
+}
+
 export interface MarkdownAutolinkResult {
   story: string;
   linked: AutolinkCandidate[];
@@ -325,9 +335,10 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
     const label = promotionLabel(story.slice(start, end), cand);
     // A label holding `[`, `]` or a backslash is written into a link that
     // `unlinkMarkdown` cannot read back (and a trailing backslash escapes the
-    // closing bracket), so this markdown path passes such a mention over and
-    // leaves its text as it was. The open editor links it through rich text.
-    if (MARKDOWN_UNSAFE_LABEL.test(label)) continue;
+    // closing bracket), and a link right after `!` reads as an image, so this
+    // markdown path passes such a mention over and leaves its text as it was.
+    // The open editor links it through rich text.
+    if (markdownCannotLinkAt(story, start, end)) continue;
     proposed.add(cand.id);
     replacements.push({ from: start, to: end, cand, label });
   }
@@ -597,7 +608,7 @@ export function findSpansMarkdown(story: string, spansOf: SpanFinder, opts: Mark
     isProtected = (a, b) => protectedSpans.some(([s, e]) => a < e && b > s);
   }
   return spansOf(story).filter(([a, b]) =>
-    !isProtected(a, b) && !(opts.safeLabels && MARKDOWN_UNSAFE_LABEL.test(story.slice(a, b))));
+    !isProtected(a, b) && !(opts.safeLabels && markdownCannotLinkAt(story, a, b)));
 }
 
 /**

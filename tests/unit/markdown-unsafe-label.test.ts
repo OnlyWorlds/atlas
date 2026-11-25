@@ -25,7 +25,17 @@ const UNSAFE: Array<[string, string]> = [
   ['[Old] Kira', 'Then [Old] Kira came.'],
   ['Kira\\', 'Then Kira\\ came.'],
   ['Ki]ra', 'Then Ki]ra came.'],
+  // Right after `!`, a link reads as an image: the place, not the name, is what the markdown cannot carry.
+  ['Kira', 'Then wow!Kira came.'],
 ];
+
+describe('a name right after ! on the markdown path', () => {
+  it('is passed over, and the next mention of the same element is linked in its place', () => {
+    const story = 'wow!Kira came, and Kira stayed.';
+    const r = autolinkMarkdown(story, buildAutolinkIndex([el(1, 'Kira')]));
+    expect(r.story).toBe(`wow!Kira came, and [Kira](ow://character/${idOf(1)}) stayed.`);
+  });
+});
 
 describe('the markdown path passes over a label it cannot carry', () => {
   for (const [name, story] of UNSAFE) {
