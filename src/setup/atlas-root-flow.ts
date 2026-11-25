@@ -36,6 +36,7 @@ import { clearedOwnTwin, isQuotaError, openBrowserMake, worldAlreadyHere, type B
 import { isBrowserWorld } from '../core/browser-worlds';
 import { isSeatSecret, seatFromFile } from '../core/seat';
 import { FsFolderStore } from '../store/folder-store-fs';
+import { refuseMisnamedFolder } from '../store/fixed-names';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
 import { getActiveStore, patchElementsFrom, setActiveStore } from '../core/active-store';
@@ -264,6 +265,10 @@ export async function discoverWorldsInRoot(
 export async function openWorldFolder(
   picked: FileSystemDirectoryHandle
 ): Promise<{ worldId: string; already: boolean }> {
+  // A fixed name held only in another case is said for what it is, before
+  // "no world.json" on a disk that tells capitals apart, and before the
+  // folder is registered on one that does not (the store refuses it too).
+  await refuseMisnamedFolder(picked);
   let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string; read_only?: boolean } } | null = null;
   try {
     meta = await readJson(picked, 'world.json');

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.26',
+    date: '2026-11-25',
+    theme: 'A folder named in other capitals is said, not read as empty',
+    entries: [
+      {
+        id: 'folder-name-case',
+        title: 'A world folder holding Elements/ instead of elements/ is refused, with the name to fix',
+        body: 'The folder format names world.json, elements/ and spatial/ in small letters. A world folder that holds one of them only in other capitals, such as Elements/, is now refused when you open it, and Atlas says which name to change. Before, on a disk that tells capitals apart (Linux, ChromeOS, some Macs) Atlas read such a world as empty, and the first new element went into a second elements/ folder beside the old one. Nothing was deleted, but the old elements went unread.',
+        tags: ['folder', 'safety'],
+      },
+    ],
+  },
+  {
     version: '1.125.25',
     date: '2026-11-25',
     theme: 'Publish says what comes first',

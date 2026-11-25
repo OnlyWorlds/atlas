@@ -38,6 +38,7 @@
  */
 
 import { PlainError } from '../core/plain-error';
+import { refuseMisnamedFolder } from './fixed-names';
 import {
   ATLAS_INTERNAL_DIR,
   ATLAS_LOCAL_ONLY_FIELDS,
@@ -415,6 +416,9 @@ export class FsFolderStore implements FolderStore {
     if (!handle) throw new Error('FsFolderStore.open requires a directory handle');
     this.root = handle;
     try {
+      // Before anything is held or written: ensureLayout would make
+      // `elements/` beside an `Elements/` it cannot see (folder spec 4.8).
+      await refuseMisnamedFolder(handle);
       await this.resolveBrowserId();
       // Held before the file lock is written, so the file never names a
       // Web Lock nobody holds (conv. 13).

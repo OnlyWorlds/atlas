@@ -43,6 +43,8 @@ const LINK = 'That file is not a world Atlas can open: it holds a link where a f
 const METHOD = 'That file is not a world Atlas can open: it is locked with a password, or packed in a way Atlas cannot read.';
 const NAME = 'That file is not a world Atlas can open: one of its file names is not allowed in a world.';
 const MARKER = 'That file says it is something other than an OnlyWorlds world.';
+// The SDK's from 4.204.0 (folder spec 4.8); a folder's own refusal is `misnamedSentence`.
+const NAME_CASE = 'That file is not a world Atlas can open: it holds world.json, elements/ or spatial/ in other capitals, where the folder format names them in small letters.';
 // The writer refuses a name or a collision as the reader would; when Atlas writes, the names are this world's own.
 const WRITE_NAME = 'This world holds a file whose name cannot go in a world file, so no file was made.';
 const WRITE_COLLISION = 'This world holds two files whose names differ only in capitals or accents, so no file was made.';
@@ -213,7 +215,8 @@ export function leftOutRecords(files: WorldFileEntry[], zip: Uint8Array): string
 }
 
 /** Each of the SDK's refusals, in Atlas's words. */
-const REFUSALS: Record<OwWorldFileReason, string> = {
+// 'name_case' is listed ahead of the pin that adds it, so the bump typechecks the day it lands.
+const REFUSALS: Record<OwWorldFileReason | 'name_case', string> = {
   unsafe_path: UNSAFE_PATH,
   too_big: TOO_BIG,
   too_many: TOO_MANY,
@@ -226,6 +229,7 @@ const REFUSALS: Record<OwWorldFileReason, string> = {
   method: METHOD,
   name: NAME,
   marker: MARKER,
+  name_case: NAME_CASE,
 };
 
 /** world.json without the tour's `demo` mark; every other file as it is. */
