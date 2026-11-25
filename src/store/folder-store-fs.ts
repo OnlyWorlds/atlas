@@ -241,12 +241,6 @@ export class FsFolderStore implements FolderStore {
    * release: a store that ever held one never owns a lock by its tab id.
    */
   private webLockName: string | null = null;
-  /**
-   * The Web Lock every page of this browser takes around each read and write
-   * of this world's lock file (`inLockSection`): one per world id, read from
-   * world.json at the claim; one for all where the folder names none.
-   */
-  private lockSectionName = 'atlas-lock-claim';
   private browserId: string | null;
 
   setViewOnly(viewOnly: boolean | 'copy'): void { this.viewOnly = viewOnly; }
@@ -623,8 +617,6 @@ export class FsFolderStore implements FolderStore {
    */
   private async claimLock(): Promise<void> {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    const meta = await readJson<{ id?: unknown }>(this.requireRoot(), WORLD_META_FILE).catch(() => null);
-    this.lockSectionName = typeof meta?.id === 'string' && meta.id ? `atlas-lock-claim:${meta.id}` : 'atlas-lock-claim';
     let dead: { name: string; release: () => void } | null = null;
     let refused: string | null = null;
     let asked = false;
@@ -647,7 +639,7 @@ export class FsFolderStore implements FolderStore {
           };
           await writeJsonAtomic(atlasDir, LOCK_FILE, fresh);
           return null;
-        });
+        }, { refuseWhenLate: true });
         if (ask === null) return;
         // The file names another name now: start again on that one.
         dead?.release();
@@ -701,23 +693,28 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * `fn`, a read of this world's lock file and the write it decides (a
-   * claim, a heartbeat, park, unpark, the move mark, the removal at close),
-   * in the lock section: a Web Lock every page of this browser takes for
-   * this world (`lockSectionName`), so no page writes between another's
-   * read and its write. Without Web Locks it runs as it is. Its holder only
-   * reads and writes one file, but a write another program holds is retried
-   * for about two seconds, so the wait is three claim waits; not granted by
-   * then, or refused, `fn` runs outside it, as before the section, said in
-   * the console: never a refusal the person did not cause.
+   * `fn`, a read of a world's lock file and the write it decides (a claim,
+   * a heartbeat, park, unpark, the move mark, the removal at close), in the
+   * lock section: one Web Lock, `atlas-lock-claim`, that every page of this
+   * browser takes for every world, so no page writes between another's read
+   * and its write. One name for all worlds: a name per world would have to
+   * come from the folder, and two pages that read it differently (a file
+   * held for a moment, a world still being made) would race again. Without
+   * Web Locks it runs as it is. Its holder only reads and writes one file,
+   * but a write another program holds is retried for about two seconds, so
+   * the wait is three claim waits. Not granted by then: a claim fails the
+   * open (`refuseWhenLate`), since a take outside the section is the race
+   * itself; the other writers run outside it, as before the section.
+   * Refused by the browser: `fn` runs as without Web Locks.
    */
-  private async inLockSection<T>(fn: () => Promise<T>): Promise<T> {
+  private async inLockSection<T>(fn: () => Promise<T>, opts: { refuseWhenLate?: boolean } = {}): Promise<T> {
     // A page that can keep no browser id asks no Web Lock at all (`webLocks`).
     const l = this.webLocks();
     if (!l) return fn();
-    const held = await requestHeldOrWhy(l, this.lockSectionName, 3 * (this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS));
+    const held = await requestHeldOrWhy(l, 'atlas-lock-claim', 3 * (this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS));
+    if (held === 'late' && opts.refuseWhenLate) throw new PlainError(COULD_NOT_OPEN_NOW);
     if (typeof held === 'string') {
-      console.warn(`[fs-folder-store] the lock section was ${held}; the lock file is read and written outside it`);
+      console.warn(`[atlas-lock] the lock section was ${held} (atlas-lock-claim); this read and write of the lock run outside it`);
       return fn();
     }
     try { return await fn(); } finally { held.release(); }
