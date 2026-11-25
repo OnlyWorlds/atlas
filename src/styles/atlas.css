@@ -18556,7 +18556,10 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-same > .atlas-home-strand-more { margin-left: 0; }
 /* The one question (R3): the card in its kind's colour. */
 .atlas-home-strand-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--type-color, var(--atlas-accent)) 55%, transparent); border-left: 3px solid var(--type-color, var(--atlas-accent)); border-radius: 8px; background: color-mix(in srgb, var(--type-color, var(--atlas-accent)) 7%, var(--atlas-bg-panel)); }
-.atlas-home-strand-card-title { margin: 0; display: flex; align-items: center; gap: 8px; color: var(--atlas-text); font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+/* A title holds a story's names, so where it wraps varies with every name and face: the row always holds two
+   lines, so a card that comes in beside a box in its row stands as tall as the one it follows (W5; a one-line
+   title in Lato on Firefox grew the Event row 4.25 px). A title of three lines still grows its row. */
+.atlas-home-strand-card-title { margin: 0; display: flex; align-items: center; gap: 8px; min-height: 2.8em; min-height: 2lh; color: var(--atlas-text); font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
 .atlas-home-strand-card-title .material-symbols-outlined { flex: 0 0 auto; font-size: 22px; color: var(--type-color, var(--atlas-accent)); }
 .atlas-home-strand-card-title > span:last-child { min-width: 0; }
 .atlas-home-strand-card-what { margin: -4px 0 0; color: var(--atlas-text-soft); font-size: 0.86rem; }
