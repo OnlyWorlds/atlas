@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.32',
+    date: '2026-11-25',
+    theme: 'Button words in bold',
+    entries: [
+      {
+        id: 'lato-control-weights',
+        title: 'Buttons, tabs and headings read in bold again',
+        body: 'The words on buttons, tabs, chips and the small links under them are bold, and so are section headings and bold words in a sentence, as in the design Atlas was drawn to. Names in a list and the labels beside a field stay regular, so a list reads calmly.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.125.31',
     date: '2026-11-25',
     theme: 'A name right after ! stays as written',

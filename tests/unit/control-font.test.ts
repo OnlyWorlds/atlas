@@ -35,6 +35,26 @@ describe('the house face', () => {
     expect(off).toEqual([]);
   });
 
+  // A control's word is 700, as in the B6 pictures; names and field labels
+  // inside the content stay 400 (1.125.32). Each rule's own block is read.
+  it.each([
+    '.atlas-btn-primary', '.atlas-btn-ghost.atlas-btn-danger','.atlas-mode-btn',
+    '.atlas-room-tab', '.atlas-row-chip', '.atlas-pin-filter-chip', '.atlas-btn-link.atlas-landing-more-link',
+    '.atlas-shortcuts-more > summary', '.atlas-home-section-title', '.atlas-detail-section-title',
+  ])("%s's word is 700", sel => {
+    const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const block = CSS.match(new RegExp('(?:^|[}\\s])' + esc + '\\s*\\{([^}]*)\\}', 'm'));
+    expect(block, sel).not.toBeNull();
+    expect(block![1]).toMatch(/font-weight:\s*700/);
+  });
+
+  it.each(['.atlas-search-name', '.atlas-field-label', '.atlas-knowledge-row-name', '.atlas-context-strand-title'])(
+    "%s stays 400", sel => {
+      const block = CSS.match(new RegExp('(?:^|[}\\s])' + sel.replace(/\./g, '\\.') + '\\s*\\{([^}]*)\\}', 'm'));
+      expect(block, sel).not.toBeNull();
+      expect(block![1]).toMatch(/font-weight:\s*400/);
+    });
+
   it('is the body face before the bundle loads', () => {
     const html = readFileSync(join(resolve(process.cwd()), 'index.html'), 'utf8');
     expect(html).toMatch(/font-family:\s*'Lato',\s*system-ui/);

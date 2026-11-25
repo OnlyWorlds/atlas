@@ -377,7 +377,7 @@ html {
   padding: 10px 12px;
   font-family: inherit;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   cursor: pointer;
   position: relative;
   text-align: center;
@@ -618,7 +618,7 @@ html {
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.16);
   color: rgba(var(--atlas-ink-rgb), 0.92);
   font-size: 11px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease, border-color 120ms ease;
@@ -748,7 +748,7 @@ html {
   border: 1.5px dashed rgba(239, 68, 68, 0.75);
   color: rgba(var(--atlas-ink-rgb), 0.95);
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.02em;
   opacity: 0;
   transform: translateY(-4px);
@@ -1007,7 +1007,7 @@ button.atlas-map-tree-name {
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
   margin-bottom: 8px;
-  font-weight: 400;
+  font-weight: 700;
 }
 
 /* ============================================================
@@ -1050,7 +1050,7 @@ button.atlas-map-tree-name {
   background: color-mix(in srgb, var(--atlas-danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--atlas-danger) 60%, transparent);
   color: var(--atlas-danger);
-  font-weight: 400;
+  font-weight: 700;
 }
 
 /* Alone (not on a ghost), it takes the Standard metrics. */
@@ -1101,7 +1101,7 @@ button.atlas-map-tree-name {
   padding: 5px 12px;
   font-size: 12px;
   font-family: inherit;
-  font-weight: 400;
+  font-weight: 700;
   border-radius: 3px;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
@@ -1517,7 +1517,7 @@ button.atlas-map-tree-name {
 
 .atlas-pane-empty b {
   color: var(--atlas-text);
-  font-weight: 400;
+  font-weight: 700;
 }
 
 /* ============================================================
@@ -1923,7 +1923,7 @@ button.atlas-map-tree-name {
   padding: 7px 12px;
   font-size: 11px;
   letter-spacing: 0.08em;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-text-soft);
   background: rgba(var(--atlas-ink-rgb), 0.015);
   cursor: pointer;
@@ -3263,7 +3263,7 @@ button.atlas-element-sync-dot {
   height: 16px;
   padding: 0 5px;
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-accent-text);
   background: rgba(var(--atlas-accent-rgb), 0.10);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.25);
@@ -3293,7 +3293,7 @@ button.atlas-element-sync-dot {
  * "loaded but not focused" so the user can see which maps are warm. */
 .atlas-row-main.atlas-map-tree-row-open {
   color: var(--atlas-accent-text);
-  font-weight: 400;
+  font-weight: 700;
 }
 
 /* Home recent rows drag onto maps — same carry dim as sidebar rows. */
@@ -3434,7 +3434,7 @@ button.atlas-element-sync-dot {
   gap: 3px;
   padding: 1px 7px 1px 5px;
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.02em;
   border-radius: 8px;
   flex-shrink: 0;
@@ -3529,7 +3529,7 @@ button.atlas-element-sync-dot {
 .atlas-world-state-chip.cleared {
   background: var(--atlas-warn-soft-tint);
   color: var(--atlas-warn);
-  font-weight: 400;
+  font-weight: 700;
 }
 
 /* A seat a link left held: the row is a world waiting to come
@@ -4355,7 +4355,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   background: rgba(var(--atlas-accent-rgb), 0.12);
   color: var(--atlas-accent-text);
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -4398,7 +4398,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
-  font-weight: 400;
+  font-weight: 700;
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -4705,7 +4705,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 .atlas-welcome h1 {
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-text-soft);
   margin: 0 0 8px;
 }
@@ -4774,7 +4774,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
    Top-of-sidebar: world name shown on Worlds button when active
    ============================================================ */
 .atlas-mode-btn .atlas-world-name {
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-accent-text);
 }
 
@@ -4960,7 +4960,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 /* The ladder's Link rung (OW Style, conv. 153). Two classes, because
    .atlas-btn-link's `font: inherit` comes later in this file and would reset it. */
-.atlas-btn-link.atlas-landing-more-link { font-weight: 400; }
+.atlas-btn-link.atlas-landing-more-link { font-weight: 700; }
 .atlas-landing-more-link:hover,
 .atlas-landing-more-link:focus-visible { color: var(--atlas-accent-text); }
 .atlas-landing-more-sep { color: var(--atlas-text-muted); }
@@ -5738,7 +5738,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   padding: 6px 18px 4px;
   margin-top: 12px;
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
 }
@@ -5877,7 +5877,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 .atlas-settings-radio-body strong {
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 700;
   color: rgba(var(--atlas-ink-rgb), 0.88);
 }
 
@@ -5931,7 +5931,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   color: var(--atlas-accent-text);
   font-size: 11px;
   letter-spacing: 0.04em;
-  font-weight: 400;
+  font-weight: 700;
   width: fit-content;
 }
 
@@ -6150,7 +6150,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 .atlas-policy-option>span>strong {
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-text);
 }
 
@@ -6191,7 +6191,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 .atlas-modal-checkbox-row>span>strong {
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-text);
 }
 
@@ -6430,7 +6430,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   border: 1px solid var(--atlas-warn-soft-border);
   cursor: pointer;
   margin-left: 4px;
-  font-weight: 400;
+  font-weight: 700;
   transition: background 140ms ease, border-color 140ms ease;
 }
 
@@ -6548,7 +6548,7 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
 
 .atlas-unsupported b {
   color: rgba(var(--atlas-ink-rgb), 0.9);
-  font-weight: 400;
+  font-weight: 700;
 }
 
 .atlas-unsupported-actions {
@@ -7180,7 +7180,7 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   border: 1px solid var(--atlas-cyan-soft);
   border-radius: 3px;
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--atlas-accent-text);
   vertical-align: middle;
@@ -7229,7 +7229,7 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
-  font-weight: 400;
+  font-weight: 700;
   margin-bottom: 2px;
 }
 
@@ -7247,7 +7247,7 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
 }
 
 .atlas-popover-title {
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.02em;
 }
 
@@ -7441,7 +7441,7 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
 
 .atlas-zone-draft-mode {
   color: var(--atlas-accent-text);
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.04em;
   padding-right: 8px;
   border-right: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
@@ -8162,7 +8162,7 @@ button.atlas-zone-chip-name {
 
 .atlas-detail-section-title {
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   color: rgba(var(--atlas-ink-rgb), 0.85);
   letter-spacing: 0.04em;
 }
@@ -9030,7 +9030,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 .atlas-home-section-title {
   margin: 0 0 8px 0;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
 }
@@ -9553,7 +9553,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 
 .atlas-writing-workspace-crumb-seg.is-current {
   color: var(--atlas-text);
-  font-weight: 400;
+  font-weight: 700;
 }
 
 a.atlas-writing-workspace-crumb-seg:hover {
@@ -14843,7 +14843,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-context-graph-node.is-center .atlas-context-graph-node-label {
   font-size: 10.5px;
   color: var(--atlas-accent-text);
-  font-weight: 400;
+  font-weight: 700;
 }
 .atlas-context-graph-node.is-adjacent .atlas-context-graph-node-label {
   opacity: 0.75;
@@ -15641,7 +15641,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-text-muted);
   font-family: inherit;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 700;
   padding: 10px 14px;
   margin-bottom: -1px;
   cursor: pointer;
@@ -15835,7 +15835,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-home-statline-seg b {
   color: var(--atlas-text);
-  font-weight: 400;
+  font-weight: 700;
 }
 .atlas-home-statline-seg:hover { color: var(--atlas-accent-text); }
 .atlas-home-statline-seg:hover b { color: var(--atlas-accent-text); }
@@ -16196,7 +16196,7 @@ body.atlas-share-fullpreview > * {
 .atlas-shortcuts-more > summary {
   cursor: pointer;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-text-muted);
   padding: 4px 0;
 }
@@ -16212,7 +16212,7 @@ body.atlas-share-fullpreview > * {
 .atlas-help-can-head {
   margin: 0 0 6px 0;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--atlas-text-muted);
 }
 .atlas-help-can {

@@ -54,15 +54,15 @@ for (const theme of ['dark', 'light'] as const) {
 
     const s = await look(page, start);
     const d = await look(page, demo);
-    // Lato has 400, 700 and 900 only (1.125.30): the entry rung is 700, the standard 400.
+    // Lato has 400, 700 and 900 only (1.125.30): every rung's word is 700, as in the B6 pictures (1.125.32).
     expect(s).toMatchObject({ ...LADDER[theme].entry, h: 36, radius: '6px', size: '14px', weight: '700' });
-    expect(d).toMatchObject({ ...LADDER[theme].standard, h: 36, radius: '6px', size: '14px', weight: '400' });
+    expect(d).toMatchObject({ ...LADDER[theme].standard, h: 36, radius: '6px', size: '14px', weight: '700' });
     // The two doors used to share one wash (1.61): they must not read alike.
     expect(s.bg).not.toBe(d.bg);
-    // The line of links under them is the Link rung: weight 500 (1.66.1), 400 in Lato (1.125.30).
+    // The line of links under them is the Link rung: weight 500 (1.66.1), 700 in Lato (1.125.32).
     const link = '.atlas-landing-more-link';
     await expect(page.locator(link).first()).toBeVisible();
-    expect((await look(page, link)).weight).toBe('400');
+    expect((await look(page, link)).weight).toBe('700');
   });
 }
 
