@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.37',
+    date: '2026-11-25',
+    theme: 'Link to element finds a name you unlinked',
+    entries: [
+      {
+        id: 'find-unlinked-name-again',
+        title: 'Link to element finds a name again after you unlink it',
+        body: 'A name holding a bracket, a backslash or a "<", such as "Kira [the elder]" or "A < B", is now found by Link to element after you unlink it, and linked back as it was. Before, such a name could be missed until the scene was saved again in the editor.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.36',
     date: '2026-11-25',
     theme: 'A link to an element named like a web link stays that element',

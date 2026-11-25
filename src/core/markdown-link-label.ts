@@ -70,6 +70,42 @@ export function labelFromSpan(span: string): string {
   return escapeLinkLabel(unescapeLinkLabel(span));
 }
 
+/** A text as its readers read it, with the way back to the text's own offsets. */
+export interface MarkdownReading {
+  /** The text with `\[`, `\]`, `\(`, `\)`, `\<` and `\\` read as the character (as {@link unescapeLinkLabel} reads them). */
+  text: string;
+  /** Where each character of `text` starts in the source: at the backslash of an escape. */
+  from: number[];
+  /** Just past each character of `text` in the source. */
+  to: number[];
+}
+
+/**
+ * What a story reads as, by the escapes a label is read by, left to right as
+ * {@link unescapeLinkLabel} pairs them: a span found in the reading maps back
+ * (`from[a]`, `to[b - 1]`) to a span of the story that holds its escapes
+ * whole, so a term the writer typed as "A < B" is found in `A \< B`.
+ */
+export function readingOf(text: string): MarkdownReading {
+  let out = '';
+  const from: number[] = [];
+  const to: number[] = [];
+  for (let i = 0; i < text.length;) {
+    if (isBackslash(text, i) && i + 1 < text.length && '\\[]()<'.includes(text[i + 1])) {
+      out += text[i + 1];
+      from.push(i);
+      to.push(i + 2);
+      i += 2;
+    } else {
+      out += text[i];
+      from.push(i);
+      to.push(i + 1);
+      i += 1;
+    }
+  }
+  return { text: out, from, to };
+}
+
 const isBackslash = (text: string, i: number): boolean => text.charCodeAt(i) === 0x5c;
 
 /** Is the character at `i` escaped (after an odd run of backslashes)? */

@@ -24,7 +24,7 @@
 import { nameFinder, trimAndFold, type OwNameFinder } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { findOwLinks, isChipLink, namedId, owLinkHref, readOwHref } from './ow-links';
-import { labelFromSpan, markdownLinkSpans, splitsEscape } from './markdown-link-label';
+import { escapeLinkLabel, labelFromSpan, markdownLinkSpans, readingOf, splitsEscape } from './markdown-link-label';
 
 /**
  * The shortest name or alias `mentionTermsFor` lists (the `terms` of an
@@ -340,7 +340,9 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
     // too), and a link right after `!` reads as an image, so such a mention's
     // text stays as it was; the open editor links it through rich text. A
     // mention inside a link the grammar reads, or splitting an escape, is no
-    // place for a link at all (1.125.34).
+    // place for a link at all (1.125.34). The label is written by the one
+    // label writer the editor's chip uses (`escapeLinkLabel`), so a name
+    // holding `<` is written `\<` and the story matches its sidecar's save.
     if (markdownCannotLinkAt(story, start, end) || passedOver(start, end)) continue;
     proposed.add(cand.id);
     replacements.push({ from: start, to: end, cand, label });
@@ -351,7 +353,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
   for (let i = replacements.length - 1; i >= 0; i--) {
     const r = replacements[i];
     out = out.slice(0, r.from)
-      + `[${r.label}](${owLinkHref(r.cand.type, r.cand.id)})`
+      + `[${escapeLinkLabel(r.label)}](${owLinkHref(r.cand.type, r.cand.id)})`
       + out.slice(r.to);
   }
   return { story: out, linked: replacements.map(r => r.cand) };
@@ -642,7 +644,7 @@ export function findTermSpansMarkdown(
   term: string | readonly string[],
   opts: TermMatchOptions = {},
 ): Array<[number, number]> {
-  return findSpansMarkdown(story, termSpans(term, opts), TERM_MARKDOWN);
+  return findSpansMarkdown(story, overReading(termSpans(term, opts)), TERM_MARKDOWN);
 }
 
 /** Chip EVERY unprotected match of `term` in a markdown story to `target`. */
@@ -652,7 +654,24 @@ export function linkTermMarkdown(
   target: TermLinkTarget,
   opts: TermMatchOptions = {},
 ): TermLinkMarkdownResult {
-  return linkSpansMarkdown(story, termSpans(term, opts), target, TERM_MARKDOWN);
+  return linkSpansMarkdown(story, overReading(termSpans(term, opts)), target, TERM_MARKDOWN);
+}
+
+/**
+ * The find bar's term over a markdown story is matched against what the story
+ * reads as (`readingOf`), as the compiled view the writer searched draws it:
+ * after an unlink, a name spelled "A < B" sits in the story escaped, and only
+ * the reading holds the term. Each span goes back to the story's own offsets
+ * with its escapes inside it, and `labelFromSpan` writes them as read.
+ */
+function overReading(spansOf: SpanFinder): SpanFinder {
+  return story => {
+    if (!story.includes('\\')) return spansOf(story);
+    const r = readingOf(story);
+    return spansOf(r.text)
+      .filter(([a, b]) => b > a)
+      .map(([a, b]): [number, number] => [r.from[a], r.to[b - 1]]);
+  };
 }
 
 /**

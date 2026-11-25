@@ -256,8 +256,10 @@ describe('done when 3: no markdown path writes a link inside a link', () => {
   const TERMS: Array<[string, string, string | null]> = [
     ['Ki[ra', 'Then Ki[ra came.', `Then [Ki\\[ra](${L}) came.`],
     ['Ki]ra', 'Then Ki]ra came.', `Then [Ki\\]ra](${L}) came.`],
-    // The story's `Kira\\` is the text "Kira\": the term's backslash escapes the next one, so it is passed over.
-    ['Kira\\', 'Then Kira\\\\ came.', null],
+    // The story's `Kira\\` is the text "Kira\", and the term is matched against what the story reads as (1.125.37).
+    ['Kira\\', 'Then Kira\\\\ came.', `Then [Kira\\\\](${L}) came.`],
+    // A lone backslash before a letter is the text it is: a term starting after it splits it and is passed over.
+    ['ira', 'Then K\\ira came.', null],
   ];
   for (const [term, story, want] of TERMS) {
     it(`the term ${JSON.stringify(term)} through "Link to element"`, () => {
@@ -281,6 +283,33 @@ describe('done when 3: no markdown path writes a link inside a link', () => {
     const drawn = renderProseFragment(story, onPage);
     expect(chipsIn(drawn)).toEqual([]);
     expect(drawn.textContent).toBe(`Then [Kira](${L}) came.`);
+  });
+});
+
+describe('1.125.37: one label writer, and the find bar reads a story as it reads', () => {
+  it('autolink writes a name holding < as the editor\'s chip does, so the story is the sidecar\'s own save', () => {
+    const story = 'Then a <x came.';
+    const out = autolinkMarkdown(story, buildAutolinkIndex([el(ID, 'a <x')])).story;
+    expect(out).toBe(`Then [a \\<x](${L}) came.`);
+    expect(out).toBe(serializeDocToMarkdown(sceneOf('a <x')));
+    expect(storyOutranksSidecar(sceneOf('a <x'), out)).toBe(false);
+    expect(editorRead(out)).toEqual([{ text: 'Then ' }, { chip: 'a <x' }, { text: ' came.' }]);
+  });
+
+  for (const name of ['A < B', 'a <x', 'Kira [the elder]', 'Kira\\', 'Ki]ra', '[x](https://x.test)']) {
+    it(`${JSON.stringify(name)}: unlinked from a story alone, "Link to element" finds it and links it back as it was`, () => {
+      const saved = serializeDocToMarkdown(sceneOf(name));
+      const back = unlinkMarkdown(saved).story;
+      expect(editorRead(back)).toEqual([{ text: `Then ${name} came.` }]);
+      expect(findTermSpansMarkdown(back, name)).toEqual([[5, back.length - ' came.'.length]]);
+      const out = linkTermMarkdown(back, name, { id: ID, type: 'character' });
+      expect(out).toEqual({ story: saved, linked: 1 });
+    });
+  }
+
+  it('a term is found in the reading but never inside a link: "A \\< B" in a link\'s label stays as it is', () => {
+    const story = `See [A \\< B](${L}) and A \\< B.`;
+    expect(findTermSpansMarkdown(story, 'A < B')).toEqual([[story.length - 'A \\< B.'.length, story.length - 1]]);
   });
 });
 
