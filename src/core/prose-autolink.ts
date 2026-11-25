@@ -362,18 +362,12 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
  * links the editor holds as chips (an element address with no moment and no
  * lens, read by the SDK), the same set `unlinkRichtext` turns back to text.
  */
-/** A label's bytes as prose: `\(` and `\)` read as the bare character, every other escape pair kept. */
-function proseFromLabel(label: string): string {
-  return label.replace(/\\([\s\S])/g, (pair, c: string) => (c === '(' || c === ')' ? c : pair));
-}
-
 export function unlinkMarkdown(story: string): { story: string; unlinked: number } {
   if (!story) return { story, unlinked: 0 };
   // Links are taken by the grammar (`markdownLinkSpans`): an escaped `[` opens
   // none, and a stray `[` earlier in the text stays where it was. The label's
   // bytes are written back as they are, escapes kept: `Kira \[the elder\]` is
-  // prose the editor reads as "Kira [the elder]". Only an escaped parenthesis goes back to bare
-  // (`proseFromLabel`): prose needs none, and a bare address before `\)` would take the backslash.
+  // prose the editor reads as "Kira [the elder]".
   let n = 0;
   let out = '';
   let last = 0;
@@ -381,7 +375,7 @@ export function unlinkMarkdown(story: string): { story: string; unlinked: number
     const link = readOwHref(story.slice(l.destStart, l.destEnd));
     if (!link || !isChipLink(link)) continue;
     n++;
-    out += story.slice(last, l.start) + proseFromLabel(story.slice(l.labelStart, l.labelEnd));
+    out += story.slice(last, l.start) + story.slice(l.labelStart, l.labelEnd);
     last = l.end;
   }
   return n === 0 ? { story, unlinked: 0 } : { story: out + story.slice(last), unlinked: n };

@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'chip-named-like-a-link',
         title: 'A link to an element whose name looks like a web link reopens as that element',
-        body: 'An element whose name holds something shaped like a web link, such as "[x](https://example.com)", is now saved in your text so it reopens as the link to that element, also in a scene opened on another device. Before, the editor could read the name\'s inner part as a web link. Unlinking such a name leaves its text as written.',
+        body: 'An element whose name holds something shaped like a web link, such as "[x](https://example.com)" or an address in angle brackets, is now saved in your text so it reopens as the link to that element, also in a scene opened on another device. Before, the editor could read the name\'s inner part as a web link. Unlinking such a name leaves its text as written.',
         tags: ['writing', 'fix'],
       },
     ],

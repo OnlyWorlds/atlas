@@ -54,7 +54,7 @@ export function storyOutranksSidecar(sidecar: JSONContent | null | undefined, st
   if (!sidecar || typeof story !== 'string' || story.trim() === '') return false;
   const fromSidecar = serializeDocToMarkdown(sidecar);
   if (fromSidecar === story) return false;
-  // Atlas's own save before 1.125.34, whose chip escaped `]` alone: still the sidecar's text.
+  // Atlas's own save by an earlier chip escape (`storyForReaders`): still the sidecar's text.
   if (storyForReaders(story, sidecar) !== story) return false;
   try {
     return normalizeStoryMarkdown(story) !== fromSidecar;

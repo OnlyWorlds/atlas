@@ -3,8 +3,8 @@
  * reader of `[label](target)` in a story, and the one escape for every writer
  * of a label (1.125.34).
  *
- * THE WRITE. A label Atlas writes escapes `\`, `[`, `]` and a `(` right after
- * a `]` (`escapeLinkLabel`), so a name such as "Kira [the elder]" or "Kira\" comes
+ * THE WRITE. A label Atlas writes escapes `\`, `[`, `]`, `<` and a `(` right
+ * after a `]` (`escapeLinkLabel`), so a name such as "Kira [the elder]" or "Kira\" comes
  * back whole: before, the editor's chip escaped `]` alone, and "Kira [the
  * elder]" was read back as `[Kira ` and a chip "the elder]".
  *
@@ -46,18 +46,18 @@ export interface MarkdownLink {
 }
 
 /**
- * A label as a link writes it: `\`, `[` and `]` escaped with a backslash, and a `(` right after a `]`
- * (1.125.36): a label holding `[x](https://x.test)` escaped at its brackets alone was read by the editor as
- * a web link inside the chip. Every other parenthesis stays bare, so "John (the younger)" is written as it
- * always was, for every reader of a story.
+ * A label as a link writes it: `\`, `[`, `]` and `<` escaped with a backslash, and a `(` right after a `]`
+ * (1.125.36): a label holding `[x](https://x.test)`, `<https://x.test>` or an HTML tag, escaped at its
+ * brackets alone, was read by the editor as a web link inside the chip. Every other parenthesis stays bare,
+ * so "John (the younger)" is written as it always was, for every reader of a story.
  */
 export function escapeLinkLabel(label: string): string {
-  return label.replace(/[\\[\]]|(?<=\])\(/g, '\\$&');
+  return label.replace(/[\\[\]<]|(?<=\])\(/g, '\\$&');
 }
 
-/** A label as a reader draws it: `\[`, `\]`, `\(`, `\)` and `\\` read as the character; every other backslash stays. */
+/** A label as a reader draws it: `\[`, `\]`, `\(`, `\)`, `\<` and `\\` read as the character; every other backslash stays. */
 export function unescapeLinkLabel(label: string): string {
-  return label.replace(/\\([\\[\]()])/g, '$1');
+  return label.replace(/\\([\\[\]()<])/g, '$1');
 }
 
 /**
