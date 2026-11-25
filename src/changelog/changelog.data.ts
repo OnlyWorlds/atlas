@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.31',
+    date: '2026-11-25',
+    theme: 'A name right after ! stays as written',
+    entries: [
+      {
+        id: 'name-after-bang',
+        title: 'Linking never turns a name into a picture',
+        body: 'A name written right after an exclamation mark, as in wow!Kira, is left as text when Atlas links names in a story kept as Markdown: its link there would read as a picture. The next mention of the same name is linked instead, and the editor still links it.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.30',
     date: '2026-11-25',
     theme: 'Atlas in Lato',
