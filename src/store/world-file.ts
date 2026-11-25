@@ -216,7 +216,7 @@ export function leftOutRecords(files: WorldFileEntry[], zip: Uint8Array): string
 }
 
 /** A world file whose world.json nests past the folder format's bound (serial 148), refused as a folder's is. */
-export const TOO_DEEP_WORLD = `The world.json in that world file is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it.`;
+export const TOO_DEEP_WORLD = `The world.json in that world file is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it. Ask for a copy written with less nesting, from the tool that made it or whoever sent it, and open that one.`;
 
 /** Each of the SDK's refusals, in Atlas's words. */
 // 'name_case' is listed ahead of the pin that adds it, so the bump typechecks the day it lands.
