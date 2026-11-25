@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.33',
+    date: '2026-11-25',
+    theme: 'A file nested too deep is left out, not a world that will not open',
+    entries: [
+      {
+        id: 'file-depth-bound',
+        title: 'A file nested past 200 levels is left out and named',
+        body: 'An element file whose values nest more than 200 levels deep is now left out of the world and counted in the element list with the files that cannot be read, as the folder format says. Before, a very deep file could stop the whole world from opening. A world.json that cannot be read now says so, for its depth or because it is not JSON, instead of saying the folder has none.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.32',
     date: '2026-11-25',
     theme: 'Button words in bold',

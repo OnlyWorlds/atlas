@@ -38,7 +38,8 @@ import { isSeatSecret, seatFromFile } from '../core/seat';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { refuseMisnamedFolder } from '../store/fixed-names';
 import { newId } from '../store/folder-store';
-import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
+import { writeJsonAtomic, readJson, readJsonStrict, tryGetDir, isNotFound, CorruptFileError } from '../store/fs-utils';
+import { FILE_MAX_DEPTH } from '../store/json-depth';
 import { getActiveStore, patchElementsFrom, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
@@ -250,6 +251,12 @@ export async function discoverWorldsInRoot(
   return { imported };
 }
 
+/** Why a world folder's world.json that is there could not be read (serial 148: past the depth bound, or not JSON). */
+export function unreadableWorldJsonSentence(err: CorruptFileError): string {
+  if (err.tooDeep) return `The world.json in that folder is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it.`;
+  return 'The world.json in that folder cannot be read as JSON, so Atlas does not open it. A git merge or an interrupted copy can do this: fix the file and open the folder again.';
+}
+
 /**
  * Open an existing world folder from anywhere on disk (2026-07-19, the
  * obsidian-alignment ask). The folder IS the world — no copy, no download:
@@ -271,8 +278,10 @@ export async function openWorldFolder(
   await refuseMisnamedFolder(picked);
   let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string; read_only?: boolean } } | null = null;
   try {
-    meta = await readJson(picked, 'world.json');
+    meta = await readJsonStrict(picked, 'world.json');
   } catch (err) {
+    // One there that cannot be read is not "no world.json" (serial 148).
+    if (err instanceof CorruptFileError) throw new PlainError(unreadableWorldJsonSentence(err));
     if (!isNotFound(err)) throw err;
   }
   if (!meta) {

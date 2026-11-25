@@ -15,6 +15,7 @@
 
 import type { LayoutDir } from '../core/constants';
 import type { ElementType } from '../core/types';
+import { parseBounded, TooDeepError } from './json-depth';
 
 const TMP_SUFFIX = '.tmp';
 
@@ -340,7 +341,7 @@ export async function readJson<T = unknown>(
     const file = await fileHandle.getFile();
     const text = await file.text();
     if (!text) return null;
-    return JSON.parse(text) as T;
+    return parseBounded<T>(text);
   } catch (err) {
     console.warn(`[fs-utils] failed to read/parse ${name}:`, err);
     return null;
@@ -359,9 +360,12 @@ export function damagedFileSentence(fileName: string, where: 'folder' | 'browser
 
 /** A file exists but will not parse: never treat it as absent and write over it. */
 export class CorruptFileError extends Error {
+  /** Refused for its depth (the folder format's bound), not for its syntax. */
+  readonly tooDeep: boolean;
   constructor(public readonly fileName: string, cause: unknown) {
     super(`${fileName} exists but cannot be read (${cause instanceof Error ? cause.message : String(cause)}). Atlas will not overwrite it; fix or remove the file (a git merge conflict leaves markers like <<<<<<<).`);
     this.name = 'CorruptFileError';
+    this.tooDeep = cause instanceof TooDeepError;
   }
 }
 
@@ -386,7 +390,7 @@ export async function readJsonStrict<T = unknown>(
   const text = await (await fileHandle.getFile()).text();
   if (!text.trim()) return null;
   try {
-    return JSON.parse(text) as T;
+    return parseBounded<T>(text);
   } catch (err) {
     throw new CorruptFileError(name, err);
   }
