@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.28',
+    date: '2026-11-25',
+    theme: 'Names with accents count everywhere the hints count them',
+    entries: [
+      {
+        id: 'names-read-as-hints-read',
+        title: 'Featured, and Unlink, read a name as the writing hints do',
+        body: 'A name that starts or ends with an accented letter, like Éowyn or Zoë, or is written in another script, now lights Featured on its card and keeps its link when one of its chips is unlinked while the name still stands in the text, as it already got a hint. A name in other capitals counts too. A name inside a longer word no longer counts (Ana in Anaïs), and neither does a name of one or two letters, which the hints never looked for.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.27',
     date: '2026-11-25',
     theme: 'One world, one tab, even at the same moment',

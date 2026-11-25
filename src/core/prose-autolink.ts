@@ -21,7 +21,7 @@
  * writer's own text as the label.
  */
 
-import { nameFinder, trimAndFold } from '@onlyworlds/sdk';
+import { nameFinder, trimAndFold, type OwNameFinder } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { findOwLinks, isChipLink, namedId, owLinkHref, readOwHref } from './ow-links';
 
@@ -133,23 +133,52 @@ export function buildAutolinkIndex(elements: readonly Element[]): AutolinkIndex 
   return index;
 }
 
+/** An element's name and aliases as the finder is handed them, and whether one is long enough to be found. */
+function finderNamesOf(el: Element): { names: string[]; holds: boolean } {
+  const names: string[] = [];
+  let holds = false;
+  const add = (value: unknown): void => {
+    if (typeof value !== 'string') return;
+    const length = trimmedCodePoints(value);
+    if (length > MAX_NAME_CODE_POINTS) return;
+    names.push(value);
+    if (length >= FINDER_MIN_CODE_POINTS) holds = true;
+  };
+  add(el.name);
+  if (Array.isArray(el.atlas_aliases)) for (const alias of el.atlas_aliases) add(alias);
+  return { names, holds };
+}
+
+/** Each element's own finder (see {@link mentionsByName}); an element is never changed in place. */
+const ownFinders = new WeakMap<Element, OwNameFinder<Element> | null>();
+
+/**
+ * Does `text` name this element by its name or an alias, as the hints read a
+ * name (the SDK's `nameFinder`, folded case, a word edge in every script)?
+ * Asked of the one element alone, so a name it shares with another still
+ * counts as its mention: the Featured badge, and whether an element is still
+ * mentioned after one chip of it is unlinked (its id leaves a link field only
+ * when no mention is left). Before, those three read an ASCII word edge with
+ * case as written: `Éowyn` was never found, `kira` never `Kira`.
+ */
+export function mentionsByName(el: Element, text: string): boolean {
+  if (text === '') return false;
+  let finder = ownFinders.get(el);
+  if (finder === undefined) {
+    const { names, holds } = finderNamesOf(el);
+    finder = holds ? nameFinder([el], { case: 'folded', names: () => names }) : null;
+    ownFinders.set(el, finder);
+  }
+  return finder !== null && finder(text).length > 0;
+}
+
 function makeAutolinkIndex(elements: readonly Element[]): AutolinkIndex {
   const scanned: Element[] = [];
   const namesOf = new Map<Element, string[]>();
   const ids = new Set<string>();
   for (const el of elements) {
     if (!el || typeof el.id !== 'string' || el.id === '' || UNSCANNED_TYPES.has(el.type)) continue;
-    const names: string[] = [];
-    let holds = false;
-    const add = (value: unknown): void => {
-      if (typeof value !== 'string') return;
-      const length = trimmedCodePoints(value);
-      if (length > MAX_NAME_CODE_POINTS) return;
-      names.push(value);
-      if (length >= FINDER_MIN_CODE_POINTS) holds = true;
-    };
-    add(el.name);
-    if (Array.isArray(el.atlas_aliases)) for (const alias of el.atlas_aliases) add(alias);
+    const { names, holds } = finderNamesOf(el);
     scanned.push(el);
     namesOf.set(el, names);
     if (holds) ids.add(el.id);

@@ -37,6 +37,7 @@ import type { Element } from '../core/types';
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
 import { forPointer } from '../core/pointer';
 import { lookupHeldId, proseNamesId } from '../core/ow-links';
+import { mentionsByName } from '../core/prose-autolink';
 
 export interface ProseContextMenuController {
   destroy(): void;
@@ -355,23 +356,10 @@ export function createProseContextMenu(deps: {
     const markdown = editorHandle.getMarkdown();
     const otherChipMatch = proseNamesId(markdown, targetEl.id, has);
 
-    // Text-mention scan: any of the element's surface forms (name + aliases)
-    // appearing as a word-bounded match in the prose-as-plain-text view.
+    // Text-mention scan: its name or an alias in the prose-as-plain-text
+    // view, as the hints read a name (`mentionsByName`).
     const plainText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n');
-    const surfaceForms: string[] = [];
-    if (targetEl.name) surfaceForms.push(targetEl.name);
-    if (Array.isArray(targetEl.atlas_aliases)) {
-      for (const a of targetEl.atlas_aliases) {
-        if (typeof a === 'string') surfaceForms.push(a);
-      }
-    }
-    let textMentionFound = false;
-    for (const form of surfaceForms) {
-      if (form.length < 2) continue;
-      const escaped = form.replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
-      const re = new RegExp('\\b' + escaped + '\\b');
-      if (re.test(plainText)) { textMentionFound = true; break; }
-    }
+    const textMentionFound = mentionsByName(targetEl, plainText);
 
     if (otherChipMatch || textMentionFound) return; // Still mentioned — leave the field alone.
 
