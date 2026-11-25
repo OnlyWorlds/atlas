@@ -478,7 +478,9 @@ describe('the claim, round two', () => {
         for (const e of errs) if (e !== null) expect(e).toBeInstanceOf(ELockHeld);
         expect(lockOf(root)!.web_lock).toBe(ss[errs.findIndex(e => e === null)].__debug_webLock());
       }
-    });
+      // Each round's losers wait out one claim (400 ms), and the jitter runs one claim at a time
+      // under the claim's own lock (2026-11-25): 12 to 17 s here, over the default 15.
+    }, 60_000);
   }
 
   it('two claimers of one dead name, started a moment apart: exactly one opens', async () => {
