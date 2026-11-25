@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.33',
+    date: '2026-11-25',
+    theme: 'A file nested too deep is left out; every tab row in one weight',
+    entries: [
+      {
+        id: 'file-depth-bound',
+        title: 'A file nested past 200 levels is left out and named',
+        body: 'An element file whose values nest more than 200 levels deep is now left out of the world and counted in the element list with the files that cannot be read, as the folder format says. Before, a very deep file could stop the whole world from opening. A world.json that cannot be read now says so, for its depth or because it is not JSON, instead of saying the folder has none.',
+        tags: ['fix'],
+      },
+      {
+        id: 'tabs-one-weight',
+        title: 'Every row of tabs in one weight',
+        body: 'The tabs above the right pane (Web, Maps and the rest), Home\'s Picture and Strand, and the Settings tabs are bold now, as the Worlds tabs are, so tabs side by side never draw two weights.',
+        tags: ['layout'],
+      },
+      {
+        id: 'start-here-once',
+        title: 'A reading aid\'s card says its name once',
+        body: 'On Home, a card\'s small label (Start here, This world\'s charter) is left out when the aid\'s own name already says it.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.125.32',
     date: '2026-11-25',
     theme: 'Button words in bold',
@@ -63,7 +88,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'lato-control-weights',
         title: 'Buttons, tabs and headings read in bold again',
-        body: 'The words on buttons, tabs, chips and the small links under them are bold, and so are section headings and bold words in a sentence, as in the design Atlas was drawn to. Names in a list and the labels beside a field stay regular, so a list reads calmly.',
+        body: 'Bold again, as in the design Atlas was drawn to: the words on main buttons such as Explore, the small links under them, the Worlds tabs, the chips on a list\'s rows, section headings and bold words in a sentence. Element names in search, in the knowledge room and in a card\'s context stay regular, as do the labels beside a field.',
         tags: ['layout'],
       },
     ],
@@ -89,7 +114,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'house-font-lato',
         title: 'Atlas is set in Lato, the OnlyWorlds face',
-        body: 'Every word in Atlas is now drawn in Lato, the face the OnlyWorlds site and tools share, in its regular, bold and black weights. Labels that were a little heavier than body text are now regular or bold. A published page and a map label keep the face they were given.',
+        body: 'Every word in Atlas is now drawn in Lato, the face the OnlyWorlds site and tools share, in its regular, bold and black weights. Labels that were a little heavier than body text are now regular or bold. A published page and a map label keep the face they were given. On Home, a story card\'s title always holds two lines, so a card keeps its size as the next one comes in.',
         tags: ['layout'],
       },
     ],

@@ -145,6 +145,7 @@ import {
   writeJsonAtomic,
   type FileStamp,
 } from './fs-utils';
+import { parseBounded } from './json-depth';
 
 const DEFAULT_META: WorldMeta = { id: '', name: '' };
 const DEFAULT_SYNC_STATE: SyncState = {
@@ -977,7 +978,7 @@ export class FsFolderStore implements FolderStore {
         try {
           const file = await files[i].handle.getFile();
           stamps[i] = { lastModified: file.lastModified, size: file.size };
-          bodies[i] = JSON.parse(await file.text()) as Element;
+          bodies[i] = parseBounded<Element>(await file.text()); // too deep is unreadable too (law 176)
         } catch {
           bodies[i] = null; // unreadable/corrupt — same null contract as readJson
         }
@@ -1521,7 +1522,7 @@ export class FsFolderStore implements FolderStore {
       throw err; // held open by another program: the slot retries next pass
     }
     try {
-      const elem = JSON.parse(text) as Element;
+      const elem = parseBounded<Element>(text);
       if (!elem || typeof elem.id !== 'string' || !elem.id) return null;
       if (typeof elem.type !== 'string' || !elem.type) elem.type = type;
       coerceForeignShapes(elem);

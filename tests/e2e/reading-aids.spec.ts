@@ -68,6 +68,9 @@ test.describe('the reading aids at the door and out of the lore', () => {
     const door = page.locator('[data-role="reading-aids"]');
     await expect(door.locator('[data-role="charter"]')).toContainText('House Rules');
     await expect(door.locator('[data-role="guide"]')).toContainText('Start Here');
+    // A card's small label is left out when the element's name already says it (1.125.33); a different name keeps it.
+    await expect(door.locator('[data-role="guide"] .atlas-home-charter-label')).toHaveCount(0);
+    await expect(door.locator('[data-role="charter"] .atlas-home-charter-label')).toHaveText("This world's charter");
     await expect(door.locator('[data-role="domains"]')).toContainText('The Docks · Where the boats come in.');
     await expect(door.locator('[data-role="domains"]')).not.toContainText('More here.');
     await expect(door.locator('[data-role="domains"]')).not.toContainText('The Market');

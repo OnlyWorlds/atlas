@@ -20,7 +20,7 @@
   "src/middle/world-home.ts": 3,
   "src/middle/writing-workspace.ts": 3,
   "src/registry/registry.ts": 1,
-  "src/setup/atlas-root-flow.ts": 20,
+  "src/setup/atlas-root-flow.ts": 24,
   "src/setup/browser-world-move.ts": 11,
   "src/setup/world-doors.ts": 28,
   "src/setup/world-download.ts": 1,

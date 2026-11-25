@@ -796,6 +796,9 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
   // A link alone, or after a label: its own name, or the unnamed form in the aid's word ("The unnamed charter").
   const nameOf = (el: { name?: unknown; type?: string }, word: string) => nameOrUnnamed({ name: el.name, type: el.type ?? 'law' }, { start: true, word });
   const link = (id: string, name: string, cls: string) => `<a class="${cls}" href="${escapeText(elementHash(worldId, id))}">${escapeText(name)}</a>`;
+  // A card's small label is left out when the element's own name already says it ("Start here" twice).
+  const label = (words: string, name: string) =>
+    name.trim().toLocaleLowerCase() === words.toLocaleLowerCase() ? '' : `<span class="atlas-home-charter-label">${words}</span>`;
   const block = document.createElement('div');
   block.className = 'atlas-home-aids';
   block.dataset.role = 'reading-aids';
@@ -803,7 +806,7 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
     const lead = charterLead(charter);
     block.insertAdjacentHTML('beforeend', `
       <div class="atlas-home-charter" data-role="charter">
-        <span class="atlas-home-charter-label">This world's charter</span>
+        ${label("This world's charter", nameOf(charter, 'charter'))}
         ${link(charter.id, nameOf(charter, 'charter'), 'atlas-home-charter-link')}
         ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
       </div>`);
@@ -812,7 +815,7 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
     const lead = charterLead(guide);
     block.insertAdjacentHTML('beforeend', `
       <div class="atlas-home-charter atlas-home-guide" data-role="guide">
-        <span class="atlas-home-charter-label">Start here</span>
+        ${label('Start here', nameOf(guide, 'guide'))}
         ${link(guide.id, nameOf(guide, 'guide'), 'atlas-home-charter-link')}
         ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
       </div>`);
