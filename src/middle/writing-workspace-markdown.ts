@@ -25,6 +25,16 @@ type ChipEscape = (label: string) => string;
 /** The chip escape Atlas wrote before 1.125.34: `]` alone, so a label holding `[` or a backslash was misread on reopen. */
 const OLD_CHIP_ESCAPE: ChipEscape = label => label.replace(/\]/g, '\\]');
 
+/** The chip escape of 1.125.34 and 1.125.35: `\`, `[` and `]`, so a label holding `](` or `<` was misread on reopen. */
+const ESCAPE_1125_34: ChipEscape = label => label.replace(/[\\[\]]/g, '\\$&');
+
+/**
+ * Every chip escape Atlas shipped before today's, newest first. A scene saved by any of them and not since
+ * holds that story byte for byte, and it is still Atlas's own save: add the old one here whenever
+ * `escapeLinkLabel` changes.
+ */
+const PAST_CHIP_ESCAPES: readonly ChipEscape[] = [ESCAPE_1125_34, OLD_CHIP_ESCAPE];
+
 interface SerializeContext {
   /** Track nested list depth for indentation. */
   listDepth: number;
@@ -32,15 +42,15 @@ interface SerializeContext {
   orderedCounters: number[];
   /** Buffer for the final markdown string. */
   out: string[];
-  /** A chip label's escape: `escapeLinkLabel` (`\`, `[` and `]`), or the old one. */
+  /** A chip label's escape: `escapeLinkLabel`, or one Atlas shipped before. */
   chipEscape: ChipEscape;
 }
 
 /**
- * A chip's label is written with `\`, `[` and `]` escaped (`escapeLinkLabel`,
- * 1.125.34), so the editor reads "Kira [the elder]" or "Kira\" back whole.
- * Nothing else changed in 1.125.34: the serializer before it is this one with
- * {@link OLD_CHIP_ESCAPE}.
+ * A chip's label is written escaped (`escapeLinkLabel`), so the editor reads
+ * "Kira [the elder]", "Kira\" or "[x](https://x.test)" back whole. Only the
+ * label's escape has changed since 1.125.33: the serializers before are this
+ * one with an escape from {@link PAST_CHIP_ESCAPES}.
  */
 export function serializeDocToMarkdown(doc: JSONContent): string {
   return serializeWith(doc, escapeLinkLabel);
@@ -55,30 +65,35 @@ export function serializeDocWithOldChipEscape(doc: JSONContent): string {
   return serializeWith(doc, OLD_CHIP_ESCAPE);
 }
 
-/** Does the doc hold a chip whose label the old escape wrote differently (one holding `[` or a backslash)? */
-function holdsOldEscapeChip(node: unknown): boolean {
+/** Does the doc hold a chip whose label `escape` wrote differently from today's escape? */
+function holdsChipEscapedOtherwise(node: unknown, escape: ChipEscape): boolean {
   if (!node || typeof node !== 'object') return false;
   const n = node as JSONContent;
   if ((n.type === 'elementChip' || n.type === 'mention') && n.attrs?.id) {
     const label = String(n.attrs.label ?? n.attrs.id);
-    if (escapeLinkLabel(label) !== OLD_CHIP_ESCAPE(label)) return true;
+    if (escapeLinkLabel(label) !== escape(label)) return true;
   }
-  return Array.isArray(n.content) && n.content.some(holdsOldEscapeChip);
+  return Array.isArray(n.content) && n.content.some(c => holdsChipEscapedOtherwise(c, escape));
 }
 
 /**
  * The story a reader draws or publishes, for a story kept beside its sidecar
  * (a scene, a knowledge entry, a page's prose block). When the story is the
- * sidecar as Atlas wrote it before 1.125.34 (a chip label holding `[` or a
- * backslash, escaped the old way), it is read as the sidecar written now, so
- * the compiled view, the knowledge room, the word count and a published page
- * draw the chip whole before the scene is saved again. Any other story is
+ * sidecar as an earlier Atlas wrote it (a chip label escaped by one of
+ * {@link PAST_CHIP_ESCAPES}, differently from today), it is read as the
+ * sidecar written now, so the compiled view, the knowledge room, the word
+ * count and a published page draw the chip whole before the scene is saved
+ * again, and `storyOutranksSidecar` keeps the sidecar. Any other story is
  * read as it is.
  */
 export function storyForReaders(story: string, sidecar: unknown): string {
-  if (typeof story !== 'string' || story === '' || !holdsOldEscapeChip(sidecar)) return story;
-  if (serializeDocWithOldChipEscape(sidecar as JSONContent) !== story) return story;
-  return serializeDocToMarkdown(sidecar as JSONContent);
+  if (typeof story !== 'string' || story === '') return story;
+  for (const escape of PAST_CHIP_ESCAPES) {
+    if (holdsChipEscapedOtherwise(sidecar, escape) && serializeWith(sidecar as JSONContent, escape) === story) {
+      return serializeDocToMarkdown(sidecar as JSONContent);
+    }
+  }
+  return story;
 }
 
 function serializeWith(doc: JSONContent, chipEscape: ChipEscape): string {

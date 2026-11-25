@@ -438,8 +438,9 @@ function renderInline(
   // below never has to read a held piece again.
   s = s.replace(/`([^`\n]+?)`/g, (_, code: string) => hold(`<code>${code.replace(HELD_RE, (_m, i: string) => held[Number(i)])}</code>`));
 
-  // `\[`, `\]` and `\\` in prose outside a link: their characters, as text.
-  s = s.replace(/\\([\\[\]])/g, (_, c: string) => hold(c));
+  // `\[`, `\]`, `\(`, `\)`, `\<` and `\\` in prose outside a link: their characters, as text (the
+  // prose is already HTML-escaped here, so `\<` reads `\&lt;`).
+  s = s.replace(/\\([\\[\]()]|&lt;)/g, (_, c: string) => hold(c));
 
   // Bold: **text**
   s = s.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');

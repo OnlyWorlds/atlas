@@ -57,8 +57,8 @@ export function markdownToPlainText(markdown: string): string {
   // Inline code — keep the code text, drop the backticks.
   s = s.replace(/`([^`\n]+?)`/g, (_, code: string) => hold(code));
 
-  // `\[`, `\]` and `\\` outside a link and a code span: their characters.
-  s = s.replace(/\\([\\[\]])/g, (_, c: string) => hold(c));
+  // `\[`, `\]`, `\(`, `\)`, `\<` and `\\` outside a link and a code span: their characters.
+  s = s.replace(/\\([\\[\]()<])/g, (_, c: string) => hold(c));
 
   // Emphasis markers. Bold before italic, as in the renderer.
   s = s.replace(/\*\*([^*]+?)\*\*/g, '$1');
