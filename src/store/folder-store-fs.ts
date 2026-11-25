@@ -622,55 +622,89 @@ export class FsFolderStore implements FolderStore {
     let asked = false;
     try {
       for (let round = 0; ; round++) {
-        const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
-        if (!existing) break;
-        const heartbeat = Date.parse(existing.last_heartbeat);
-        if (!(Number.isFinite(heartbeat) && Date.now() - heartbeat < LOCK_STALE_MS)) break;
-        // The name this claim holds is still the one the file names: its store is gone.
-        if (dead && existing.web_lock === dead.name) break;
-        const moving = existing.moving === true;
-        // A world another tab is moving to a folder is never taken while its
-        // mover lives, not even with the take-over consent: edits here would
-        // be lost when the browser copy goes (1.17).
-        if (this.opts.forceTakeLock && !moving) break;
-        if (this.opts.takeStaleLock === false) throw new ELockHeld(existing);
-        if (this.webLock && existing.web_lock && this.browserId && existing.browser_id === this.browserId) {
-          // Asked once already and not granted, and the file still names it live.
-          if (refused === existing.web_lock) throw new ELockHeld(existing);
-          // The file names another name now: start again on that one.
-          dead?.release();
-          dead = null;
-          if (round >= MAX_CLAIM_ROUNDS) throw new ELockHeld(existing);
-          if (!asked) { asked = true; this.opts.onOtherTabCheck?.(); }
-          dead = await this.askWebLock(existing.web_lock);
-          if (!dead) refused = existing.web_lock;
-          continue; // read the file again: holding the dead name, or after the wait
-        }
-        // The update reload: the new release reloads every open tab over the
-        // lock its old page wrote in the old shape (no `web_lock` key at all,
-        // no `browser_id`), of this very tab. Taken as the old release takes
-        // it, in silence, a moving one too (recovery ran before the open).
-        // This release's own nameless locks carry `web_lock: null`, so they
-        // stay refused below.
-        if (isOldReleaseLock(existing) && existing.tab_id === this.tabId) break;
-        // Never by a tab id match when either side names a Web Lock.
-        if (existing.web_lock || this.webLock) throw new ELockHeld(existing);
-        // Neither does (no Web Locks in this browser): the rule by tab id, a
-        // moving lock included (this tab's own move, after a reload).
-        if (existing.tab_id !== this.tabId) throw new ELockHeld(existing);
-        break;
+        // Each read that can end in a take, and the take's write, run under
+        // one Web Lock for every page of this browser: two pages that both
+        // read no lock (or a stale one) would otherwise both write their own
+        // and both keep the world (2026-11-25). It is let go before any wait on
+        // another page's name, so no claim waits behind that wait.
+        const ask = await this.underClaimMutex(async () => {
+          const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+          const take = existing ? this.decideOver(existing, dead, refused, round) : 'take';
+          if (take !== 'take') return take;
+          const fresh: LockPayload = {
+            tab_id: this.tabId,
+            ...(this.webLock && this.browserId ? { browser_id: this.browserId, web_lock: this.webLock.name } : { web_lock: null }),
+            started_at: this.clock(),
+            last_heartbeat: this.clock(),
+          };
+          await writeJsonAtomic(atlasDir, LOCK_FILE, fresh);
+          return null;
+        });
+        if (ask === null) return;
+        // The file names another name now: start again on that one.
+        dead?.release();
+        dead = null;
+        if (!asked) { asked = true; this.opts.onOtherTabCheck?.(); }
+        dead = await this.askWebLock(ask);
+        if (!dead) refused = ask;
+        // read the file again: holding the dead name, or after the wait
       }
-      const fresh: LockPayload = {
-        tab_id: this.tabId,
-        ...(this.webLock && this.browserId ? { browser_id: this.browserId, web_lock: this.webLock.name } : { web_lock: null }),
-        started_at: this.clock(),
-        last_heartbeat: this.clock(),
-      };
-      await writeJsonAtomic(atlasDir, LOCK_FILE, fresh);
     } finally {
       // Only now, the own lock written (or the claim refused), the dead name goes.
       dead?.release();
     }
+  }
+
+  /**
+   * One read of a live-or-stale lock file, decided: `'take'`, the Web Lock
+   * name to ask about, or `ELockHeld` thrown.
+   */
+  private decideOver(existing: LockPayload, dead: { name: string } | null, refused: string | null, round: number): 'take' | string {
+    const heartbeat = Date.parse(existing.last_heartbeat);
+    if (!(Number.isFinite(heartbeat) && Date.now() - heartbeat < LOCK_STALE_MS)) return 'take';
+    // The name this claim holds is still the one the file names: its store is gone.
+    if (dead && existing.web_lock === dead.name) return 'take';
+    const moving = existing.moving === true;
+    // A world another tab is moving to a folder is never taken while its
+    // mover lives, not even with the take-over consent: edits here would
+    // be lost when the browser copy goes (1.17).
+    if (this.opts.forceTakeLock && !moving) return 'take';
+    if (this.opts.takeStaleLock === false) throw new ELockHeld(existing);
+    if (this.webLock && existing.web_lock && this.browserId && existing.browser_id === this.browserId) {
+      // Asked once already and not granted, and the file still names it live.
+      if (refused === existing.web_lock) throw new ELockHeld(existing);
+      if (round >= MAX_CLAIM_ROUNDS) throw new ELockHeld(existing);
+      return existing.web_lock;
+    }
+    // The update reload: the new release reloads every open tab over the
+    // lock its old page wrote in the old shape (no `web_lock` key at all,
+    // no `browser_id`), of this very tab. Taken as the old release takes
+    // it, in silence, a moving one too (recovery ran before the open).
+    // This release's own nameless locks carry `web_lock: null`, so they
+    // stay refused below.
+    if (isOldReleaseLock(existing) && existing.tab_id === this.tabId) return 'take';
+    // Never by a tab id match when either side names a Web Lock.
+    if (existing.web_lock || this.webLock) throw new ELockHeld(existing);
+    // Neither does (no Web Locks in this browser): the rule by tab id, a
+    // moving lock included (this tab's own move, after a reload).
+    if (existing.tab_id !== this.tabId) throw new ELockHeld(existing);
+    return 'take';
+  }
+
+  /**
+   * `fn` under the claim's Web Lock (`atlas-lock-claim`), shared by every
+   * page of this browser. Without Web Locks it runs as it is. Its holder
+   * only reads and writes the lock file, but a write another program holds
+   * is retried for about two seconds, so the wait is three claim waits; not
+   * granted by then, the open fails, as a late own name does.
+   */
+  private async underClaimMutex<T>(fn: () => Promise<T>): Promise<T> {
+    const l = this.webLocks();
+    if (!l || !this.webLock) return fn();
+    const held = await requestHeldOrWhy(l, 'atlas-lock-claim', 3 * (this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS));
+    if (held === 'late') throw new PlainError(COULD_NOT_OPEN_NOW);
+    if (held === 'refused') return fn();
+    try { return await fn(); } finally { held.release(); }
   }
 
   /**
