@@ -241,6 +241,12 @@ export class FsFolderStore implements FolderStore {
    * release: a store that ever held one never owns a lock by its tab id.
    */
   private webLockName: string | null = null;
+  /**
+   * The Web Lock every page of this browser takes around each read and write
+   * of this world's lock file (`inLockSection`): one per world id, read from
+   * world.json at the claim; one for all where the folder names none.
+   */
+  private lockSectionName = 'atlas-lock-claim';
   private browserId: string | null;
 
   setViewOnly(viewOnly: boolean | 'copy'): void { this.viewOnly = viewOnly; }
@@ -452,10 +458,10 @@ export class FsFolderStore implements FolderStore {
         // (stale-TTL takeover) — deleting unconditionally would destroy the
         // OTHER tab's live lock (2026-07-19).
         if (atlasDir) {
-          await this.runLockOp(async () => {
+          await this.runLockOp(() => this.inLockSection(async () => {
             const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE).catch(() => null);
             if (this.ownsLock(lock)) await removeFile(atlasDir, LOCK_FILE);
-          });
+          }));
         }
       }
     } finally {
@@ -507,7 +513,7 @@ export class FsFolderStore implements FolderStore {
     // takeover is detected and forces the cold reopen. Best-effort.
     // On the lock chain: an unpark() right behind this waits for it,
     // instead of writing the same file through the same tmp at once.
-    void this.runLockOp(async () => {
+    void this.runLockOp(() => this.inLockSection(async () => {
       try {
         if (!this.root) return;
         const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
@@ -516,7 +522,7 @@ export class FsFolderStore implements FolderStore {
           await writeJsonAtomic(atlasDir, LOCK_FILE, { ...lock, last_heartbeat: new Date(0).toISOString() });
         }
       } catch { /* parked lock staling is best-effort */ }
-    });
+    }));
   }
 
   /**
@@ -532,7 +538,7 @@ export class FsFolderStore implements FolderStore {
   async unpark(): Promise<boolean> {
     if (!this.root) return false;
     const root = this.root;
-    const ours = await this.runLockOp(async () => {
+    const ours = await this.runLockOp(() => this.inLockSection(async () => {
       try {
         const atlasDir = await getDir(root, [ATLAS_INTERNAL_DIR]);
         const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE);
@@ -542,7 +548,7 @@ export class FsFolderStore implements FolderStore {
       } catch {
         return false;
       }
-    });
+    }));
     if (!ours) return false;
     if (!this.opts.disableHeartbeat && !this.heartbeatTimer) {
       this.heartbeatTimer = setInterval(() => {
@@ -570,7 +576,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   private setMovingMark(on: boolean): Promise<void> {
-    return this.runLockOp(async () => {
+    return this.runLockOp(() => this.inLockSection(async () => {
       const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
       const lock = await readJsonStrict<LockPayload>(atlasDir, LOCK_FILE);
       if (!this.ownsLock(lock)) {
@@ -579,7 +585,7 @@ export class FsFolderStore implements FolderStore {
       }
       const { moving: _was, ...rest } = lock;
       await writeJsonAtomic(atlasDir, LOCK_FILE, on ? { ...rest, moving: true, last_heartbeat: this.clock() } : { ...rest, last_heartbeat: this.clock() });
-    });
+    }));
   }
 
   // ---- Layout setup + lock ----
@@ -617,20 +623,22 @@ export class FsFolderStore implements FolderStore {
    */
   private async claimLock(): Promise<void> {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    const meta = await readJson<{ id?: unknown }>(this.requireRoot(), WORLD_META_FILE).catch(() => null);
+    this.lockSectionName = typeof meta?.id === 'string' && meta.id ? `atlas-lock-claim:${meta.id}` : 'atlas-lock-claim';
     let dead: { name: string; release: () => void } | null = null;
     let refused: string | null = null;
     let asked = false;
     try {
       for (let round = 0; ; round++) {
-        // Each read that can end in a take, and the take's write, run under
-        // one Web Lock for every page of this browser: two pages that both
+        // Each read that can end in a take, and the take's write, run in the
+        // lock section every page of this browser shares: two pages that both
         // read no lock (or a stale one) would otherwise both write their own
         // and both keep the world (2026-11-25). It is let go before any wait on
         // another page's name, so no claim waits behind that wait.
-        const ask = await this.underClaimMutex(async () => {
+        const ask = await this.inLockSection(async () => {
           const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
-          const take = existing ? this.decideOver(existing, dead, refused, round) : 'take';
-          if (take !== 'take') return take;
+          const decided = existing ? this.decideOver(existing, dead, refused, round) : { take: true as const };
+          if ('ask' in decided) return decided.ask;
           const fresh: LockPayload = {
             tab_id: this.tabId,
             ...(this.webLock && this.browserId ? { browser_id: this.browserId, web_lock: this.webLock.name } : { web_lock: null }),
@@ -656,25 +664,26 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * One read of a live-or-stale lock file, decided: `'take'`, the Web Lock
+   * One read of a live-or-stale lock file, decided: take it, the Web Lock
    * name to ask about, or `ELockHeld` thrown.
    */
-  private decideOver(existing: LockPayload, dead: { name: string } | null, refused: string | null, round: number): 'take' | string {
+  private decideOver(existing: LockPayload, dead: { name: string } | null, refused: string | null, round: number): { take: true } | { ask: string } {
+    const take = { take: true as const };
     const heartbeat = Date.parse(existing.last_heartbeat);
-    if (!(Number.isFinite(heartbeat) && Date.now() - heartbeat < LOCK_STALE_MS)) return 'take';
+    if (!(Number.isFinite(heartbeat) && Date.now() - heartbeat < LOCK_STALE_MS)) return take;
     // The name this claim holds is still the one the file names: its store is gone.
-    if (dead && existing.web_lock === dead.name) return 'take';
+    if (dead && existing.web_lock === dead.name) return take;
     const moving = existing.moving === true;
     // A world another tab is moving to a folder is never taken while its
     // mover lives, not even with the take-over consent: edits here would
     // be lost when the browser copy goes (1.17).
-    if (this.opts.forceTakeLock && !moving) return 'take';
+    if (this.opts.forceTakeLock && !moving) return take;
     if (this.opts.takeStaleLock === false) throw new ELockHeld(existing);
     if (this.webLock && existing.web_lock && this.browserId && existing.browser_id === this.browserId) {
       // Asked once already and not granted, and the file still names it live.
       if (refused === existing.web_lock) throw new ELockHeld(existing);
       if (round >= MAX_CLAIM_ROUNDS) throw new ELockHeld(existing);
-      return existing.web_lock;
+      return { ask: existing.web_lock };
     }
     // The update reload: the new release reloads every open tab over the
     // lock its old page wrote in the old shape (no `web_lock` key at all,
@@ -682,28 +691,35 @@ export class FsFolderStore implements FolderStore {
     // it, in silence, a moving one too (recovery ran before the open).
     // This release's own nameless locks carry `web_lock: null`, so they
     // stay refused below.
-    if (isOldReleaseLock(existing) && existing.tab_id === this.tabId) return 'take';
+    if (isOldReleaseLock(existing) && existing.tab_id === this.tabId) return take;
     // Never by a tab id match when either side names a Web Lock.
     if (existing.web_lock || this.webLock) throw new ELockHeld(existing);
     // Neither does (no Web Locks in this browser): the rule by tab id, a
     // moving lock included (this tab's own move, after a reload).
     if (existing.tab_id !== this.tabId) throw new ELockHeld(existing);
-    return 'take';
+    return take;
   }
 
   /**
-   * `fn` under the claim's Web Lock (`atlas-lock-claim`), shared by every
-   * page of this browser. Without Web Locks it runs as it is. Its holder
-   * only reads and writes the lock file, but a write another program holds
-   * is retried for about two seconds, so the wait is three claim waits; not
-   * granted by then, the open fails, as a late own name does.
+   * `fn`, a read of this world's lock file and the write it decides (a
+   * claim, a heartbeat, park, unpark, the move mark, the removal at close),
+   * in the lock section: a Web Lock every page of this browser takes for
+   * this world (`lockSectionName`), so no page writes between another's
+   * read and its write. Without Web Locks it runs as it is. Its holder only
+   * reads and writes one file, but a write another program holds is retried
+   * for about two seconds, so the wait is three claim waits; not granted by
+   * then, or refused, `fn` runs outside it, as before the section, said in
+   * the console: never a refusal the person did not cause.
    */
-  private async underClaimMutex<T>(fn: () => Promise<T>): Promise<T> {
+  private async inLockSection<T>(fn: () => Promise<T>): Promise<T> {
+    // A page that can keep no browser id asks no Web Lock at all (`webLocks`).
     const l = this.webLocks();
-    if (!l || !this.webLock) return fn();
-    const held = await requestHeldOrWhy(l, 'atlas-lock-claim', 3 * (this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS));
-    if (held === 'late') throw new PlainError(COULD_NOT_OPEN_NOW);
-    if (held === 'refused') return fn();
+    if (!l) return fn();
+    const held = await requestHeldOrWhy(l, this.lockSectionName, 3 * (this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS));
+    if (typeof held === 'string') {
+      console.warn(`[fs-folder-store] the lock section was ${held}; the lock file is read and written outside it`);
+      return fn();
+    }
     try { return await fn(); } finally { held.release(); }
   }
 
@@ -778,7 +794,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   private refreshHeartbeat(): Promise<void> {
-    return this.runLockOp(async () => {
+    return this.runLockOp(() => this.inLockSection(async () => {
       if (!this.root) return;
       const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
       // A lock another program holds for a moment (OneDrive, antivirus) is
@@ -799,7 +815,7 @@ export class FsFolderStore implements FolderStore {
         return;
       }
       await writeJsonAtomic(atlasDir, LOCK_FILE, { ...existing, last_heartbeat: this.clock() });
-    });
+    }));
   }
 
   private requireRoot(): FileSystemDirectoryHandle {

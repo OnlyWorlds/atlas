@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'two-tabs-one-claim',
         title: 'Two tabs opening one world at the same moment: one opens it, the other says why',
-        body: 'A world is open in one tab at a time, so two tabs never write one folder. When two tabs opened a world at the same moment and neither found it in use (its last tab closed, or long quiet), both could open it. Now the tabs of a browser take a world one at a time: the first opens it, the other says it is open in another tab.',
+        body: 'A world is meant to be open in one tab at a time, so that two tabs do not write one folder. When two tabs opened a world at the same moment and neither found it in use (its last tab closed, or long quiet), both could open it; so could a tab coming back to a world another tab was taking just then. Now the tabs of a browser read and mark a world\'s use one at a time: the first opens it, the other says it is open in another tab.',
         tags: ['folder', 'safety'],
       },
     ],
