@@ -41,6 +41,8 @@ describe('the house face', () => {
     '.atlas-btn-primary', '.atlas-btn-ghost.atlas-btn-danger','.atlas-mode-btn',
     '.atlas-room-tab', '.atlas-row-chip', '.atlas-pin-filter-chip', '.atlas-btn-link.atlas-landing-more-link',
     '.atlas-shortcuts-more > summary', '.atlas-home-section-title', '.atlas-detail-section-title',
+    // Every tab row one weight, as the Worlds pair (1.125.33).
+    '.atlas-tab', '.atlas-settings-tab', '.atlas-home-tab',
   ])("%s's word is 700", sel => {
     const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const block = CSS.match(new RegExp('(?:^|[}\\s])' + esc + '\\s*\\{([^}]*)\\}', 'm'));

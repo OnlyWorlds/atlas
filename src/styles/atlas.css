@@ -521,6 +521,7 @@ html {
   cursor: pointer;
   color: var(--atlas-text-soft);
   font-size: 12px;
+  font-weight: 700; /* every tab row draws one weight (1.125.33) */
   font-family: inherit;
   background: transparent;
   border: none;
@@ -5707,6 +5708,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-align: left;
   padding: 8px 18px;
   font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
   border-left: 2px solid transparent;
@@ -18469,7 +18471,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 /* The world's strand (home-strand.ts, strand-offer.ts, context-strand-frame.ts). The kind's colour is its
    family's (--type-color, set from ELEMENT_TYPE_COLORS as the grid sets it); every other colour is a token. */
 .atlas-home-tabs { display: inline-flex; align-self: flex-start; width: fit-content; gap: 2px; margin: 24px 0 0; padding: 2px; border: 1px solid var(--atlas-divider-strong); border-radius: 8px; background: var(--atlas-bg-panel); }
-.atlas-home-tab { min-height: 30px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--atlas-text-soft); font: inherit; font-size: 0.86rem; cursor: pointer; }
+.atlas-home-tab { min-height: 30px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--atlas-text-soft); font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer; }
 .atlas-home-tab:hover { color: var(--atlas-text); background: var(--atlas-bg-hover); }
 .atlas-home-tab[aria-selected="true"] { color: var(--atlas-text); background: var(--atlas-row-selected); }
 .atlas-home-tab:focus-visible { outline: 2px solid var(--atlas-accent); outline-offset: 1px; }
