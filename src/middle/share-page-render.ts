@@ -29,6 +29,7 @@ import {
 } from '../core/share-payload';
 import type { ProseRenderOptions } from './writing-compiled';
 import { renderProseFragment } from './writing-compiled';
+import { storyForReaders } from './writing-workspace-markdown';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { humanizeFieldName } from './element-detail-fields';
 import { escapeText } from '../core/dom-utils';
@@ -663,7 +664,8 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       return h;
     }
     case 'prose':
-      return renderProseFragment(block.markdown, elements);
+      // A block saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
+      return renderProseFragment(storyForReaders(block.markdown, block.richtextJson), elements);
     case 'element-card':
       return renderElementCard(block, elements);
     case 'collection':
@@ -837,7 +839,12 @@ function renderPayloadFieldValue(
     }
     return wrap;
   }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (typeof value === 'string') {
+    // A field's text as written: a plain field is not Markdown, so a typed `\\` or `\[` stays (1.125.34's code gate S1).
+    wrap.textContent = value;
+    return wrap;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
     wrap.textContent = String(value);
     return wrap;
   }

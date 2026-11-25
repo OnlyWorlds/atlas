@@ -41,7 +41,7 @@ import { currentLore } from '../core/parlor-room';
  * when `story` outranks it (an outside edit), transform `story` and drop the
  * stale sidecar; with no sidecar, `story` alone, as before.
  */
-async function authoritativeHalf(story: string, sidecar: unknown): Promise<'sidecar' | 'story'> {
+export async function authoritativeHalf(story: string, sidecar: unknown): Promise<'sidecar' | 'story'> {
   if (!sidecar) return 'story';
   if (serializeDocToMarkdown(sidecar as JSONContent) === story) return 'sidecar';
   const { storyOutranksSidecar } = await import('./story-sidecar');

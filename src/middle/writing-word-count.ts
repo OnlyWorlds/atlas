@@ -14,6 +14,8 @@
  * in, because a linked name is a word on the page.
  */
 
+import { markdownLinkSpans, unescapeLinkLabel } from '../core/markdown-link-label';
+
 /**
  * Count words in already-plain text. Whitespace-delimited, empty is zero.
  */
@@ -33,15 +35,30 @@ export function countWords(text: string): number {
  */
 export function markdownToPlainText(markdown: string): string {
   if (!markdown) return '';
-  let s = markdown;
+  // A piece already read (a link's label, a code span, an unescaped
+  // character) is held, so no later pass reads it, as in the renderer.
+  const held: string[] = [];
+  const hold = (text: string): string => `\uE000${held.push(text) - 1}\uE001`;
+  // The two marks are private characters; one in the text is read as another character (never a space).
+  let s = markdown.replace(/[\uE000\uE001]/g, '\uFFFD');
 
-  // Links, ow:// chips included — keep the label, drop the target. Matched
-  // before anything else, for the same reason renderInline matches them first:
-  // a target can contain characters the emphasis rules would otherwise chew.
-  s = s.replace(/\[([^\]]+?)\]\([^)\s]*?\)/g, '$1');
+  // Links, ow:// chips included — keep the label, drop the target. Taken by
+  // the grammar before anything else, as renderInline takes them (1.125.34): a
+  // target can contain characters the emphasis rules would otherwise chew,
+  // and the label is read unescaped.
+  let linked = '';
+  let last = 0;
+  for (const l of markdownLinkSpans(s)) {
+    linked += s.slice(last, l.start) + hold(unescapeLinkLabel(s.slice(l.labelStart, l.labelEnd)));
+    last = l.end;
+  }
+  s = linked + s.slice(last);
 
   // Inline code — keep the code text, drop the backticks.
-  s = s.replace(/`([^`\n]+?)`/g, '$1');
+  s = s.replace(/`([^`\n]+?)`/g, (_, code: string) => hold(code));
+
+  // `\[`, `\]` and `\\` outside a link and a code span: their characters.
+  s = s.replace(/\\([\\[\]])/g, (_, c: string) => hold(c));
 
   // Emphasis markers. Bold before italic, as in the renderer.
   s = s.replace(/\*\*([^*]+?)\*\*/g, '$1');
@@ -57,7 +74,7 @@ export function markdownToPlainText(markdown: string): string {
       .replace(/^\s*\d+\.\s+/, '');                        // ordered marker
   });
 
-  return lines.join('\n');
+  return lines.join('\n').replace(/\uE000(\d+)\uE001/g, (_, i: string) => held[Number(i)]);
 }
 
 /** Count words in stored prose markdown, as a reader sees it. */

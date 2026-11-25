@@ -35,6 +35,8 @@ import { knowledgeHeldBy } from './knowledge';
 import { handsOnAsProposed } from './review-mark';
 import { isHiddenMark } from './hidden-mark';
 import { findAddresses, findLooseAddressRuns, isPrefixAlone, namedId, plainRunId } from './ow-links';
+import { labelOpeners } from './markdown-link-label';
+import { storyForReaders } from '../middle/writing-workspace-markdown';
 // Pure shape/geometry helpers (no DOM) — one resolver for zone shape across
 // canvas, builder, and payload; the tabs/right location is historical.
 import { getZoneShape } from '../tabs/right/zone-derived';
@@ -228,25 +230,17 @@ function handIdsOf(held: Map<string, Element>): HandIds {
 }
 
 /**
- * Where a link's label opens, for the `](` at `open`: the `[` that matches
- * its `]`, nested brackets counted (`[a [b] c]`); with none (`[a]b]`), the
- * nearest `[`. Never before `floor` (text already written out) and never
- * across a blank line; -1 when there is none.
+ * Where a link's label opens, for the `](` at `open`: the `[` the link
+ * grammar pairs with its `]` (`labelOpeners`, 1.125.34: an escaped `[` opens no
+ * label, nested brackets are counted, a label never crosses a blank line and
+ * holds no link), or -1 when it pairs with none, so no prose before it is
+ * eaten. Never before `floor` (text already written out). The pairing does not
+ * ask how the target reads, so a target the grammar would not read whole (a
+ * hand id holding a space) still finds its label.
  */
-function labelStartBefore(md: string, open: number, floor: number): number {
-  let depth = 0;
-  let nearest = -1;
-  for (let k = open - 1; k >= floor; k--) {
-    const c = md[k];
-    if (c === '\n' && md[k - 1] === '\n') break;
-    if (c === ']') depth++;
-    else if (c === '[') {
-      if (nearest === -1) nearest = k;
-      if (depth === 0) return k;
-      depth--;
-    }
-  }
-  return nearest;
+function labelStartBefore(openerOf: (close: number) => number, open: number, floor: number): number {
+  const start = openerOf(open);
+  return start >= floor ? start : -1;
 }
 
 /**
@@ -354,16 +348,18 @@ export function scrubMarkdownForPayload(
     return nextClose + 1 - from;
   };
 
+  const openerOf = labelOpeners(markdown);
   let out = '';
   let last = 0;
   for (const sp of merged) {
     if (sp.start < last) continue; // inside a markdown link already replaced
     // `[label](…)` (an href in angle brackets too): the whole link becomes its
-    // label. The href may go on past the span (a query, a fragment, a closing
-    // `>`, a title in "…", '…' or (…)) up to its `)`.
+    // label, as written (a reader draws its escapes). The href may go on past
+    // the span (a query, a fragment, a closing `>`, a title in "…", '…' or
+    // (…)) up to its `)`.
     const angle = markdown.slice(sp.start - 3, sp.start) === '](<';
     const open = angle ? sp.start - 3 : (markdown.slice(sp.start - 2, sp.start) === '](' ? sp.start - 2 : -1);
-    const labelStart = open !== -1 ? labelStartBefore(markdown, open, last) : -1;
+    const labelStart = open !== -1 ? labelStartBefore(openerOf, open, last) : -1;
     LINK_CLOSE.lastIndex = sp.end;
     const close = labelStart !== -1 ? LINK_CLOSE.exec(markdown) : null;
     const closeLength = close ? close[0].length : (labelStart !== -1 && handIds === 2 ? wideCloseLength(sp.end) : -1);
@@ -784,7 +780,8 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   // same way) — the published page never re-resolves.
   const payloadBlocks: PayloadBlock[] = blocks.map((b): PayloadBlock | null => {
     if (b.kind === 'prose') {
-      return { id: b.id, kind: 'prose', markdown: scrubMarkdownForPayload(b.markdown, includedIds, held) };
+      // A block saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
+      return { id: b.id, kind: 'prose', markdown: scrubMarkdownForPayload(storyForReaders(b.markdown, b.richtextJson), includedIds, held) };
     }
     if (b.kind === 'circle') {
       const frozen = freezeCircleBlock(b, elements, byId);
@@ -864,7 +861,9 @@ export function projectElementEntry(
       // Field text is public wire too. Scrub every ow:// link
       // to its label (empty included set: cards render fields as plain text,
       // so no link survives, disclosed or not).
-      entry.fields[field] = typeof raw === 'string' ? scrubMarkdownForPayload(raw, NO_IDS, held) : raw;
+      // A scene's story saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
+      const text = typeof raw === 'string' && field === 'story' ? storyForReaders(raw, rec.atlas_richtext_json) : raw;
+      entry.fields[field] = typeof text === 'string' ? scrubMarkdownForPayload(text, NO_IDS, held) : text;
       continue;
     }
     const rawIds = kind === 'single' ? [raw] : (Array.isArray(raw) ? raw : []);
@@ -1036,8 +1035,10 @@ export function freezeCircleBlock(
     knowerType: knower.type,
     entries: held.map(entry => ({
       title: nameOrUnnamed(entry, { start: true, word: 'entry' }),
+      // An entry saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
       markdown: typeof (entry as Record<string, unknown>).story === 'string'
-        ? (entry as Record<string, unknown>).story as string : '',
+        ? storyForReaders((entry as Record<string, unknown>).story as string, (entry as Record<string, unknown>).atlas_richtext_json)
+        : '',
     })),
   };
 }

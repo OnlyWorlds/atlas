@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.34',
+    date: '2026-11-25',
+    theme: 'A link whose name holds a bracket or a backslash comes back whole',
+    entries: [
+      {
+        id: 'link-label-escape',
+        title: 'A link named with a bracket or a backslash comes back whole',
+        body: 'A link whose name holds a square bracket or a backslash, such as "Kira [the elder]", is now saved so it reopens as the same link and is drawn as its name in the compiled view, the knowledge room and on a published page. Link to element in the find bar writes such a name the same way, and no link is ever written inside another link.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'backslash-drawn-once',
+        title: 'A typed backslash or bracket is drawn once on a page',
+        body: 'Text you typed with a backslash, such as C:\\Users, is drawn with one backslash in the compiled view and on a published page, as in the editor. A page published before this release that holds such a link draws it right once you publish it again.',
+        tags: ['sharing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.33',
     date: '2026-11-25',
     theme: 'A file nested too deep is left out; every tab row in one weight',

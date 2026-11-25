@@ -39,6 +39,7 @@ import {
 import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writing-workspace-derive';
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
+import { storyForReaders } from './writing-workspace-markdown';
 import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
 import { capitalise, missingLabel, nameOrUnnamed, openWords, ownName, quotedName, theUnnamed, typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
@@ -1106,8 +1107,10 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           if (!aboutIdsOf(entry).includes(el.id)) continue;
           const quote = document.createElement('div');
           quote.className = 'atlas-knowledge-known-quote';
+          // An entry saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
           const story = typeof (entry as Record<string, unknown>).story === 'string'
-            ? (entry as Record<string, unknown>).story as string : '';
+            ? storyForReaders((entry as Record<string, unknown>).story as string, (entry as Record<string, unknown>).atlas_richtext_json)
+            : '';
           // Entry text is markdown with ow:// mentions — render it (chips for
           // mentions), never the raw `[Name](ow://…)` source (audit 239 #1).
           if (story.trim()) {
