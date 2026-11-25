@@ -419,7 +419,7 @@ function renderInline(
       return `<span class="atlas-element-chip" data-id="${el?.id ?? link.id}" data-type="${link.type}">${text}</span>`;
     }
     if (!SAFE_LINK_HREF_RE.test(url)) return text;
-    return `<a href="${escapeText(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    return `<a href="${escapeProse(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   };
   let s = '';
   let last = 0;
@@ -434,7 +434,9 @@ function renderInline(
   // collide with surrounding emphasis, and before the prose's escapes, so
   // nothing in a code span is unescaped. `code` is already escaped
   // (re-escaping would double-escape: `<` would render as the text "&lt;").
-  s = s.replace(/`([^`\n]+?)`/g, (_, code) => hold(`<code>${code}</code>`));
+  // A link held inside the span is put back here, once, so the last step
+  // below never has to read a held piece again.
+  s = s.replace(/`([^`\n]+?)`/g, (_, code: string) => hold(`<code>${code.replace(HELD_RE, (_m, i: string) => held[Number(i)])}</code>`));
 
   // `\[`, `\]` and `\\` in prose outside a link: their characters, as text.
   s = s.replace(/\\([\\[\]])/g, (_, c: string) => hold(c));
@@ -447,9 +449,10 @@ function renderInline(
   // because we work line-by-line at the block boundary.
   s = s.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
 
-  // The held pieces back in, a code span's held links inside it included.
-  const restore = (text: string): string => text.replace(HELD_RE, (_, i: string) => restore(held[Number(i)]));
-  return restore(s);
+  // The held pieces back in, in one pass that never reads what it puts in:
+  // an author's text that spells a marker inside a piece (a link's address)
+  // stays inert there, and cannot paste a piece into an attribute.
+  return s.replace(HELD_RE, (_, i: string) => held[Number(i)] ?? '');
 }
 
 /** Renderable link schemes — anything else renders as plain text. */

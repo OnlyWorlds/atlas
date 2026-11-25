@@ -138,6 +138,8 @@ describe('done when 2: a scene saved before 1.125.34 opens and publishes from it
     expect(drawn.textContent).toBe('Kira [the elder] met [Ki]ra]() and Kira\\ left.');
   });
 
+  // A card draws a field's text as written, Markdown marks and all (the code gate's S1: a plain field is not
+  // Markdown, so nothing in it is unescaped); the story it holds is the sidecar written now.
   it('a full card of the scene: its story field reads the sidecar as written now, drawn as text', () => {
     const SCENE = 'd1000000-0000-0000-0000-000000000001';
     const elements = [
@@ -152,7 +154,7 @@ describe('done when 2: a scene saved before 1.125.34 opens and publishes from it
     expect(JSON.stringify(payload)).not.toContain(ID);
     const drawn = renderPayloadCard(payload.blocks[0] as ElementCardBlock, payload.elements);
     expect(drawn.querySelector('.atlas-share-card-field-value')?.textContent)
-      .toBe('Kira [the elder] met [Ki]ra]() and Kira\\ left.');
+      .toBe('Kira \\[the elder\\] met [Ki]ra]() and Kira\\\\ left.');
   });
 
   it('the compiled view and its word count read the sidecar as written now', () => {
@@ -265,5 +267,20 @@ describe('done when 4: the drawing readers draw a label as its text', () => {
   it('a web link whose text holds an escaped bracket draws it unescaped', () => {
     const drawn = renderProseFragment('see [a \\[b\\]](https://x.test) here', onPage);
     expect(drawn.querySelector('a')?.textContent).toBe('a [b]');
+  });
+
+  // The code gate's M1: an author's text that spells the renderer's held-piece marker (U+E000 n U+E001)
+  // must never paste a drawn piece into an attribute, nor make the render throw.
+  it('a forged marker in a link address stays inert: no handler attribute, no throw', () => {
+    const M0 = '\uE0000\uE001';
+    const md = `[a](https://a.test/onmouseover=alert(document.domain)//) and [b](https://b.test/${M0})`;
+    for (const mode of ['chip', 'text'] as const) {
+      const drawn = renderProseFragment(md, onPage, { unresolved: mode });
+      const anchors = [...drawn.querySelectorAll('a')];
+      expect(anchors.length).toBe(2);
+      for (const a of anchors) expect([...a.attributes].map(x => x.name).sort()).toEqual(['href', 'rel', 'target']);
+    }
+    expect(() => renderProseFragment(`[b](https://b.test/${M0})`, onPage)).not.toThrow();
+    expect(() => renderProseFragment(`\`x\` and [b](https://b.test/${M0})`, onPage)).not.toThrow();
   });
 });

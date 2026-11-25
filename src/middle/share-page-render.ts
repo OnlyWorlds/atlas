@@ -30,7 +30,6 @@ import {
 import type { ProseRenderOptions } from './writing-compiled';
 import { renderProseFragment } from './writing-compiled';
 import { storyForReaders } from './writing-workspace-markdown';
-import { unescapeLinkLabel } from '../core/markdown-link-label';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { humanizeFieldName } from './element-detail-fields';
 import { escapeText } from '../core/dom-utils';
@@ -841,9 +840,8 @@ function renderPayloadFieldValue(
     return wrap;
   }
   if (typeof value === 'string') {
-    // The scrub turned each link in the text into its label as written; drawn as text, `\[`, `\]` and `\\` read
-    // as `[`, `]` and `\` (1.125.34).
-    wrap.textContent = unescapeLinkLabel(value);
+    // A field's text as written: a plain field is not Markdown, so a typed `\\` or `\[` stays (1.125.34's code gate S1).
+    wrap.textContent = value;
     return wrap;
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
