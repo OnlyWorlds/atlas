@@ -18,7 +18,8 @@
  *       timeline in [Charts]." (its place there). It changes words, and goes on its × only.
  *     Location: no map in view, "[Create a map] to pin it in place." (the Maps panel's own New map
  *       dialog, nothing filled in); a map, "[Pin it on a map]." (the map `mapFor` names, opened with the
- *       location's page, whose header offers +pin; on a narrow window the right drawer); gone once a
+ *       location's page, the pin readied as +pin readies it, so the next press on the map places it;
+ *       on a narrow window the right drawer); gone once a
  *       settled pin places it on a map in view.
  *     Where they are now: no line.
  *
@@ -47,7 +48,8 @@ import { isProposed } from '../core/review-mark';
 import { isKnownOf } from '../sync/known-of';
 import { spatialMapOf, spatialOtherOf } from '../core/world-links';
 import type { StrandSlot } from '../core/strand';
-import { getState } from '../core/state';
+import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { lineKey, linesOf, noteStrandLine, strandLine, type LineFacts, type LineLink } from '../core/strand-lines';
 import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { getTierForNarrative, getWritingLabels, isWritingInitialized } from './writing-helpers';
@@ -233,7 +235,8 @@ export function buildStrandLine(slot: StrandSlot, el: Element, c: StrandContext,
  * The map acts a location's line and its box share. Create a map: the Maps panel's own New map dialog,
  * nothing filled in; once it made a map, the focus goes to `then` (the control that now pins it: the
  * code gate's C2), else the dialog puts it back itself. Pin it on a map: `mapFor`'s map with the
- * location's page (the drawer on a narrow window). Neither writes anything of its own.
+ * location's page (the drawer on a narrow window), the pin readied there when the place has none on it.
+ * Neither writes the world.
  */
 function mapAct(kind: 'create-map' | 'pin-map', el: Element, c: StrandContext, then: string, redraw: () => void): void {
   if (kind === 'create-map') {
@@ -245,8 +248,35 @@ function mapAct(kind: 'create-map' | 'pin-map', el: Element, c: StrandContext, t
     return;
   }
   const map = mapFor(el.id, c.byId.values());
-  if (map) navigateWithMap(mapHash(c.worldId, map.id, el.id));
+  if (!map) return;
+  navigateWithMap(mapHash(c.worldId, map.id, el.id));
+  // "Pin it" readies the pin, as the page's pin button does: the next press on the map places it. On its
+  // own the link placed nothing and said not how, and on a narrow window the map drawer covers that button.
+  // A place already pinned on this map is not readied again (one pin per element and map).
+  if (map.pinned || worldIsViewOnly()) return;
+  readied?.abort(); // a press before: its placement is replaced, its watch goes with it
+  const placement = { elementId: el.id };
+  patchSlice('ui', { ...getState().ui, pinPlacement: placement });
+  // Readied here, it is let go when the address leaves this map and place (Back, another page) or the
+  // window loses focus (another app may edit the folder): an armed placement keeps the crosshair, and a
+  // folder world notices no outside edit while one is armed (the 1.121.0 contract gate's G10, why this
+  // act once never readied). Only this press's own placement object is let go, never one armed since by
+  // +pin. A re-key moves an armed placement to the new id as a new object (rekey-run.ts), so that one is
+  // left armed as +pin's is after a re-key: the banner's Cancel and Esc let it go.
+  const at = mapHash(c.worldId, map.id, el.id);
+  const watch = new AbortController();
+  readied = watch;
+  const letGo = (): void => {
+    watch.abort();
+    if (readied === watch) readied = null;
+    if (getState().ui.pinPlacement === placement) patchSlice('ui', { ...getState().ui, pinPlacement: null });
+  };
+  window.addEventListener('hashchange', () => { if (window.location.hash !== at) letGo(); }, { signal: watch.signal });
+  window.addEventListener('blur', letGo, { signal: watch.signal });
 }
+
+/** The watch on the placement Pin it on a map readied last, until it is let go. */
+let readied: AbortController | null = null;
 
 /**
  * A link inside a line: navigation (the element's page as its box's title opens it, the writing room

@@ -13177,8 +13177,38 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 .atlas-share-block-add {
   display: flex;
+  flex-wrap: wrap; /* on a phone the seven run past the edge, out of reach */
   gap: 8px;
   margin-top: 8px;
+}
+
+/* A page's header is one 36 px band (.atlas-middle-header). Its actions with
+   their words take about 540 px before the page's name gets any: on a phone
+   Publish and Delete sat past the edge, where no tap reaches, and in a laptop's
+   middle pane under 600 px (both side panes open) the name shrank to a letter.
+   There the words step out of sight and stay the buttons' names for a screen
+   reader; each keeps its title. The room's own width decides, not the window's
+   (measured 2026-11-24: the header is 571 px at a 1120 px window, 653 at 1280). */
+.atlas-share-room {
+  container: share-room / inline-size;
+}
+@container share-room (max-width: 600px) {
+  .atlas-share-detail-header {
+    gap: 4px;
+  }
+  .atlas-share-detail-header .atlas-share-action-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* An icon alone needs no side room; the page's name gets it. */
+  .atlas-share-detail-header .atlas-share-preview-toggle {
+    padding: 4px 6px;
+    gap: 0;
+  }
 }
 
 .atlas-share-block-add-btn {

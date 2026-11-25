@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.23',
+    date: '2026-11-24',
+    theme: 'Pages on a phone, and Full page draws its icons',
+    entries: [
+      {
+        id: 'pin-it-readies-the-pin',
+        title: 'Pin it on a map gets the pin ready, so the next press on the map places it',
+        body: 'On Home\'s Strand tab, Pin it on a map opened the map beside the place\'s page and placed nothing; the way on was a small pin button by the place\'s name, which on a phone sits under the map. It now readies the pin as that button does: the map says "Click the map to place" and the place\'s name, and one press or tap on the map puts it there. Cancel or Esc stops it, and leaving the map lets it go.',
+        tags: ['home', 'maps', 'onboarding'],
+      },
+      {
+        id: 'page-actions-on-a-phone',
+        title: 'On a phone, Publish and every other page action can be pressed',
+        body: 'On a narrow screen the row above a page ran past the edge, so Publish and Delete could not be reached. Where the page has little room, as on a phone, its buttons now show their icons alone and keep their names for a screen reader and on hover, so the page\'s name has room too, and the buttons that add a block wrap onto more lines.',
+        tags: ['pages', 'layout', 'fix'],
+      },
+      {
+        id: 'full-page-icons',
+        title: 'Full page shows a card\'s icon, and the page\'s own font',
+        body: 'In Pages, Full page opens the page in a tab of its own. That tab could not find Atlas\'s icon and text fonts, so a card\'s person icon showed as the letters "pe" and the text fell back to another font. It now loads both, in every browser.',
+        tags: ['pages', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.22',
     date: '2026-11-24',
     theme: 'The + says what it makes',
