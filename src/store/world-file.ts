@@ -22,6 +22,7 @@
 import { readWorldFile, writeWorldFile, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
 import { unzipSync } from 'fflate';
 import { PlainError } from '../core/plain-error';
+import { FILE_MAX_DEPTH, tooDeep } from './json-depth';
 import { ATLAS_INTERNAL_DIR, FOLDER_FORMAT_VERSION } from '../core/constants';
 import { withProvenance, type ExportedAs, type WorldSource } from '../core/provenance';
 import { isTransientPath, walkWorld, worldFileName, WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES } from './world-tree';
@@ -214,6 +215,9 @@ export function leftOutRecords(files: WorldFileEntry[], zip: Uint8Array): string
   return [...had].filter(p => !kept.has(p)).sort();
 }
 
+/** A world file whose world.json nests past the folder format's bound (serial 148), refused as a folder's is. */
+export const TOO_DEEP_WORLD = `The world.json in that world file is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it.`;
+
 /** Each of the SDK's refusals, in Atlas's words. */
 // 'name_case' is listed ahead of the pin that adds it, so the bump typechecks the day it lands.
 const REFUSALS: Record<OwWorldFileReason | 'name_case', string> = {
@@ -276,6 +280,10 @@ export function readWorldZip(
     const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);
     if (rest.includes('/') && isTransientPath(`${ATLAS_INTERNAL_DIR}/${rest.split('/')[0]}`)) throw new PlainError(NOT_OPENABLE);
   }
+  // The SDK parses world.json at any depth; a folder's world.json past the bound is refused at its open, so a
+  // file's is refused here, before anything lands (it used to land as a world that would never open).
+  const worldJson = read.files.find(f => f.path === WORLD_FILE);
+  if (worldJson && tooDeep(new TextDecoder().decode(worldJson.data))) throw new PlainError(TOO_DEEP_WORLD);
   // `demo: true` is this browser's mark for the tour's sandbox, never a world's
   // own: Atlas writes no file from the tour world, so a file carrying it is a
   // tour folder zipped by hand. It opens as a world of the person's own, the
