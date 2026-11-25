@@ -24,6 +24,7 @@
 import { nameFinder, trimAndFold, type OwNameFinder } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { findOwLinks, isChipLink, namedId, owLinkHref, readOwHref } from './ow-links';
+import { labelFromSpan, markdownLinkSpans, splitsEscape } from './markdown-link-label';
 
 /**
  * The shortest name or alias `mentionTermsFor` lists (the `terms` of an
@@ -329,16 +330,18 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
 
   const replacements: Array<{ from: number; to: number; cand: AutolinkCandidate; label: string }> = [];
   const proposed = new Set<string>();
+  const passedOver = markdownPassesOver(story);
   for (const { start, end, candidate: cand } of index.find(story)) {
     if (only && cand.id !== only) continue;
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
     const label = promotionLabel(story.slice(start, end), cand);
-    // A label holding `[`, `]` or a backslash is written into a link that
-    // `unlinkMarkdown` cannot read back (and a trailing backslash escapes the
-    // closing bracket), and a link right after `!` reads as an image, so this
-    // markdown path passes such a mention over and leaves its text as it was.
-    // The open editor links it through rich text.
-    if (markdownCannotLinkAt(story, start, end)) continue;
+    // A label holding `[`, `]` or a backslash is passed over on this markdown
+    // path (the stop-gap of 1.125.17, kept until the markdown writers escape
+    // too), and a link right after `!` reads as an image, so such a mention's
+    // text stays as it was; the open editor links it through rich text. A
+    // mention inside a link the grammar reads, or splitting an escape, is no
+    // place for a link at all (1.125.34).
+    if (markdownCannotLinkAt(story, start, end) || passedOver(start, end)) continue;
     proposed.add(cand.id);
     replacements.push({ from: start, to: end, cand, label });
   }
@@ -361,17 +364,21 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
  */
 export function unlinkMarkdown(story: string): { story: string; unlinked: number } {
   if (!story) return { story, unlinked: 0 };
-  // A label holds no bracket (`autolinkMarkdown` writes none), so an unmatched `[` earlier in the text is never
-  // read as the start of the link and stays where it was.
-  const re = /\[([^[\]]*)\]\(([^)\s]*)\)/g;
+  // Links are taken by the grammar (`markdownLinkSpans`): an escaped `[` opens
+  // none, and a stray `[` earlier in the text stays where it was. The label's
+  // bytes are written back as they are, escapes kept: `Kira \[the elder\]` is
+  // prose the editor reads as "Kira [the elder]".
   let n = 0;
-  const out = story.replace(re, (all, label: string, href: string) => {
-    const link = readOwHref(href);
-    if (!link || !isChipLink(link)) return all;
+  let out = '';
+  let last = 0;
+  for (const l of markdownLinkSpans(story)) {
+    const link = readOwHref(story.slice(l.destStart, l.destEnd));
+    if (!link || !isChipLink(link)) continue;
     n++;
-    return label;
-  });
-  return { story: out, unlinked: n };
+    out += story.slice(last, l.start) + story.slice(l.labelStart, l.labelEnd);
+    last = l.end;
+  }
+  return n === 0 ? { story, unlinked: 0 } : { story: out + story.slice(last), unlinked: n };
 }
 
 // ---------------------------------------------------------------------------
@@ -580,35 +587,49 @@ export function termSpans(term: string | readonly string[], opts: TermMatchOptio
 }
 
 export interface MarkdownSpanOptions {
-  /** Drop a span that overlaps an existing `[..](..)` link (the term source; a name finder passes links over by itself). */
-  protectLinks: boolean;
   /** Drop a span whose text a markdown label cannot hold and give back (`[`, `]`, `\`; conv. 197). */
   safeLabels: boolean;
 }
 
 /** How the mentions path reads a markdown story, in its count and its write alike. */
-export const MENTIONS_MARKDOWN: Readonly<MarkdownSpanOptions> = Object.freeze({ protectLinks: false, safeLabels: true });
-const TERM_MARKDOWN: Readonly<MarkdownSpanOptions> = Object.freeze({ protectLinks: true, safeLabels: false });
+export const MENTIONS_MARKDOWN: Readonly<MarkdownSpanOptions> = Object.freeze({ safeLabels: true });
+/** The find bar's "Link to element": the writer chose the term, so its span is written escaped (`labelFromSpan`). */
+const TERM_MARKDOWN: Readonly<MarkdownSpanOptions> = Object.freeze({ safeLabels: false });
+
+/**
+ * NO LINK INSIDE A LINK (1.125.34), on every markdown path: a span that overlaps
+ * a link the grammar reads (`markdownLinkSpans`: an escaped label, a balanced
+ * one and a titled target included, which neither the SDK's finder nor a
+ * pattern of brackets saw), or that splits a backslash escape (it would
+ * escape the link's own bracket), is passed over. Made once per story.
+ */
+function markdownPassesOver(story: string): (from: number, to: number) => boolean {
+  const links = markdownLinkSpans(story);
+  return (from, to) => {
+    if (splitsEscape(story, from, to)) return true;
+    // The links are in order and none overlaps the next: only the last one that starts before `to` can reach `from`.
+    let lo = 0;
+    let hi = links.length - 1;
+    let at = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (links[mid].start < to) { at = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return at !== -1 && links[at].end > from;
+  };
+}
 
 /**
  * The spans of a markdown story a link may be written over: the source's
- * spans, less those `opts` drops. One reader for the count and the write, so
- * the number shown is the number written.
+ * spans, less those inside a link or splitting an escape, and less those
+ * `opts` drops. One reader for the count and the write, so the number shown
+ * is the number written.
  */
 export function findSpansMarkdown(story: string, spansOf: SpanFinder, opts: MarkdownSpanOptions): Array<[number, number]> {
   if (!story) return [];
-  let isProtected: (a: number, b: number) => boolean = () => false;
-  if (opts.protectLinks) {
-    const protectedSpans: Array<[number, number]> = [];
-    const linkRe = /\[[^\]]*\]\([^)]*\)/g;
-    let lm: RegExpExecArray | null;
-    while ((lm = linkRe.exec(story)) !== null) {
-      protectedSpans.push([lm.index, lm.index + lm[0].length]);
-    }
-    isProtected = (a, b) => protectedSpans.some(([s, e]) => a < e && b > s);
-  }
+  const passedOver = markdownPassesOver(story);
   return spansOf(story).filter(([a, b]) =>
-    !isProtected(a, b) && !(opts.safeLabels && markdownCannotLinkAt(story, a, b)));
+    !passedOver(a, b) && !(opts.safeLabels && markdownCannotLinkAt(story, a, b)));
 }
 
 /**
@@ -634,7 +655,11 @@ export function linkTermMarkdown(
   return linkSpansMarkdown(story, termSpans(term, opts), target, TERM_MARKDOWN);
 }
 
-/** Chip every span `findSpansMarkdown` keeps in a markdown story to `target`; the label is the story's own text. */
+/**
+ * Chip every span `findSpansMarkdown` keeps in a markdown story to `target`;
+ * the label is the story's own text, escaped (`labelFromSpan`: a bare `[`,
+ * `]` or backslash gains its escape, so the label reads as the prose did).
+ */
 export function linkSpansMarkdown(
   story: string,
   spansOf: SpanFinder,
@@ -648,7 +673,7 @@ export function linkSpansMarkdown(
   for (let i = spans.length - 1; i >= 0; i--) {
     const [from, to] = spans[i];
     out = out.slice(0, from)
-      + `[${story.slice(from, to)}](${owLinkHref(target.type, target.id)})`
+      + `[${labelFromSpan(story.slice(from, to))}](${owLinkHref(target.type, target.id)})`
       + out.slice(to);
   }
   return { story: out, linked: spans.length };

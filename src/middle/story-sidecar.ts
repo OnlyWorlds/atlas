@@ -10,7 +10,10 @@
  *
  * The decision, cheapest check first:
  *   1. `serialize(sidecar) === story` exactly: Atlas's own last save, open
- *      the sidecar (every detail kept). The common case, no parsing.
+ *      the sidecar (every detail kept). The common case, no parsing. A save
+ *      made before 1.125.34 counts too: its chip escaped `]` alone, so the
+ *      story equals the sidecar serialized with that old escape
+ *      (`storyForReaders`).
  *   2. Otherwise NORMALISE `story` through the same parse and serializer the
  *      editor uses and compare again (a learned lesson: compare in the SAME
  *      representation; another writer's `*` bullets or trailing newline are
@@ -28,7 +31,7 @@ import { Editor, type JSONContent } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { ElementChip } from './writing-workspace-element-chip';
-import { serializeDocToMarkdown } from './writing-workspace-markdown';
+import { serializeDocToMarkdown, storyForReaders } from './writing-workspace-markdown';
 import { convertLinkMarksToChips } from './writing-workspace-load';
 
 /** `story` as the editor itself would write it back: parse, chips, serialize. */
@@ -51,6 +54,8 @@ export function storyOutranksSidecar(sidecar: JSONContent | null | undefined, st
   if (!sidecar || typeof story !== 'string' || story.trim() === '') return false;
   const fromSidecar = serializeDocToMarkdown(sidecar);
   if (fromSidecar === story) return false;
+  // Atlas's own save before 1.125.34, whose chip escaped `]` alone: still the sidecar's text.
+  if (storyForReaders(story, sidecar) !== story) return false;
   try {
     return normalizeStoryMarkdown(story) !== fromSidecar;
   } catch {

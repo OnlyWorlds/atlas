@@ -25,8 +25,10 @@ import { getState } from '../core/state';
 import { navigate, writingHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 import { lookupHeldId, readOwHref } from '../core/ow-links';
+import { markdownLinkSpans, unescapeLinkLabel } from '../core/markdown-link-label';
 import { buildNarrativeIndex, getTierForNarrative, getWritingLabels, iconForTier, tierWord, type NarrativeNode } from './writing-helpers';
 import { countMarkdownWords } from './writing-word-count';
+import { storyForReaders } from './writing-workspace-markdown';
 import { nameOrUnnamed } from '../core/type-words';
 
 export interface CompiledSection {
@@ -61,7 +63,8 @@ export function buildCompiledTree(root: Element, allElements: readonly Element[]
   const idx = buildNarrativeIndex(allElements as Element[], worldId);
   const fromNode = (el: Element, kids: readonly NarrativeNode[]): CompiledSection => ({
     el,
-    prose: typeof el.story === 'string' ? el.story : '',
+    // A scene saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
+    prose: typeof el.story === 'string' ? storyForReaders(el.story, (el as Record<string, unknown>).atlas_richtext_json) : '',
     children: kids.map(k => fromNode(k.el, k.children)),
   });
   return fromNode(root, idx.byId.get(root.id)?.children ?? []);
@@ -355,18 +358,38 @@ export function renderProseFragment(
   return wrap;
 }
 
+/** Marks a piece already drawn: what lies between them is never read again by a later pass. */
+const HELD_OPEN = '\uE000';
+const HELD_CLOSE = '\uE001';
+const HELD_RE = /\uE000(\d+)\uE001/g;
+
+/** `escapeText`, with the two private characters the renderer marks its pieces with written as references. */
+function escapeProse(text: string): string {
+  return escapeText(text).replace(/[\uE000\uE001]/g, c => `&#x${c.charCodeAt(0).toString(16)};`);
+}
+
 /**
  * Inline renderer — handles bold/italic/code/links inside a block's text.
- * Escapes HTML first, then converts markdown tokens to HTML tags. Order
- * matters: ow:// links matched BEFORE generic links so chips render with the
- * .atlas-element-chip styling instead of as plain anchors.
+ * Order matters, and is the one it always was: links first, then code, then
+ * bold and italic.
+ *
+ * LINKS (1.125.34) are taken by the grammar (`markdownLinkSpans`, in
+ * `core/markdown-link-label.ts`): an escaped `[` opens none, a label may hold
+ * escaped and balanced brackets, a link holds no link. Each is drawn whole
+ * and held, its label unescaped (`\[`, `\]`, `\\` read as `[`, `]`, `\`) and
+ * drawn as text: no later pass reads it, so a chip named `*Star*` draws no
+ * italic and one named `[x](https://x.test)` no link. In prose outside a
+ * link, the same three escapes are drawn as their characters after the code
+ * pass (inside a code span nothing is unescaped), and held as text too; every
+ * other escape (`\*`, `\_`) is drawn as before.
  */
 function renderInline(
   raw: string,
   elements: Map<string, Element>,
   unresolved: 'chip' | 'text' = 'chip',
 ): string {
-  let s = escapeText(raw);
+  const held: string[] = [];
+  const hold = (html: string): string => `${HELD_OPEN}${held.push(html) - 1}${HELD_CLOSE}`;
 
   // ow:// chip links: [Label](ow://type/uuid). Unresolved targets render per
   // the caller's mode: 'chip' keeps a label-fallback chip (writing compiled
@@ -381,32 +404,40 @@ function renderInline(
   // Standard links: [text](url). Scheme allowlist: markdown reaches public
   // visitors via published payloads, so a javascript:/data: href would be
   // click-to-execute XSS. Unsafe scheme (an `ow://` href that is no element
-  // address in this world included) → plain text (`text` was captured from
-  // the already-escaped string).
-  s = s.replace(/\[([^\]]+?)\]\(([^)\s]+?)\)/g, (_, text, url) => {
+  // address in this world included) → plain text. Every piece is escaped
+  // once, from the raw text (escapeText covers quotes, so the href is
+  // attribute-safe; escaping twice turned `?a=1&b=2` into `&amp;amp;`).
+  const drawLink = (url: string, text: string): string => {
     const link = readOwHref(url);
     if (link) {
       const el = lookupHeldId(link.idAsWritten, id => elements.get(id));
       if (!el && unresolved === 'text') return text;
       // THE LABEL LAW reaches the read-only view (Titus: a link must
       // NEVER be shown as the element's name). The writer's label is the text;
-      // the chip resolves by id. `text` is already escaped (captured from the
-      // escaped string), so it goes back as-is; the id and type are the
-      // reading's (hex and a type word).
+      // the chip resolves by id. The id and type are the reading's (hex and a
+      // type word).
       return `<span class="atlas-element-chip" data-id="${el?.id ?? link.id}" data-type="${link.type}">${text}</span>`;
     }
     if (!SAFE_LINK_HREF_RE.test(url)) return text;
-    // `url` was captured from the already-escaped string (escapeText covers
-    // quotes), so it is attribute-safe as-is; escaping it again
-    // turned `?a=1&b=2` into `&amp;amp;` and broke the link.
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-  });
+    return `<a href="${escapeText(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  };
+  let s = '';
+  let last = 0;
+  for (const l of markdownLinkSpans(raw)) {
+    const text = escapeProse(unescapeLinkLabel(raw.slice(l.labelStart, l.labelEnd)));
+    s += escapeProse(raw.slice(last, l.start)) + hold(drawLink(raw.slice(l.destStart, l.destEnd), text));
+    last = l.end;
+  }
+  s += escapeProse(raw.slice(last));
 
   // Inline code (backticks) — done before bold/italic so backticks don't
-  // collide with surrounding emphasis. `code` was captured from the
-  // already-escaped string — re-escaping would double-escape (`<` would
-  // render as the literal text "&lt;"; show's renderer does not).
-  s = s.replace(/`([^`\n]+?)`/g, (_, code) => `<code>${code}</code>`);
+  // collide with surrounding emphasis, and before the prose's escapes, so
+  // nothing in a code span is unescaped. `code` is already escaped
+  // (re-escaping would double-escape: `<` would render as the text "&lt;").
+  s = s.replace(/`([^`\n]+?)`/g, (_, code) => hold(`<code>${code}</code>`));
+
+  // `\[`, `\]` and `\\` in prose outside a link: their characters, as text.
+  s = s.replace(/\\([\\[\]])/g, (_, c: string) => hold(c));
 
   // Bold: **text**
   s = s.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
@@ -416,7 +447,9 @@ function renderInline(
   // because we work line-by-line at the block boundary.
   s = s.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
 
-  return s;
+  // The held pieces back in, a code span's held links inside it included.
+  const restore = (text: string): string => text.replace(HELD_RE, (_, i: string) => restore(held[Number(i)]));
+  return restore(s);
 }
 
 /** Renderable link schemes — anything else renders as plain text. */

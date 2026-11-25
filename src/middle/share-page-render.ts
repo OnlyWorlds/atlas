@@ -29,6 +29,8 @@ import {
 } from '../core/share-payload';
 import type { ProseRenderOptions } from './writing-compiled';
 import { renderProseFragment } from './writing-compiled';
+import { storyForReaders } from './writing-workspace-markdown';
+import { unescapeLinkLabel } from '../core/markdown-link-label';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { humanizeFieldName } from './element-detail-fields';
 import { escapeText } from '../core/dom-utils';
@@ -663,7 +665,8 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       return h;
     }
     case 'prose':
-      return renderProseFragment(block.markdown, elements);
+      // A block saved before 1.125.34 reads as its sidecar written now (`storyForReaders`).
+      return renderProseFragment(storyForReaders(block.markdown, block.richtextJson), elements);
     case 'element-card':
       return renderElementCard(block, elements);
     case 'collection':
@@ -837,7 +840,13 @@ function renderPayloadFieldValue(
     }
     return wrap;
   }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (typeof value === 'string') {
+    // The scrub turned each link in the text into its label as written; drawn as text, `\[`, `\]` and `\\` read
+    // as `[`, `]` and `\` (1.125.34).
+    wrap.textContent = unescapeLinkLabel(value);
+    return wrap;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
     wrap.textContent = String(value);
     return wrap;
   }

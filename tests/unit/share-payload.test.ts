@@ -287,7 +287,9 @@ describe('buildPagePayload', () => {
       ['a title in single quotes', `x [lbl](ow://character/${S} 't') y`, 'x lbl y'],
       ['a title in brackets', `x [lbl](ow://character/${S} (t)) y`, 'x lbl y'],
       ['an angle href with a space', `x [lbl](<ow://character/${S} >) y`, 'x lbl y'],
-      ['a label with ]', `x [a]b](ow://character/${S}) y`, 'x a]b y'],
+      // No link to the grammar (1.125.34: `[a]` closes at its own `]`, and `b]` has no opener): the address goes and
+      // the brackets stay where they were, no prose eaten.
+      ['a label with ]', `x [a]b](ow://character/${S}) y`, 'x [a]b]() y'],
       ['a label with nested brackets', `x [a [b] c](ow://character/${S}) y`, 'x a [b] c y'],
       ['an image', `x ![pic](ow://character/${S}) y`],
       ['a run ending in )', `x (see ow://character/${S}) y`],
@@ -309,6 +311,17 @@ describe('buildPagePayload', () => {
       ['on the page, an angle href', `x [a](<ow://character/${A}>) y`, `x [a](<ow://character/${A}>) y`],
       ['on the page, a title', `x [a](ow://character/${A} "t") y`, `x [a](ow://character/${A} "t") y`],
     ];
+    // A label's opener is the one the link grammar gives (1.125.34): a `[` after an odd run of backslashes opens
+    // none, and with no opener only the address goes. No address survives and no prose is eaten.
+    FORMS_2.push(
+      ['an escaped opener after a bracketed word', `see [1] and \\[Kira](ow://character/${S}) came`, 'see [1] and \\[Kira]() came'],
+      ['an opener after an escaped backslash', `x\\\\[Kira](ow://character/${S}) came`, 'x\\\\Kira came'],
+      ['a stray opener before an escaped one', `A [note: \\[Kira](ow://character/${S}) came`, 'A note: \\[Kira came'],
+      ['an escaped ] inside the label', `[a \\] b](ow://character/${S})`, 'a \\] b'],
+      ['a label ending in an escaped backslash', `[Kira\\\\](ow://character/${S})`, 'Kira\\\\'],
+      ['a link inside a link', `[[Kira](ow://character/${S})](https://x.test) came`, '[Kira](https://x.test) came'],
+      ['a stray opener before a link', `A [note: [Kira](ow://character/${S}) came`, 'A [note: Kira came'],
+    );
     for (const [label, md, want] of FORMS_2) {
       it(`${label}: nothing off the page ships${want !== undefined ? ', and the text is exact' : ''}`, () => {
         const out = scrub(md);
