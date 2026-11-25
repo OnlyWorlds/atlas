@@ -9,6 +9,8 @@ import { tooDeep, FILE_MAX_DEPTH } from '../../src/store/json-depth';
 import { FsFolderStore } from '../../src/store/folder-store-fs';
 import { memoryDirectoryWith } from '../../src/store/memory-dir';
 import { openWorldFolder } from '../../src/setup/atlas-root-flow';
+import { readWorldZip, TOO_DEEP_WORLD } from '../../src/store/world-file';
+import { zipSync } from 'fflate';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 /** An element whose x_ value nests to `depth` levels in all, the top object counted 1. */
@@ -68,5 +70,20 @@ describe('a world folder holding a file past the bound', () => {
     await expect(openWorldFolder(tooDeepDir)).rejects.toThrow('The world.json in that folder is nested more than 200 levels deep');
     const brokenDir = await memoryDirectoryWith([{ path: 'world.json', data: enc('{"id": ') }]);
     await expect(openWorldFolder(brokenDir)).rejects.toThrow('The world.json in that folder cannot be read as JSON');
+  });
+});
+
+describe('a world file whose world.json nests past the bound', () => {
+  /** A world file whose world.json nests to `depth` levels in all, the top object counted 1. */
+  const worldFileAt = (depth: number) => zipSync({
+    'deep-0192b000/world.json': enc(`{"id":"0192b000-0000-7000-8000-000000000148","name":"Depth","x_deep":${'['.repeat(depth - 1)}${']'.repeat(depth - 1)}}`),
+    'deep-0192b000/elements/character/ana--00000001.json': enc('{"id":"1","name":"Ana"}'),
+  });
+
+  it(`is read at ${FILE_MAX_DEPTH}, and refused past it before anything lands, at any depth`, () => {
+    expect(readWorldZip(worldFileAt(FILE_MAX_DEPTH)).worldName).toBe('Depth');
+    for (const depth of [FILE_MAX_DEPTH + 1, 100_000]) {
+      expect(() => readWorldZip(worldFileAt(depth))).toThrow(TOO_DEEP_WORLD);
+    }
   });
 });

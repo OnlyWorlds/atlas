@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.35',
+    date: '2026-11-25',
+    theme: 'A world file nested too deep is refused before it lands',
+    entries: [
+      {
+        id: 'world-file-too-deep',
+        title: 'A world file whose world.json is nested too deep is refused at once',
+        body: 'Opening a world file whose world.json is nested more than 200 levels deep now says so and adds nothing, as opening such a folder already did. Before, it was added to your list. Worlds Atlas writes now say they follow version 0.3.25 of the folder format.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.34',
     date: '2026-11-25',
     theme: 'A link whose name holds a bracket or a backslash comes back whole',
