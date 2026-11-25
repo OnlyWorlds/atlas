@@ -43,6 +43,7 @@ import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 import { currentLore } from '../core/parlor-room';
 import { lookupHeldId, proseNamesId } from '../core/ow-links';
+import { mentionsByName } from '../core/prose-autolink';
 
 export interface KnowledgeEditorOptions {
   /** Prose host — the editor takes over this element (already carries the prose CSS class). */
@@ -179,21 +180,12 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     const field = aboutFieldFor(targetEl.type);
     if (!field) return; // collective (holder) or non-subject type — leave fields alone
 
-    // Any other mention left? Other chips with the same id, or word-bounded
-    // name/alias text matches.
+    // Any other mention left? Other chips with the same id, or its name or an
+    // alias as the hints read a name (`mentionsByName`).
     const markdown = editorHandle.getMarkdown();
     if (proseNamesId(markdown, targetEl.id, id => elements.some(e => e.id === id))) return;
     const plainText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n');
-    const surfaceForms: string[] = [];
-    if (targetEl.name) surfaceForms.push(targetEl.name);
-    if (Array.isArray(targetEl.atlas_aliases)) {
-      for (const a of targetEl.atlas_aliases) if (typeof a === 'string') surfaceForms.push(a);
-    }
-    for (const form of surfaceForms) {
-      if (form.length < 2) continue;
-      const escaped = form.replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
-      if (new RegExp('\\b' + escaped + '\\b').test(plainText)) return;
-    }
+    if (mentionsByName(targetEl, plainText)) return;
 
     const existing = (entry as Record<string, unknown>)[field];
     if (!Array.isArray(existing)) return;

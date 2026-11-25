@@ -39,6 +39,7 @@ import { toastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
 import { escapeOwned } from '../../core/escape-mark';
 import { proseNamesId } from '../../core/ow-links';
+import { mentionsByName } from '../../core/prose-autolink';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -100,25 +101,12 @@ export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHan
 // for it. Only meaningful in writing mode; callers gate on mode.
 //
 // Match rule: scan narrative.story for either an element address naming this
-// element (as the SDK reads it) OR a word-boundary text match of the element's name / any alias.
+// element (as the SDK reads it) OR its name or an alias as the hints read a name (`mentionsByName`).
 export function isElementFeatured(el: Element, narrative: Element): boolean {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (story.length === 0) return false;
   if (proseNamesId(story, el.id, id => getState().data.elements.some(e => e.id === id))) return true;
-  const candidates: string[] = [];
-  if (el.name) candidates.push(el.name);
-  if (Array.isArray(el.atlas_aliases)) {
-    for (const a of el.atlas_aliases) {
-      if (typeof a === 'string') candidates.push(a);
-    }
-  }
-  for (const cand of candidates) {
-    if (cand.length < 2) continue;
-    const escaped = escapeRegex(cand);
-    const re = new RegExp('\\b' + escaped + '\\b');
-    if (re.test(story)) return true;
-  }
-  return false;
+  return mentionsByName(el, story);
 }
 
 function buildPreview(
@@ -373,10 +361,6 @@ function previewTypeLabel(el: Element): string {
   if (kind === 'knowledge') return 'knowledge entry';
   if (kind === 'page') return 'page';
   return typeName(el.type, { supertype: el.supertype });
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
 }
 
 /**
