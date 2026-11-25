@@ -846,6 +846,22 @@ test('@firefox Full page draws a card\'s icon as an icon, not the first letters 
   await fullPageIconIsAnIcon(page, context);
 });
 
+test('Publish on a world that is not online says why where it lands, the focus on the way to Make online', async ({ page }) => {
+  await setupWorld(page);
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  const publish = page.locator('[data-action="open-publish"]');
+  await expect(publish).toHaveAttribute('title', /needs an online world/);
+  await publish.click();
+  const hint = page.locator('[data-role="publish-section"] .atlas-share-publish-hint');
+  await expect(hint).toContainText('Publishing a page needs an online world');
+  await expect(hint.locator('a')).toBeFocused();
+  // Read as a step, not a footnote: the body's own size and colour.
+  const [hintPx, bodyPx] = await hint.evaluate((el) => [parseFloat(getComputedStyle(el).fontSize), parseFloat(getComputedStyle(document.querySelector('.atlas-share-section-title')!.parentElement!).fontSize)]);
+  expect(hintPx).toBeGreaterThanOrEqual(13);
+  expect(bodyPx).toBeGreaterThan(0);
+});
+
 test('on a phone every action of a page and every block to add can be pressed', async ({ page }) => {
   await setupWorld(page);
   await openShare(page);

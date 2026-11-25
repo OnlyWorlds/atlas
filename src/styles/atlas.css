@@ -12313,6 +12313,14 @@ td.atlas-writing-setup-promote-count {
   line-height: 1.5;
 }
 
+/* What stands before publishing (the world is not online yet) reads as a step, not a footnote. */
+.atlas-share-section-hint.is-first-step {
+  font-size: 13px;
+  color: var(--atlas-text);
+  padding-left: 10px;
+  border-left: 2px solid var(--atlas-accent);
+}
+
 /* A6: publish-prerequisite hints link straight to the settings tab that fixes them. */
 .atlas-share-settings-link {
   color: var(--atlas-accent-text);
