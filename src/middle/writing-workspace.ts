@@ -30,7 +30,7 @@ import { showProblem } from '../ui/problem-fixes';
 import { noteOpenedFromStory } from './story-notice';
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderHeader, isEditingIn } from './element-detail-header';
-import { mountWorkspaceEditor, linkTermInEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
+import { mountWorkspaceEditor, linkTermInEditor, linkSpansInEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
 import { compiledIds, compiledWordCount, mountCompiledView, narrativeHasChildren } from './writing-compiled';
 import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
@@ -821,6 +821,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         linkTerm: (term, target, opts) => {
           const ed = editorHandle?.editor;
           return ed ? linkTermInEditor(ed, term, target, opts) : 0;
+        },
+        linkSpans: (spansOf, target) => {
+          const ed = editorHandle?.editor;
+          return ed ? linkSpansInEditor(ed, spansOf, target) : 0;
         },
       });
     }

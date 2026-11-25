@@ -18,11 +18,11 @@ import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import {
   buildAutolinkIndex, autolinkMarkdown, autolinkRichtext, unlinkMarkdown, unlinkRichtext,
-  linkTermMarkdown, linkTermRichtext,
-  type TermLinkTarget, type TermMatchOptions,
+  linkTermMarkdown, linkTermRichtext, linkSpansMarkdown, linkSpansRichtext, MENTIONS_MARKDOWN,
+  type SpanFinder, type TermLinkTarget, type TermMatchOptions,
 } from '../core/prose-autolink';
 import { computeRelationPatch, linkTargetsIn } from './writing-workspace-derive';
-import { getLiveEditorOps } from './writing-live-editor-ops';
+import { getLiveEditorOps, type LiveEditorOps } from './writing-live-editor-ops';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
@@ -133,6 +133,38 @@ export async function bulkLinkTerm(
   target: TermLinkTarget,
   opts: TermMatchOptions,
 ): Promise<BulkLinkSummary> {
+  return bulkLinkWith(ids, {
+    live: ops => ops.linkTerm(term, target, opts),
+    sidecar: doc => linkTermRichtext(doc, term, target, opts),
+    story: story => linkTermMarkdown(story, term, target, opts),
+  });
+}
+
+/**
+ * Link every span `spansOf` finds to one element across a set of narratives
+ * (the context pane's Link all, over the element's own name finder). Same
+ * routing as {@link bulkLinkTerm}; a markdown story is read by
+ * `MENTIONS_MARKDOWN`, the rule its "Mentioned, unlinked" count reads.
+ */
+export async function bulkLinkSpans(
+  ids: readonly string[],
+  spansOf: SpanFinder,
+  target: TermLinkTarget,
+): Promise<BulkLinkSummary> {
+  return bulkLinkWith(ids, {
+    live: ops => ops.linkSpans(spansOf, target),
+    sidecar: doc => linkSpansRichtext(doc, spansOf, target),
+    story: story => linkSpansMarkdown(story, spansOf, target, MENTIONS_MARKDOWN),
+  });
+}
+
+interface OneTargetLink {
+  live: (ops: LiveEditorOps) => number;
+  sidecar: (doc: unknown) => { doc: unknown; linked: number };
+  story: (story: string) => { story: string; linked: number };
+}
+
+async function bulkLinkWith(ids: readonly string[], link: OneTargetLink): Promise<BulkLinkSummary> {
   const folder = getActiveStore();
   if (!folder) return { changed: 0, count: 0 };
   const live = getLiveEditorOps();
@@ -144,7 +176,7 @@ export async function bulkLinkTerm(
 
   for (const id of ids) {
     if (live && live.narrativeId === id) {
-      const n = live.linkTerm(term, target, opts);
+      const n = link.live(live);
       if (n > 0) { changed++; count += n; }
       continue;
     }
@@ -155,8 +187,8 @@ export async function bulkLinkTerm(
 
     const half = await authoritativeHalf(story, sidecar);
     const out = half === 'sidecar'
-      ? fromSidecar(linkTermRichtext(sidecar, term, target, opts), r => r.linked)
-      : fromStory(linkTermMarkdown(story, term, target, opts), r => r.linked, sidecar);
+      ? fromSidecar(link.sidecar(sidecar), r => r.linked)
+      : fromStory(link.story(story), r => r.linked, sidecar);
     const n = out.n;
     if (n === 0) continue;
     const patch: Partial<Element> = { ...out.patch, ...computeRelationPatch(el, out.patch.story as string, exists) };

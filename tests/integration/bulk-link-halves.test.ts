@@ -19,7 +19,9 @@ import type { JSONContent } from '@tiptap/core';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { setActiveStore } from '../../src/core/active-store';
 import { patchSlice } from '../../src/core/state';
-import { bulkLinkNarratives, bulkLinkTerm } from '../../src/middle/writing-bulk-link';
+import { bulkLinkNarratives, bulkLinkSpans, bulkLinkTerm } from '../../src/middle/writing-bulk-link';
+import { elementSpans, type SpanFinder } from '../../src/core/prose-autolink';
+import { setLiveEditorOps } from '../../src/middle/writing-live-editor-ops';
 import { serializeDocToMarkdown } from '../../src/middle/writing-workspace-markdown';
 import { storyOutranksSidecar } from '../../src/middle/story-sidecar';
 import type { Element } from '../../src/core/types';
@@ -154,4 +156,60 @@ describe('the re-key kernel keeps both halves', () => {
       expect(storyOutranksSidecar(sidecar, story)).toBe(false);
     });
   }
+});
+
+describe('bulkLinkSpans (the context pane Link all) routes as bulkLinkTerm does', () => {
+  let eowyn: Element;
+  beforeEach(async () => {
+    eowyn = await store.createElement('character', { name: 'Éowyn' });
+    patchSlice('data', { elements: await store.listElements(), loading: false } as never);
+  });
+  const chipsOf = (doc: JSONContent | null): JSONContent[] =>
+    (doc?.content ?? []).flatMap(n => n.content ?? []).filter(n => n.type === 'elementChip');
+
+  it('a sidecar-authoritative scene: the sidecar is written, the story derived from it, the derive runs', async () => {
+    const id = await scene({ type: 'doc', content: [p(t('Éowyn rode. They waited for ÉOWYN.'))] });
+    const r = await bulkLinkSpans([id], elementSpans(eowyn)!, { id: eowyn.id, type: 'character' });
+    expect(r).toEqual({ changed: 1, count: 2 });
+    const { story, sidecar } = await halves(id);
+    expect(chipsOf(sidecar).map(c => c.attrs?.label)).toEqual(['Éowyn', 'ÉOWYN']);
+    expect(story).toBe(serializeDocToMarkdown(sidecar!));
+    expect(storyOutranksSidecar(sidecar!, story)).toBe(false);
+    expect((await store.getElement(id) as Record<string, unknown>).characters).toContain(eowyn.id);
+  });
+
+  it('a story that outranks its sidecar: the story is written and the stale sidecar dropped', async () => {
+    const id = await scene({ type: 'doc', content: [p(t('An older draft.'))] }, 'Éowyn rode, and Éowyn sang.');
+    const r = await bulkLinkSpans([id], elementSpans(eowyn)!, { id: eowyn.id, type: 'character' });
+    expect(r).toEqual({ changed: 1, count: 2 });
+    const { story, sidecar } = await halves(id);
+    expect(sidecar).toBeNull();
+    expect(story).toBe(`[Éowyn](ow://character/${eowyn.id}) rode, and [Éowyn](ow://character/${eowyn.id}) sang.`);
+    expect((await store.getElement(id) as Record<string, unknown>).characters).toContain(eowyn.id);
+  });
+
+  it('a story with no sidecar: the story alone', async () => {
+    const el = await store.createElement('narrative', { name: 'bare', story: 'Then Éowyn.' } as Partial<Element>);
+    const r = await bulkLinkSpans([el.id], elementSpans(eowyn)!, { id: eowyn.id, type: 'character' });
+    expect(r).toEqual({ changed: 1, count: 1 });
+    expect((await halves(el.id)).story).toBe(`Then [Éowyn](ow://character/${eowyn.id}).`);
+  });
+
+  it('the open scene goes through the live editor op, never the disk', async () => {
+    const id = await scene({ type: 'doc', content: [p(t('Éowyn rode.'))] });
+    let seen: SpanFinder | null = null;
+    setLiveEditorOps({
+      narrativeId: id, linkAll: () => 0, unlinkAll: () => 0, linkTerm: () => 0,
+      linkSpans: (spansOf) => { seen = spansOf; return spansOf('Éowyn rode.').length; },
+    });
+    try {
+      const before = await halves(id);
+      const r = await bulkLinkSpans([id], elementSpans(eowyn)!, { id: eowyn.id, type: 'character' });
+      expect(r).toEqual({ changed: 1, count: 1 });
+      expect(seen).not.toBeNull();
+      expect(await halves(id)).toEqual(before);
+    } finally {
+      setLiveEditorOps(null);
+    }
+  });
 });

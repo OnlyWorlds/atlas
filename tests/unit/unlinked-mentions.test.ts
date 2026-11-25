@@ -1,15 +1,16 @@
 /**
  * Unlinked mentions — the count behind the context pane's
  * "Mentioned, unlinked (N in M scenes) · Link all" line and the create
- * modal's nudge. The count and the link share one span finder, so the
- * number shown is the number written.
+ * modal's nudge. The count and the link share one span source (the
+ * element's own name finder, as the hints read names) and one markdown
+ * rule, so the number shown is the number written on the story.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
-  findUnlinkedMentions, mentionTermsFor, mentionsPhrase, createdToastText, MENTION_MATCH,
+  findUnlinkedMentions, mentionTermsFor, mentionsPhrase, createdToastText,
 } from '../../src/core/unlinked-mentions';
-import { buildTermScanner, linkTermMarkdown } from '../../src/core/prose-autolink';
+import { buildTermScanner, elementSpans, linkSpansMarkdown, MENTIONS_MARKDOWN } from '../../src/core/prose-autolink';
 import type { Element } from '../../src/core/types';
 
 function el(id: string, type: string, name: string, extra: Record<string, unknown> = {}): Element {
@@ -64,14 +65,55 @@ describe('findUnlinkedMentions', () => {
     expect(findUnlinkedMentions(chief, next)).toEqual(a);
   });
 
-  it('agrees with the link it offers: linking every listed narrative with the same terms writes exactly total chips', () => {
-    const m = findUnlinkedMentions(chief, WORLD);
-    let written = 0;
-    for (const n of m.narratives) {
-      const story = WORLD.find(e => e.id === n.id)!.story as string;
-      written += linkTermMarkdown(story, m.terms, { id: chief.id, type: chief.type }, MENTION_MATCH).linked;
+  it('agrees with the link it offers: linking every listed narrative by the same spans writes exactly total chips', () => {
+    for (const subject of [chief, eowyn]) {
+      const m = findUnlinkedMentions(subject, NAMES_WORLD);
+      expect(m.total).toBeGreaterThan(0);
+      let written = 0;
+      for (const n of m.narratives) {
+        const story = NAMES_WORLD.find(e => e.id === n.id)!.story as string;
+        written += linkSpansMarkdown(story, elementSpans(subject)!, { id: subject.id, type: subject.type }, MENTIONS_MARKDOWN).linked;
+      }
+      expect(written).toBe(m.total);
     }
-    expect(written).toBe(m.total);
+  });
+});
+
+// Names as the hints read them (the SDK's nameFinder: a word edge in every script, folded case).
+const eowyn = el('c2', 'character', 'Éowyn');
+const ana = el('c3', 'character', 'Ana');
+const NAMES_WORLD: Element[] = [
+  ...WORLD,
+  eowyn, ana,
+  el('n5', 'narrative', 'Scene E', { story: 'Éowyn rode. They waited for ÉOWYN, and Anaïs too.' }),
+];
+
+describe('findUnlinkedMentions reads names as the hints do', () => {
+  it('counts a name with an accent at its edge, in any case', () => {
+    const m = findUnlinkedMentions(eowyn, NAMES_WORLD);
+    expect(m.total).toBe(2);
+    expect(m.narratives).toEqual([{ id: 'n5', name: 'Scene E', count: 2 }]);
+  });
+
+  it('never counts a name inside a longer word in another script', () => {
+    expect(findUnlinkedMentions(ana, NAMES_WORLD).total).toBe(0);
+  });
+
+  it('passes over a name a markdown label cannot hold, in the count and in the write', () => {
+    for (const name of ['Kira [the elder]', '[Old] Kira', 'Kira\\', 'Ki]ra']) {
+      const subject = el('u1', 'character', name);
+      const story = `Then ${name} came.`;
+      const world: Element[] = [subject, el('u2', 'narrative', 'Scene U', { story })];
+      expect(findUnlinkedMentions(subject, world).total).toBe(0);
+      const out = linkSpansMarkdown(story, elementSpans(subject)!, { id: 'u1', type: 'character' }, MENTIONS_MARKDOWN);
+      expect(out).toEqual({ story, linked: 0 });
+    }
+  });
+
+  it('has no spans for an element with no id or no name of three code points, and throws nothing', () => {
+    expect(elementSpans(el('', 'character', 'Éowyn'))).toBeNull();
+    expect(elementSpans(el('z1', 'character', 'Bo'))).toBeNull();
+    expect(findUnlinkedMentions(el('z1', 'character', 'Bo'), NAMES_WORLD).total).toBe(0);
   });
 });
 

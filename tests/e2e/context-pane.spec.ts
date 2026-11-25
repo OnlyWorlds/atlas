@@ -656,6 +656,34 @@ test('element preview lists unlinked mentions and "Link all" links them across n
   expect(storyB).toBe(`An [orc](ow://character/${chief}) already linked, and an [orc](ow://character/${chief}) not.`);
 });
 
+/**
+ * The card reads a name as the writing hints do (a word edge in every script,
+ * folded case): an accented name is counted, and the button links what the
+ * line counted. The old scanner's ASCII edge never saw Éowyn at all.
+ */
+test('"Link all" counts and links a name with an accent at its edge', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'ctx-mentions-accent-root');
+  await createWorld(page, 'accent world');
+  const eowyn = await createElement(page, 'character', { name: 'Éowyn' });
+  const scene = await createElement(page, 'narrative', {
+    name: 'Scene E', supertype: 'Scene', story: 'Éowyn rode. They waited for Éowyn.',
+  });
+
+  await gotoElement(page, eowyn);
+  await openContextTab(page);
+  const preview = page.locator('.atlas-context-pane .atlas-context-preview');
+  await expect(preview.locator('.atlas-context-preview-name')).toHaveText('Éowyn');
+  const line = preview.locator('.atlas-context-preview-mentions');
+  await expect(line).toContainText('Mentioned, unlinked (2 in 1 scene):');
+
+  await line.locator('[data-action="link-mentions"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'Linked 2 mentions of Éowyn across 1 scene' })).toBeVisible();
+  const story = await page.evaluate((id) =>
+    (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.story, scene);
+  expect(story).toBe(`[Éowyn](ow://character/${eowyn}) rode. They waited for [Éowyn](ow://character/${eowyn}).`);
+});
+
 test('the create modal nudges when the new name already sits in prose', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'ctx-create-nudge-root');

@@ -10,15 +10,15 @@
  * cached per elements-array reference (the state swaps the array on every
  * write, so a stale cache is impossible and idle ticks cost nothing).
  *
- * The match rule is the find bar's, whole-word and case-insensitive, over
- * name ∪ aliases of at least `MIN_NAME_CHARS`, a minimum that now governs this
- * path alone (the hints and link-all take the SDK finder's own); text inside
- * an existing link is never counted. The same terms feed `bulkLinkTerm`, so
- * the count and the link agree by construction.
+ * The match rule is the writing hints': the element's own name finder
+ * (`elementSpans`: name and aliases, a word edge in every script, folded
+ * case), over the stored `story`, a name a markdown label cannot hold passed
+ * over (`MENTIONS_MARKDOWN`). Link all writes by the same spans and the same
+ * rule (`bulkLinkSpans`), so the count and the link agree on the story.
  */
 
 import type { Element } from './types';
-import { MIN_NAME_CHARS, findTermSpansMarkdown } from './prose-autolink';
+import { MIN_NAME_CHARS, MENTIONS_MARKDOWN, elementSpans, findSpansMarkdown } from './prose-autolink';
 import { nameOrUnnamed, ownName } from './type-words';
 
 export interface NarrativeMentions {
@@ -32,16 +32,14 @@ export interface UnlinkedMentions {
   total: number;
   /** Narratives with at least one match, most mentions first. */
   narratives: NarrativeMentions[];
-  /** The terms that were scanned for (name ∪ aliases, trimmed, long enough). */
+  /** Name ∪ aliases, trimmed, long enough; no count or write reads it (the finder reads its own names). */
   terms: string[];
 }
 
 /** Types the autolink index never links; scanning for them would be noise. */
 const NEVER_MENTIONED = new Set(['narrative', 'pin', 'marker', 'map']);
 
-export const MENTION_MATCH = { wholeWord: true, caseSensitive: false } as const;
-
-/** Name ∪ aliases as scan terms, trimmed, deduplicated, at least MIN_NAME_CHARS. */
+/** Name ∪ aliases, trimmed, deduplicated, at least MIN_NAME_CHARS: the result's `terms`. */
 export function mentionTermsFor(el: Element): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -78,8 +76,9 @@ export function findUnlinkedMentions(el: Element, elements: readonly Element[]):
 
 function scan(el: Element, elements: readonly Element[]): UnlinkedMentions {
   if (NEVER_MENTIONED.has(el.type)) return EMPTY;
+  const spans = elementSpans(el);
+  if (!spans) return EMPTY;
   const terms = mentionTermsFor(el);
-  if (terms.length === 0) return EMPTY;
   const narratives: NarrativeMentions[] = [];
   // Sorted by the narrative's own name: an unnamed one sorts first, never among the T's.
   const sortName = new Map<string, string>();
@@ -88,7 +87,7 @@ function scan(el: Element, elements: readonly Element[]): UnlinkedMentions {
     if (n.type !== 'narrative' || n.id === el.id) continue;
     const story = typeof n.story === 'string' ? n.story : '';
     if (!story) continue;
-    const count = findTermSpansMarkdown(story, terms, MENTION_MATCH).length;
+    const count = findSpansMarkdown(story, spans, MENTIONS_MARKDOWN).length;
     if (count === 0) continue;
     // Each is a link of its own after "Mentioned, unlinked (…):", and a reader may say it alone: the capital.
     narratives.push({ id: n.id, name: nameOrUnnamed(n, { start: true }), count });
