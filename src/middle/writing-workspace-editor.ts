@@ -192,7 +192,8 @@ export function linkTermInEditor(
  * Chip every span `spansOf` finds in each text node of a live editor to
  * `target`, in one transaction (undoable, autosaved): the context pane's Link
  * all on the open narrative. A node inside a link mark is passed over, as the
- * closed writes pass a web link over; the label is the node's own text.
+ * closed writes pass a web link over, and so is a code block; the label is
+ * the node's own text.
  */
 export function linkSpansInEditor(
   editor: Editor,
@@ -203,6 +204,7 @@ export function linkSpansInEditor(
   if (!chipType) return 0;
   const found: Array<{ from: number; to: number; label: string }> = [];
   editor.state.doc.descendants((node, pos) => {
+    if (node.type.spec.code) return false; // a code block holds no chip: replacing inside it would split it
     if (!node.isText || !node.text) return;
     if (node.marks.some(m => m.type.name === 'link')) return;
     for (const [a, b] of spansOf(node.text)) found.push({ from: pos + a, to: pos + b, label: node.text.slice(a, b) });

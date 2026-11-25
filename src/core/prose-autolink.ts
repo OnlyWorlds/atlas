@@ -576,8 +576,8 @@ export interface MarkdownSpanOptions {
 }
 
 /** How the mentions path reads a markdown story, in its count and its write alike. */
-export const MENTIONS_MARKDOWN: MarkdownSpanOptions = { protectLinks: false, safeLabels: true };
-const TERM_MARKDOWN: MarkdownSpanOptions = { protectLinks: true, safeLabels: false };
+export const MENTIONS_MARKDOWN: Readonly<MarkdownSpanOptions> = Object.freeze({ protectLinks: false, safeLabels: true });
+const TERM_MARKDOWN: Readonly<MarkdownSpanOptions> = Object.freeze({ protectLinks: true, safeLabels: false });
 
 /**
  * The spans of a markdown story a link may be written over: the source's

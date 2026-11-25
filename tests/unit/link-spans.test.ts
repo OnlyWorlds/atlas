@@ -54,6 +54,22 @@ describe('linkSpansInEditor', () => {
       h.destroy();
     }
   });
+
+  it('leaves a code block whole', () => {
+    const doc = { type: 'doc', content: [
+      { type: 'codeBlock', content: [text('Éowyn in code, Éowyn again')] },
+      { type: 'paragraph', content: [text('Then Éowyn.')] },
+    ] };
+    const h = mountWorkspaceEditor({ target: document.createElement('div'), initialJson: doc as never, onUpdate: () => {} });
+    try {
+      expect(linkSpansInEditor(h.editor, elementSpans(eowyn)!, target)).toBe(1);
+      const json = h.editor.getJSON();
+      expect(json.content?.map(n => n.type)).toEqual(['codeBlock', 'paragraph']);
+      expect((json.content?.[0].content?.[0] as { text?: string } | undefined)?.text).toBe('Éowyn in code, Éowyn again');
+    } finally {
+      h.destroy();
+    }
+  });
 });
 
 describe('the count on a large world is linear in its text', () => {

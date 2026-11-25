@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'mentions-read-as-hints-read',
         title: 'A card counts and links the names the hints show',
-        body: 'On a card, Mentioned, unlinked and its Link all, and the note after you create an element, now find a name as the writing hints do: Éowyn, Zoë and names in other scripts are counted and linked, and Link all links what the line counted. A name inside a longer word no longer counts (Ana in Anaïs), nor one inside a longer run like Mr.Fox. A name holding a bracket or a backslash is not counted, as autolink passes it over. In a scene open in the editor, Link all can be undone and leaves a web link alone.',
+        body: 'On a card, Mentioned, unlinked and its Link all, and the note after you create an element, now find a name as the writing hints do: Éowyn, Zoë and names in other scripts are counted and linked, and Link all links what the line counted. A name inside a longer word no longer counts (Ana in Anaïs). A name holding a bracket or a backslash is not counted, as autolink passes it over. In a scene open in the editor, Link all can be undone and leaves a web link alone.',
         tags: ['writing', 'fix'],
       },
     ],
