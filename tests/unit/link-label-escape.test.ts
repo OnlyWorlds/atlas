@@ -86,8 +86,9 @@ describe('done when 1: a chip whose name holds a bracket or a backslash comes ba
       expect(editorRead(story)).toEqual([{ text: 'Then ' }, { chip: name }, { text: ' came.' }]);
       const unlinked = unlinkMarkdown(story);
       expect(unlinked.unlinked).toBe(1);
-      // A known gap: unlinked, an HTML tag's closing half is read by the editor as a tag even after `\<`, and
-      // dropped (no link is made). Every other name comes back as its text.
+      // A known gap: unlinked, the editor autolinks the bare address inside an HTML-tag name (text and address
+      // equal, up to the next space), which takes the backslash before `</a>`, so the tag is read and dropped.
+      // Every other name comes back as its text.
       if (name.includes('</')) expect(editorRead(unlinked.story)).toEqual([{ text: 'Then <a href="https://e.test">x\\ came.' }]);
       else expect(editorRead(unlinked.story)).toEqual([{ text: `Then ${name} came.` }]);
     });
