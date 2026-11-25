@@ -56,8 +56,21 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.24',
+    date: '2026-11-25',
+    theme: 'The newest OnlyWorlds SDK',
+    entries: [
+      {
+        id: 'sdk-4-203-1',
+        title: 'Atlas reads and writes world files with the newest OnlyWorlds SDK',
+        body: 'A world file holding a world.json inside a folder whose name starts with a dot now opens, as the folder format says: such a folder belongs to a tool and holds no second world. A world file you make still leaves out who and which tool wrote each element, from every element file it carries.',
+        tags: ['world file', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.23',
-    date: '2026-11-24',
+    date: '2026-11-25',
     theme: 'Pages on a phone, and Full page draws its icons',
     entries: [
       {

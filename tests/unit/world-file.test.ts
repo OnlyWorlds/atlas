@@ -195,9 +195,15 @@ describe('the reader refuses before anything is written', () => {
     refuses({ 'world.json': strToU8(j({ id: WID, name: 'W' })), 'other/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
   });
 
-  it('a world in its one folder with another world nested inside, or a world.json under .atlas', () => {
+  it('a world in its one folder with another world nested inside', () => {
     refuses({ ...world, 'w/inner/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
-    refuses({ ...world, 'w/.atlas/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
+  });
+
+  it('a world.json under a folder whose name starts with a dot is no second world: the world opens as its root says', () => {
+    // The folder format passes over dot-folders (a tool's own), and the SDK's reader follows it (4.203.1 here).
+    const back = readWorldZip(zipSync({ ...world, 'w/.atlas/world.json': strToU8(j({ id: 'o', name: 'O' })) }));
+    expect(back.files.find(f => f.path === 'world.json')).toBeDefined();
+    expect(JSON.parse(new TextDecoder().decode(back.files.find(f => f.path === 'world.json')!.data)).id).toBe(WID);
   });
 
   it('a path under .atlas whose first part is a transient file\'s name', () => {
