@@ -71,7 +71,9 @@ function editorRead(md: string): Array<{ chip: string } | { text: string }> {
 const chipsIn = (node: HTMLElement): string[] =>
   [...node.querySelectorAll('.atlas-element-chip')].map(c => c.textContent ?? '');
 
-const NAMES = ['Kira [the elder]', 'Kira\\', 'Ki]ra', 'Kira [the elder'];
+// The last three are named like a link, or hold one (1.125.36): the editor read `[x](https://x.test)` in a
+// label escaped only at its brackets as a web link inside the chip.
+const NAMES = ['Kira [the elder]', 'Kira\\', 'Ki]ra', 'Kira [the elder', '[x](https://x.test)', 'a [x](https://x.test) b', 'f(x) and )('];
 
 describe('done when 1: a chip whose name holds a bracket or a backslash comes back from its story alone', () => {
   for (const name of NAMES) {
@@ -100,6 +102,25 @@ describe('done when 2: a scene saved before 1.125.34 opens and publishes from it
   it('the story is Atlas\'s own save: storyOutranksSidecar false, authoritativeHalf "sidecar"', async () => {
     expect(storyOutranksSidecar(sidecar, OLD)).toBe(false);
     await expect(authoritativeHalf(OLD, sidecar)).resolves.toBe('sidecar');
+  });
+
+  it('a parenthesis is escaped only right after a bracket: "John (the younger)" is written as it always was', () => {
+    expect(serializeDocToMarkdown(sceneOf('John (the younger)'))).toBe(`Then [John (the younger)](${L}) came.`);
+    expect(serializeDocToMarkdown(sceneOf('[x](https://x.test)'))).toBe(`Then [\\[x\\]\\(https://x.test)](${L}) came.`);
+  });
+
+  // A chip named with parentheses, saved by an earlier escape, is still Atlas's own save (a guard for any
+  // later change to which parentheses are escaped).
+  it('a chip named with parentheses, saved by an earlier escape, keeps its sidecar', async () => {
+    const parens: JSONContent = { type: 'doc', content: [p(chip('John (the younger)'), t(' and '), chip('Kira [the elder] (x)'), t(' left.'))] };
+    const before134 = `[John (the younger)](${L}) and [Kira [the elder\\] (x)](${L}) left.`; // `]` alone
+    const from134 = `[John (the younger)](${L}) and [Kira \\[the elder\\] (x)](${L}) left.`; // 1.125.34 and 1.125.35
+    for (const story of [before134, from134]) {
+      expect(storyOutranksSidecar(parens, story)).toBe(false);
+      await expect(authoritativeHalf(story, parens)).resolves.toBe('sidecar');
+    }
+    // And the 1.125.34 form still opens whole from its story alone (a scene pulled from OnlyWorlds).
+    expect(editorRead(from134)).toEqual([{ chip: 'John (the younger)' }, { text: ' and ' }, { chip: 'Kira [the elder] (x)' }, { text: ' left.' }]);
   });
 
   const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
@@ -238,7 +259,7 @@ describe('done when 3: no markdown path writes a link inside a link', () => {
 });
 
 describe('done when 4: the drawing readers draw a label as its text', () => {
-  const ALL = [...NAMES, '[x](https://x.test)', '*Star*'];
+  const ALL = [...NAMES, '*Star*'];
   for (const name of ALL) {
     it(`a chip named ${JSON.stringify(name)}, on the page and left off`, () => {
       const story = serializeDocToMarkdown(sceneOf(name));

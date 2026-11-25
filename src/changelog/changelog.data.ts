@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.36',
+    date: '2026-11-25',
+    theme: 'A link to an element named like a web link stays that element',
+    entries: [
+      {
+        id: 'chip-named-like-a-link',
+        title: 'A link to an element whose name looks like a web link reopens as that element',
+        body: 'An element whose name holds something shaped like a web link, such as "[x](https://example.com)", is now saved in your text so it reopens as the link to that element, also in a scene opened on another device. Before, the editor could read the name\'s inner part as a web link. Unlinking such a name leaves its text as written.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.35',
     date: '2026-11-25',
     theme: 'A world file nested too deep is refused before it lands',

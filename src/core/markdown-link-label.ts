@@ -3,8 +3,8 @@
  * reader of `[label](target)` in a story, and the one escape for every writer
  * of a label (1.125.34).
  *
- * THE WRITE. A label Atlas writes escapes `\`, `[` and `]`
- * (`escapeLinkLabel`), so a name such as "Kira [the elder]" or "Kira\" comes
+ * THE WRITE. A label Atlas writes escapes `\`, `[`, `]` and a `(` right after
+ * a `]` (`escapeLinkLabel`), so a name such as "Kira [the elder]" or "Kira\" comes
  * back whole: before, the editor's chip escaped `]` alone, and "Kira [the
  * elder]" was read back as `[Kira ` and a chip "the elder]".
  *
@@ -16,8 +16,8 @@
  * Then `](` and a target up to its `)`: a destination (in angle brackets, or
  * a run with no white space and balanced parentheses) and a title in `"…"`,
  * `'…'` or `(…)` after white space. A reader that draws a link draws its
- * label through `unescapeLinkLabel` (`\[`, `\]` and `\\` read as `[`, `]` and
- * `\`), as text.
+ * label through `unescapeLinkLabel` (`\[`, `\]`, `\(`, `\)` and `\\` read as the
+ * character), as text.
  *
  * The walk is the bracket stack CommonMark describes, one pass over the text:
  * an opener is pushed, a `]` pops the nearest, and a pop followed by a target
@@ -45,14 +45,19 @@ export interface MarkdownLink {
   destEnd: number;
 }
 
-/** A label as a link writes it: `\`, `[` and `]` escaped with a backslash. */
+/**
+ * A label as a link writes it: `\`, `[` and `]` escaped with a backslash, and a `(` right after a `]`
+ * (1.125.36): a label holding `[x](https://x.test)` escaped at its brackets alone was read by the editor as
+ * a web link inside the chip. Every other parenthesis stays bare, so "John (the younger)" is written as it
+ * always was, for every reader of a story.
+ */
 export function escapeLinkLabel(label: string): string {
-  return label.replace(/[\\[\]]/g, '\\$&');
+  return label.replace(/[\\[\]]|(?<=\])\(/g, '\\$&');
 }
 
-/** A label as a reader draws it: `\[`, `\]` and `\\` read as `[`, `]` and `\`; every other backslash stays. */
+/** A label as a reader draws it: `\[`, `\]`, `\(`, `\)` and `\\` read as the character; every other backslash stays. */
 export function unescapeLinkLabel(label: string): string {
-  return label.replace(/\\([\\[\]])/g, '$1');
+  return label.replace(/\\([\\[\]()])/g, '$1');
 }
 
 /**
