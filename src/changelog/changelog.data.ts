@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.30',
+    date: '2026-11-25',
+    theme: 'Atlas in Lato',
+    entries: [
+      {
+        id: 'house-font-lato',
+        title: 'Atlas is set in Lato, the OnlyWorlds face',
+        body: 'Every word in Atlas is now drawn in Lato, the face the OnlyWorlds site and tools share, in its regular, bold and black weights. Labels that were a little heavier than body text are now regular or bold. A published page and a map label keep the face they were given.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.125.29',
     date: '2026-11-25',
     theme: 'Mentioned and Link all read names as the hints do',
