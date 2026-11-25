@@ -32,14 +32,14 @@ import { renderElementImage } from '../../ui/element-image';
 import { narrativeKindOf } from '../../core/narrative-kind';
 import { findIncomingReferences } from '../../middle/element-detail-refs';
 import { foldBacklinks, markerFoldLabel } from '../../core/spatial-backlinks';
-import { findUnlinkedMentions, mentionsPhrase, MENTION_MATCH } from '../../core/unlinked-mentions';
-import { bulkLinkTerm } from '../../middle/writing-bulk-link';
+import { findUnlinkedMentions, mentionsPhrase } from '../../core/unlinked-mentions';
+import { bulkLinkSpans } from '../../middle/writing-bulk-link';
 import { getWritingLabels } from '../../middle/writing-helpers';
 import { toastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
 import { escapeOwned } from '../../core/escape-mark';
 import { proseNamesId } from '../../core/ow-links';
-import { mentionsByName } from '../../core/prose-autolink';
+import { elementSpans, mentionsByName } from '../../core/prose-autolink';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -200,7 +200,8 @@ function buildPreview(
   // one, and on every existing element too. "Link all" writes the subtree
   // machinery over every narrative listed, then this card rebuilds.
   const mentions = findUnlinkedMentions(el, getState().data.elements);
-  if (mentions.total > 0) {
+  const spans = elementSpans(el); // the count's own span source: Link all writes what the line counted
+  if (mentions.total > 0 && spans) {
     const worldId = getState().active?.worldId;
     const word = worldId ? getWritingLabels(worldId).l3.toLowerCase() : 'scene';
     const mn = document.createElement('div');
@@ -230,11 +231,11 @@ function buildPreview(
     linkAll.className = 'atlas-btn-ghost atlas-context-preview-mentions-link';
     linkAll.dataset.action = 'link-mentions';
     linkAll.textContent = 'Link all';
-    linkAll.title = `Link every mention of ${nameOrUnnamed(el)} in ${mentions.narratives.length} ${word}${mentions.narratives.length === 1 ? '' : 's'}. Written to the files; no undo.`;
+    linkAll.title = `Link every mention of ${nameOrUnnamed(el)} in ${mentions.narratives.length} ${word}${mentions.narratives.length === 1 ? '' : 's'}. Written to the files; only a ${word} open in the editor can be undone.`;
     linkAll.addEventListener('click', () => {
       linkAll.disabled = true;
       const ids = mentions.narratives.map(n => n.id);
-      void bulkLinkTerm(ids, mentions.terms, { id: el.id, type: el.type }, MENTION_MATCH).then(({ changed, count }) => {
+      void bulkLinkSpans(ids, spans, { id: el.id, type: el.type }).then(({ changed, count }) => {
         toastManager.info(count > 0
           ? `Linked ${count} mention${count === 1 ? '' : 's'} of ${nameOrUnnamed(el)} across ${changed} ${word}${changed === 1 ? '' : 's'}`
           : 'Nothing to link');

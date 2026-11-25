@@ -6,7 +6,7 @@
  * editor's next autosave would silently revert.
  */
 
-import type { TermLinkTarget, TermMatchOptions } from '../core/prose-autolink';
+import type { SpanFinder, TermLinkTarget, TermMatchOptions } from '../core/prose-autolink';
 
 export interface LiveEditorOps {
   narrativeId: string;
@@ -16,6 +16,8 @@ export interface LiveEditorOps {
   unlinkAll(): number;
   /** Chip every match of `term` to `target` in the live doc. Returns count. */
   linkTerm(term: string | readonly string[], target: TermLinkTarget, opts: TermMatchOptions): number;
+  /** Chip every span `spansOf` finds in the live doc's text (outside links) to `target`. Returns count. */
+  linkSpans(spansOf: SpanFinder, target: TermLinkTarget): number;
 }
 
 let current: LiveEditorOps | null = null;

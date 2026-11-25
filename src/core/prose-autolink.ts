@@ -26,9 +26,10 @@ import type { Element } from './types';
 import { findOwLinks, isChipLink, namedId, owLinkHref, readOwHref } from './ow-links';
 
 /**
- * The shortest name or alias the MENTIONS path counts (`mentionTermsFor`,
- * the context pane's "Mentioned, unlinked"). The hints and link-all take the
- * SDK finder's own minimum, three code points after its trim (conv. 197).
+ * The shortest name or alias `mentionTermsFor` lists (the `terms` of an
+ * unlinked-mentions result, read by no count or write). Every count and link
+ * takes the SDK finder's own minimum, three code points after its trim
+ * (conv. 197).
  */
 export const MIN_NAME_CHARS = 3;
 /**
@@ -163,13 +164,40 @@ const ownFinders = new WeakMap<Element, OwNameFinder<Element> | null>();
  */
 export function mentionsByName(el: Element, text: string): boolean {
   if (text === '') return false;
+  const finder = ownFinderOf(el);
+  return finder !== null && finder(text).length > 0;
+}
+
+/**
+ * The one element's own finder, made once per element object: its name and
+ * aliases as the hints read them, folded case. `null` when it holds no name
+ * the finder keeps, or has no id to answer with (the SDK refuses one).
+ */
+export function ownFinderOf(el: Element): OwNameFinder<Element> | null {
   let finder = ownFinders.get(el);
   if (finder === undefined) {
     const { names, holds } = finderNamesOf(el);
-    finder = holds ? nameFinder([el], { case: 'folded', names: () => names }) : null;
+    const hasId = typeof el.id === 'string' && el.id !== '';
+    finder = holds && hasId ? nameFinder([el], { case: 'folded', names: () => names }) : null;
     ownFinders.set(el, finder);
   }
-  return finder !== null && finder(text).length > 0;
+  return finder;
+}
+
+/** `[from, to)` UTF-16 offsets into the text it is given, ascending, none overlapping, none with white space at an edge. */
+export type SpanFinder = (text: string) => Array<[number, number]>;
+
+/**
+ * Where this element is named in a text, by its own finder ({@link ownFinderOf}):
+ * the span source of the context pane's "Mentioned, unlinked" count and its
+ * Link all, so the two read one rule. Over the one element alone, so a name it
+ * shares with another counts as its own: the writer pressed Link all on this
+ * element's card. `null` when the element holds nothing to find.
+ */
+export function elementSpans(el: Element): SpanFinder | null {
+  const finder = ownFinderOf(el);
+  if (!finder) return null;
+  return text => (text === '' ? [] : finder(text).map(f => [f.start, f.end] as [number, number]));
 }
 
 function makeAutolinkIndex(elements: readonly Element[]): AutolinkIndex {
@@ -520,37 +548,69 @@ export interface TermLinkMarkdownResult {
 }
 
 /**
+ * The typed term as a span source (the find bar's "Link to element" and the
+ * compiled view): every non-empty match, trimmed of its edge white space. A
+ * fresh copy of the scanner per text, so no `lastIndex` carries between texts.
+ */
+export function termSpans(term: string | readonly string[], opts: TermMatchOptions = {}): SpanFinder {
+  const scanner = buildTermScanner(term, opts);
+  if (!scanner) return () => [];
+  return text => {
+    const re = new RegExp(scanner.source, scanner.flags);
+    const spans: Array<[number, number]> = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      if (m[0].length === 0) { re.lastIndex++; continue; }
+      const span = trimMatchSpan(text, m.index, m.index + m[0].length);
+      if (span) spans.push(span);
+    }
+    return spans;
+  };
+}
+
+export interface MarkdownSpanOptions {
+  /** Drop a span that overlaps an existing `[..](..)` link (the term source; a name finder passes links over by itself). */
+  protectLinks: boolean;
+  /** Drop a span whose text a markdown label cannot hold and give back (`[`, `]`, `\`; conv. 197). */
+  safeLabels: boolean;
+}
+
+/** How the mentions path reads a markdown story, in its count and its write alike. */
+export const MENTIONS_MARKDOWN: MarkdownSpanOptions = { protectLinks: false, safeLabels: true };
+const TERM_MARKDOWN: MarkdownSpanOptions = { protectLinks: true, safeLabels: false };
+
+/**
+ * The spans of a markdown story a link may be written over: the source's
+ * spans, less those `opts` drops. One reader for the count and the write, so
+ * the number shown is the number written.
+ */
+export function findSpansMarkdown(story: string, spansOf: SpanFinder, opts: MarkdownSpanOptions): Array<[number, number]> {
+  if (!story) return [];
+  let isProtected: (a: number, b: number) => boolean = () => false;
+  if (opts.protectLinks) {
+    const protectedSpans: Array<[number, number]> = [];
+    const linkRe = /\[[^\]]*\]\([^)]*\)/g;
+    let lm: RegExpExecArray | null;
+    while ((lm = linkRe.exec(story)) !== null) {
+      protectedSpans.push([lm.index, lm.index + lm[0].length]);
+    }
+    isProtected = (a, b) => protectedSpans.some(([s, e]) => a < e && b > s);
+  }
+  return spansOf(story).filter(([a, b]) =>
+    !isProtected(a, b) && !(opts.safeLabels && MARKDOWN_UNSAFE_LABEL.test(story.slice(a, b))));
+}
+
+/**
  * Every unprotected, whitespace-trimmed match of `term` in a markdown story,
- * as [from, to) offsets. Existing links are protected. The one span finder
- * behind {@link linkTermMarkdown} and the unlinked-mentions count, so the
- * number the pane shows is the number the link writes.
+ * as [from, to) offsets. Existing links are protected. The span finder behind
+ * {@link linkTermMarkdown}.
  */
 export function findTermSpansMarkdown(
   story: string,
   term: string | readonly string[],
   opts: TermMatchOptions = {},
 ): Array<[number, number]> {
-  const scanner = buildTermScanner(term, opts);
-  if (!story || !scanner) return [];
-
-  const protectedSpans: Array<[number, number]> = [];
-  const linkRe = /\[[^\]]*\]\([^)]*\)/g;
-  let lm: RegExpExecArray | null;
-  while ((lm = linkRe.exec(story)) !== null) {
-    protectedSpans.push([lm.index, lm.index + lm[0].length]);
-  }
-  const isProtected = (a: number, b: number): boolean =>
-    protectedSpans.some(([s, e]) => a < e && b > s);
-
-  const spans: Array<[number, number]> = [];
-  let m: RegExpExecArray | null;
-  while ((m = scanner.exec(story)) !== null) {
-    if (m[0].length === 0) { scanner.lastIndex++; continue; }
-    const span = trimMatchSpan(story, m.index, m.index + m[0].length);
-    if (!span || isProtected(span[0], span[1])) continue;
-    spans.push(span);
-  }
-  return spans;
+  return findSpansMarkdown(story, termSpans(term, opts), TERM_MARKDOWN);
 }
 
 /** Chip EVERY unprotected match of `term` in a markdown story to `target`. */
@@ -560,7 +620,17 @@ export function linkTermMarkdown(
   target: TermLinkTarget,
   opts: TermMatchOptions = {},
 ): TermLinkMarkdownResult {
-  const spans = findTermSpansMarkdown(story, term, opts);
+  return linkSpansMarkdown(story, termSpans(term, opts), target, TERM_MARKDOWN);
+}
+
+/** Chip every span `findSpansMarkdown` keeps in a markdown story to `target`; the label is the story's own text. */
+export function linkSpansMarkdown(
+  story: string,
+  spansOf: SpanFinder,
+  target: TermLinkTarget,
+  opts: MarkdownSpanOptions,
+): TermLinkMarkdownResult {
+  const spans = findSpansMarkdown(story, spansOf, opts);
   if (spans.length === 0) return { story, linked: 0 };
 
   let out = story;
@@ -589,22 +659,31 @@ export function linkTermRichtext(
   target: TermLinkTarget,
   opts: TermMatchOptions = {},
 ): TermLinkRichtextResult {
-  const scanner = buildTermScanner(term, opts);
-  if (!doc || typeof doc !== 'object' || !scanner) return { doc, linked: 0 };
+  if (!buildTermScanner(term, opts)) return { doc, linked: 0 };
+  return linkSpansRichtext(doc, termSpans(term, opts), target);
+}
+
+/**
+ * Chip every span of each text node to `target` in a sidecar doc. A text
+ * node inside a web link is left alone; any other node is recursed into, and
+ * a chip, which has no content, is never entered. Returns a new doc; the
+ * input is never mutated.
+ */
+export function linkSpansRichtext(
+  doc: unknown,
+  spansOf: SpanFinder,
+  target: TermLinkTarget,
+): TermLinkRichtextResult {
+  if (!doc || typeof doc !== 'object') return { doc, linked: 0 };
   const root = structuredClone(doc) as RtNode;
   let linked = 0;
 
   const splitOne = (node: RtNode): RtNode[] => {
     const text = node.text!;
-    const re = new RegExp(scanner.source, scanner.flags);
     const parts: RtNode[] = [];
     let cursor = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      if (m[0].length === 0) { re.lastIndex++; continue; }
-      const span = trimMatchSpan(text, m.index, m.index + m[0].length);
-      if (!span) continue;
-      const [from, to] = span;
+    for (const [from, to] of spansOf(text)) {
+      if (from < cursor) continue;
       if (from > cursor) parts.push({ ...node, text: text.slice(cursor, from) });
       parts.push({ type: 'elementChip', attrs: { id: target.id, type: target.type, label: text.slice(from, to) } });
       linked++;

@@ -35,7 +35,7 @@ import {
   type AutolinkIndex,
 } from './writing-workspace-autolink';
 import type { Element } from '../core/types';
-import { isValidChipLabel, trimMatchSpan } from '../core/prose-autolink';
+import { isValidChipLabel, trimMatchSpan, type SpanFinder } from '../core/prose-autolink';
 import { lookupHeldId } from '../core/ow-links';
 import type { JSONContent } from '@tiptap/core';
 
@@ -186,6 +186,34 @@ export function linkTermInEditor(
   }
   if (n > 0) editor.view.dispatch(tr);
   return n;
+}
+
+/**
+ * Chip every span `spansOf` finds in each text node of a live editor to
+ * `target`, in one transaction (undoable, autosaved): the context pane's Link
+ * all on the open narrative. A node inside a link mark is passed over, as the
+ * closed writes pass a web link over; the label is the node's own text.
+ */
+export function linkSpansInEditor(
+  editor: Editor,
+  spansOf: SpanFinder,
+  target: { id: string; type: string },
+): number {
+  const chipType = editor.state.schema.nodes.elementChip;
+  if (!chipType) return 0;
+  const found: Array<{ from: number; to: number; label: string }> = [];
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) return;
+    if (node.marks.some(m => m.type.name === 'link')) return;
+    for (const [a, b] of spansOf(node.text)) found.push({ from: pos + a, to: pos + b, label: node.text.slice(a, b) });
+  });
+  if (found.length === 0) return 0;
+  const tr = editor.state.tr;
+  for (const f of found.sort((x, y) => y.from - x.from)) {
+    tr.replaceWith(f.from, f.to, chipType.create({ id: target.id, type: target.type, label: f.label }));
+  }
+  editor.view.dispatch(tr);
+  return found.length;
 }
 
 export interface AutolinkSeed {
