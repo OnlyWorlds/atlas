@@ -357,7 +357,7 @@ function cell(slot: StrandSlot, c: StrandContext, opts: StrandPanelOptions, aske
   return li;
 }
 
-// ---- W5: a row never gets shorter within a visit ----
+// ---- W5: a card's row never gets shorter within a visit; a box's lets go with its press (1.125.39) ----
 
 /**
  * The grid's rows as this visit to Home has drawn them (1.121.2): per cell, the tallest it stood while a
@@ -409,12 +409,19 @@ export function holdStrandRows(root: ParentNode, worldId: string): void {
     rowHold = { worldId, width, tallest: new Map() };
     return;
   }
+  // A cell whose card has become its box lets go in the draw of the press that made it (1.125.39, the
+  // designer's ruling): the band a held box left read to a stranger as a failed load. Only a card is held,
+  // so what moves, moves with that one press; a card being typed in, and anything between presses, never.
+  const isBox = (li: HTMLElement): boolean => !!li.querySelector('[data-box]') && !li.querySelector('[data-card-slot]');
   for (const li of cells) {
-    const h = rowHold.tallest.get(li.getAttribute('data-slot') ?? '');
+    const slot = li.getAttribute('data-slot') ?? '';
+    if (isBox(li)) { rowHold.tallest.delete(slot); li.style.removeProperty(HOLD_VAR); continue; }
+    const h = rowHold.tallest.get(slot);
     if (h) li.style.setProperty(HOLD_VAR, `${h}px`);
   }
   const boxTops = [...grid.querySelectorAll<HTMLElement>('[data-box]')].map(b => b.getBoundingClientRect().top);
   for (const li of cells) {
+    if (isBox(li)) continue;
     const slot = li.getAttribute('data-slot');
     const r = li.getBoundingClientRect();
     if (!slot || r.height <= 0 || !boxTops.some(t => t >= r.bottom - 0.5)) continue;

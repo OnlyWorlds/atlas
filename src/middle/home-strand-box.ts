@@ -321,12 +321,14 @@ export function buildWholeLine(c: StrandContext, opts: StrandPanelOptions): HTML
     b.addEventListener('click', run);
     return b;
   };
+  // No tab is named: Home shows its Picture and Strand tabs only from its next opening, so the
+  // sentence offers the picture itself (a stranger read "the Picture tab" with none on screen).
   p.append(
-    document.createTextNode(`${slotName('narrative', c.strand, true)} is whole. Your world's picture is on the `),
-    link('Picture', 'strand-whole-picture', () => opts.showPicture?.()),
-    document.createTextNode(' tab, and '),
+    document.createTextNode(`${slotName('narrative', c.strand, true)} is whole. See it in your world's `),
+    link('picture', 'strand-whole-picture', () => opts.showPicture?.()),
+    document.createTextNode(', or on '),
     link('the Web', 'strand-whole-web', () => openWebOn(c.worldId, story.id)),
-    document.createTextNode(' draws these links among everything else you make.'),
+    document.createTextNode(', which draws these links among everything else you make.'),
   );
   return p;
 }

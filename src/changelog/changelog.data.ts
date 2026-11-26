@@ -56,6 +56,43 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.39',
+    date: '2026-11-26',
+    theme: 'A new world says what its first boxes ask for',
+    entries: [
+      {
+        id: 'born-says-what-number',
+        title: 'Born, When and Founded say what number they take',
+        body: 'In a world with no calendar, the date on a new Character, Event or Location in the strand now says it is a whole number in your world\'s own time, such as a year.',
+        tags: ['home', 'fix'],
+      },
+      {
+        id: 'strand-no-empty-band',
+        title: 'No empty band under a finished card in the strand',
+        body: 'When a card in the strand became its box, its row kept the card\'s height until the whole strand was done, leaving a wide empty band that looked like something failed to load. The row now closes up in the same press, and nothing moves while you are typing in a card.',
+        tags: ['home', 'fix'],
+      },
+      {
+        id: 'strand-whole-offers-the-picture',
+        title: 'A finished strand offers its picture, not a tab you cannot see yet',
+        body: 'When a strand is whole, its line now links the world\'s picture and the Web directly, instead of naming a Picture tab that only shows the next time you open Home.',
+        tags: ['home', 'fix'],
+      },
+      {
+        id: 'dates-as-numbers-one-name',
+        title: 'A calendar shown as numbers says so in one name',
+        body: 'The calendar menu\'s "None" and a calendar too large to word now both say "dates as numbers", its row explains why in plain words, and its bound is written 1,000 rather than 1000.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'copy-page-json-words',
+        title: 'Copy page as JSON says what it copies',
+        body: 'The tooltip now reads "Copy this page\'s data as JSON", without naming a viewer you would not find anywhere in Atlas.',
+        tags: ['sharing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.38',
     date: '2026-11-26',
     theme: 'A calendar too large to read quickly shows its dates as numbers',

@@ -2470,7 +2470,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     copyPayload.type = 'button';
     copyPayload.className = 'atlas-share-preview-toggle';
     copyPayload.dataset.action = 'copy-payload';
-    copyPayload.title = 'Copy this page as JSON (for the show viewer or manual sharing)';
+    copyPayload.title = "Copy this page's data as JSON";
     copyPayload.innerHTML = `<span class="material-symbols-outlined">data_object</span> <span class="atlas-share-action-word">Copy JSON</span>`;
     copyPayload.addEventListener('click', () => {
       void (async () => {

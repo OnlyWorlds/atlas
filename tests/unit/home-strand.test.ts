@@ -393,7 +393,7 @@ describe('R5, R7, R8: the boxes', () => {
     expect(lines).toEqual([`It tells of event-01, which happened in or at The Quay.`, 'Its main character is Odile, still in or at The Quay.']);
     expect(cellOf('now').querySelector('[data-role="strand-same"] p')!.textContent).toBe('is still in or at The Quay');
     expect(cellOf('location').querySelector('[data-role="strand-join"]')!.textContent).toBe('happened in or at');
-    expect(panel.querySelector('[data-role="strand-whole"]')!.textContent).toBe("narrative-01 is whole. Your world's picture is on the Picture tab, and the Web draws these links among everything else you make.");
+    expect(panel.querySelector('[data-role="strand-whole"]')!.textContent).toBe("narrative-01 is whole. See it in your world's picture, or on the Web, which draws these links among everything else you make.");
     expect(panel.querySelector('[data-role="strand-whole"]')!.getAttribute('tabindex')).toBe('-1');
   });
 

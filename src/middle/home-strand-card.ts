@@ -143,6 +143,15 @@ function whenField(c: StrandContext, type: string, key: string, value: string, o
     read();
     input.addEventListener('input', read);
     wrap.appendChild(reading);
+  } else {
+    // No calendar: the number is in the world's own time, which a stranger cannot guess from an empty box.
+    const hint = document.createElement('p');
+    hint.className = 'atlas-home-strand-when-reading';
+    hint.setAttribute('data-role', 'strand-when-hint');
+    hint.id = `${input.id || `atlas-strand-when-${++fieldSeq}`}-hint`;
+    hint.textContent = "A whole number in your world's own time, such as a year.";
+    input.setAttribute('aria-describedby', hint.id);
+    wrap.appendChild(hint);
   }
   input.addEventListener('input', onInput);
   return { wrap, input };

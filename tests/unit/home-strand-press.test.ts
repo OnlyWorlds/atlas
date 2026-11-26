@@ -388,6 +388,22 @@ describe('G9: Born and Founded on the cards', () => {
     expect((await disk(quay.id)).founding_date).toBe(1102);
   });
 
+  it('with no calendar the date says what number it takes; with one, the calendar reads it instead', async () => {
+    await put('narrative', N, { events: [E], name: 'The Ferry', protagonist: C });
+    await put('character', C, { name: 'Odile' });
+    await put('event', E, { name: 'The night crossing' });
+    await open({ narrative: N, event: E, location: GONE_L });
+    const when = card().querySelector<HTMLInputElement>('[data-field="when"]')!;
+    const hint = card().querySelector('[data-role="strand-when-hint"]')!;
+    expect(hint.textContent).toBe("A whole number in your world's own time, such as a year.");
+    expect(when.getAttribute('aria-describedby')).toBe(hint.id);
+    expect(document.getElementById(hint.id)).toBe(hint);
+    await put('construct', 'cal-1', { name: 'Reckoning', supertype: 'calendar', atlas_calendar: { version: 1, grain: 'year', eras: [{ name: 'Third Age', abbrev: 'TA', start: 0 }], format: '{year} {era}' } });
+    await open({ narrative: N, event: E, location: GONE_L });
+    expect(card().querySelector('[data-role="strand-when-hint"]')).toBeNull();
+    expect(card().querySelector('[data-role="strand-when-reading"]')).not.toBeNull();
+  });
+
   it('the story\'s card asks no date', async () => {
     await open(null);
     expect(card().getAttribute('data-card-slot')).toBe('narrative');
