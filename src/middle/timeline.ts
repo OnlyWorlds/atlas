@@ -580,7 +580,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         item(`${cal.name} (dates as numbers)`, {
           icon: 'calendar_month',
           disabled: viewOnly,
-          title: `Its dates show as numbers: it holds more than ${costly.bound} ${costly.what}, more than Atlas words dates by.`
+          title: `Its dates show as numbers: it holds more than ${costly.bound.toLocaleString('en-US')} ${costly.what}, and wording every date would slow the page.`
             + (viewOnly ? '' : ' Open it to edit.'),
           action: () => new CalendarBuilderModal(toasts, {
             elementId: cal.id,
@@ -593,7 +593,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       item(cal.name, { icon: 'calendar_month', active: lens?.id === cal.id, action: () => setLens(cal.id) });
     }
     if (calendars.length > 0) {
-      item('None (bare numbers)', { icon: 'tag', active: !lens, action: () => setLens(null) });
+      item('None (dates as numbers)', { icon: 'tag', active: !lens, action: () => setLens(null) });
     }
     if (!viewOnly) {
       if (lens) {

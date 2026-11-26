@@ -79,6 +79,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['home', 'fix'],
       },
       {
+        id: 'dates-as-numbers-one-name',
+        title: 'A calendar shown as numbers says so in one name',
+        body: 'The calendar menu\'s "None" and a calendar too large to word now both say "dates as numbers", its row explains why in plain words, and its bound is written 1,000 rather than 1000.',
+        tags: ['charts', 'fix'],
+      },
+      {
         id: 'copy-page-json-words',
         title: 'Copy page as JSON says what it copies',
         body: 'The tooltip now reads "Copy this page\'s data as JSON", without naming a viewer you would not find anywhere in Atlas.',

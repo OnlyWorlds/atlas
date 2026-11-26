@@ -163,7 +163,7 @@ test('lens off restores bare numbers; a saved chart remembers its lens', async (
 
   // Lens off: the now chip returns to the bare number. Nothing moves.
   await page.click('.atlas-cal-chip');
-  await page.locator('.atlas-cal-menu-item', { hasText: 'none (bare numbers)' }).click();
+  await page.locator('.atlas-cal-menu-item', { hasText: 'none (dates as numbers)' }).click();
   await expect(page.locator('.atlas-cal-chip')).toContainText('no calendar');
   await expect(page.locator('.atlas-chart-now-chip')).toContainText('400');
 

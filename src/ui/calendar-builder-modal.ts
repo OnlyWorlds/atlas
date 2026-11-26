@@ -475,7 +475,7 @@ export class CalendarBuilderModal extends BaseModal {
     const costly = calendarTooCostly(config);
     if (costly) {
       panel.innerHTML = `<div class="atlas-calbuilder-errors"><div>⚠ ${escapeText(
-        `Atlas shows this calendar's dates as plain numbers: it holds more than ${costly.bound} ${costly.what}, and wording every date would slow the page. You can still save it.`,
+        `Atlas shows this calendar's dates as numbers: it holds more than ${costly.bound.toLocaleString('en-US')} ${costly.what}, and wording every date would slow the page. You can still save it.`,
       )}</div></div>`;
       return;
     }
