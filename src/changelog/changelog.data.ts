@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.40',
+    date: '2026-11-26',
+    theme: 'A very long month keeps the timeline quick',
+    entries: [
+      {
+        id: 'long-month-timeline',
+        title: 'A very long month keeps the timeline quick',
+        body: 'Zoomed in to days, the timeline counted through each visible month from its first day, so a calendar with months millions of days long slowed every redraw. It now counts only the days on screen.',
+        tags: ['charts', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.39',
     date: '2026-11-26',
     theme: 'A new world says what its first boxes ask for',

@@ -216,7 +216,11 @@ export function calendarTicks(
     for (let y = yLo; y <= yHi && ticks.length < MAX_TICKS; y++) {
       for (const m of monthStartSteps(cfg, y)) {
         const len = months!.lengths[m.month - 1];
-        for (let day = 1; day <= len; day += stride) {
+        // Walk only the days inside the window, on the stride anchored at day 1: a month a million
+        // days long costs what its visible days cost, not its length.
+        const skip = Math.max(0, Math.ceil((min - m.step) / stride)) * stride;
+        const last = Math.min(len, Math.floor(max - m.step) + 1);
+        for (let day = 1 + skip; day <= last; day += stride) {
           const step = m.step + (day - 1);
           if (step < min || step > max) continue;
           ticks.push({ step, label: formatMidLabel(cfg, step), rung: 'day' });
