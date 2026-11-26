@@ -28,6 +28,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { elementHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 import { renderGate } from '../ui/render-gate';
+import { afterPress, pressHeld } from '../ui/press';
 import { nameOrUnnamed } from '../core/type-words';
 
 interface RoomDef {
@@ -171,6 +172,23 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   // render (the world, the selected element); the rest is read at the click.
   const stripGate = renderGate();
 
+  // A press is on the room it went down on when the pointer did not move: the first world's settle
+  // slides every button, and one pressed as the slide began is gone from under the pointer by the
+  // release, so the browser gives that click to the strip. The strip hands it to the room's button.
+  let downOn: { room: string; x: number; y: number } | null = null;
+  strip.addEventListener('pointerdown', (e) => {
+    const btn = (e.target as Element | null)?.closest?.('.atlas-room-nav-btn[data-room]') as HTMLElement | null;
+    downOn = btn ? { room: btn.dataset.room!, x: e.clientX, y: e.clientY } : null;
+  }, true);
+  strip.addEventListener('click', (e) => {
+    const press = downOn;
+    downOn = null;
+    if (!press || e.target !== strip || e.detail === 0) return;
+    if (Math.abs(e.clientX - press.x) > 8 || Math.abs(e.clientY - press.y) > 8) return;
+    const btn = strip.querySelector<HTMLButtonElement>(`.atlas-room-nav-btn[data-room="${press.room}"]`);
+    btn?.click();
+  });
+
   function renderPreview(): void {
     // The Data room with no world (#856) is a room here: its button reads current.
     const here = parseHash(window.location.hash);
@@ -218,6 +236,10 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     // the timer's final pass repaints fresh (380ms, nothing user-critical
     // changes in the strip within that window).
     if (settleTimer) return;
+    // Never rebuild under a held press: the first world's settle pass, a state flood or a route
+    // change would replace the button between its press and its release, and the click is lost
+    // (a room pressed in the first second after Create). The strip draws once the press has landed.
+    if (pressHeld()) { afterPress(render); return; }
     const route = parseHash(window.location.hash);
     const worldId = route.worldId ?? getState().active?.worldId ?? null;
     // A worldId the registry doesn't know (stale URL hash surviving a
@@ -306,10 +328,9 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
         // Collapse with the settle animation, then drop the labels.
         strip.classList.add('is-settling');
         settleTimer = setTimeout(() => {
-          strip.classList.remove('is-settling');
           settleTimer = null;
           localStorage.setItem(NAV_LABELS_KEY, '0');
-          render();
+          afterPress(() => { render(); strip.classList.remove('is-settling'); });
         }, 420);
       } else {
         // Mount labels pre-collapsed, then release for the expand transition.
@@ -411,11 +432,14 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       // Lock re-renders out for the animation's lifetime FIRST, then collapse
       // the labels two frames later (they need one paint at full width).
       settleTimer = setTimeout(() => {
-        strip.classList.remove('is-settling');
         settleTimer = null;
-        render(); // clean pass without labels
+        // The clean pass without labels, once any press has landed; the labels stay collapsed until
+        // it draws (dropping the class first would grow them back under a held press).
+        afterPress(() => { render(); strip.classList.remove('is-settling'); });
       }, 420);
-      requestAnimationFrame(() => requestAnimationFrame(() => strip.classList.add('is-settling')));
+      // The collapse moves every button: it starts only once no press is held, so a press that went
+      // down on a button at rest lands on it.
+      requestAnimationFrame(() => requestAnimationFrame(() => afterPress(() => strip.classList.add('is-settling'))));
     }
   }
 
