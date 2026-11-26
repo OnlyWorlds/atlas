@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.38',
+    date: '2026-11-26',
+    theme: 'A calendar too large to read quickly shows its dates as numbers',
+    entries: [
+      {
+        id: 'calendar-too-large',
+        title: 'A very large calendar shows its dates as numbers instead of slowing the page',
+        body: 'A calendar holding more than 256 eras, 256 months, 64 extra days or 256 weekdays, a leap rule with more than 8 exceptions, a date pattern over 1,000 characters or a name over 1,000 characters now shows its dates as plain numbers. Its row in the calendar menu says why and opens it to edit, and the calendar is kept as written. Before, a world file holding such a calendar could make the page stop answering.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'too-deep-says-what-to-do',
+        title: 'A world.json nested too deep says what to do next',
+        body: 'When Atlas refuses a folder or a world file because its world.json is nested too deep, the message now says what to do: get a copy written with less nesting, then open that.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.37',
     date: '2026-11-25',
     theme: 'Link to element finds a name you unlinked',

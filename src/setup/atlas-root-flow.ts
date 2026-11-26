@@ -253,7 +253,7 @@ export async function discoverWorldsInRoot(
 
 /** Why a world folder's world.json that is there could not be read (serial 148: past the depth bound, or not JSON). */
 export function unreadableWorldJsonSentence(err: CorruptFileError): string {
-  if (err.tooDeep) return `The world.json in that folder is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it.`;
+  if (err.tooDeep) return `The world.json in that folder is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it. The tool that wrote it can write it again with less nesting: then open the folder again.`;
   return 'The world.json in that folder cannot be read as JSON, so Atlas does not open it. A git merge or an interrupted copy can do this: fix the file and open the folder again.';
 }
 
