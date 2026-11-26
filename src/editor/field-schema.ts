@@ -51,7 +51,7 @@ const SHORT_TEXT_FIELDS = new Set(['name', 'supertype', 'subtype', 'image_url'])
 function resolveWidget(fieldName: string, rawType: string | undefined): WidgetKind {
   if (rawType === 'single_link') return 'single-link';
   if (rawType === 'multi_link') return 'multi-link';
-  if (rawType === 'number' || rawType === 'integer' || rawType === 'integer_max') return 'number';
+  if (rawType === 'number' || rawType === 'integer') return 'number';
   // default: text
   if (SHORT_TEXT_FIELDS.has(fieldName)) return 'text-short';
   return 'text-long';
@@ -208,19 +208,19 @@ export function polymorphicPairFor(type: ElementType, sectionField: string): { i
   return { idField, typeField };
 }
 
-/** Field names whose SDK schema type is numeric (number / integer / integer_max). */
+/** Field names whose SDK schema type is numeric (number / integer). */
 export function numberFieldsFor(type: ElementType): Set<string> {
   const schema = (FIELD_SCHEMA as any)[type];
   const out = new Set<string>();
   if (!schema) return out;
   for (const [name, raw] of Object.entries(schema)) {
     const t = (raw as { type?: string })?.type;
-    if (t === 'number' || t === 'integer' || t === 'integer_max') out.add(name);
+    if (t === 'number' || t === 'integer') out.add(name);
   }
   return out;
 }
 
-/** The schema's scalar fields of a type by kind: `text`, `integer` (integer / integer_max) or `number`. */
+/** The schema's scalar fields of a type by kind: `text`, `integer` or `number`. */
 export function scalarKindsFor(type: ElementType): Map<string, 'text' | 'integer' | 'number'> {
   const schema = (FIELD_SCHEMA as any)[type];
   const out = new Map<string, 'text' | 'integer' | 'number'>();
@@ -228,7 +228,7 @@ export function scalarKindsFor(type: ElementType): Map<string, 'text' | 'integer
   for (const [name, raw] of Object.entries(schema)) {
     const t = (raw as { type?: string })?.type;
     if (t === 'text') out.set(name, 'text');
-    else if (t === 'integer' || t === 'integer_max') out.set(name, 'integer');
+    else if (t === 'integer') out.set(name, 'integer');
     else if (t === 'number') out.set(name, 'number');
   }
   return out;
