@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.41',
+    date: '2026-11-26',
+    theme: 'A room pressed right after a new world opens opens',
+    entries: [
+      {
+        id: 'room-press-after-create',
+        title: 'A room button pressed right after making a world opens its room',
+        body: 'For about a second after a new world opened, the room buttons were still settling into place, and a press on one could be lost: the room stayed Home. A press now lands on the room it went down on, and the buttons hold still while it is held.',
+        tags: ['layout', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.40',
     date: '2026-11-26',
     theme: 'A very long month keeps the timeline quick',
