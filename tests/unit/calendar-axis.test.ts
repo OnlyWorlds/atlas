@@ -165,6 +165,25 @@ describe('calendarTicks — day rung', () => {
     expect(festivals.length).toBe(1);
   });
 
+  it("walks only the window's days, so a very long month costs what is on screen", () => {
+    // A world may write a month of any length; the walk once began at day 1 every redraw.
+    const len = 200_000_000;
+    const cfg: CalendarConfig = { version: 2, grain: 'day', format: '{day} {month} {year}', bundles: { months: { names: ['Long', 'Short'], lengths: [len, 30] } } };
+    const min = len - 60.5; const max = len; const w = 1200;
+    calendarTicks(cfg, min, max, w, linearToX(min, max, w));
+    const t0 = performance.now();
+    const ticks = calendarTicks(cfg, min, max, w, linearToX(min, max, w));
+    const ms = performance.now() - t0;
+    const days = ticks.filter(t => t.rung === 'day');
+    expect(days.length).toBeGreaterThan(0);
+    for (const t of days) {
+      expect(t.step).toBeGreaterThanOrEqual(min);
+      expect(t.step).toBeLessThanOrEqual(max);
+      expect(t.step % 10).toBe(0); // the 10-day stride, anchored at day 1 (step 0)
+    }
+    expect(ms).toBeLessThan(5);
+  });
+
   it('era landmarks outrank colliding day ticks', () => {
     const min = -30; const max = 30; const w = 1200;
     const ticks = calendarTicks(KIRROWMOSS, min, max, w, linearToX(min, max, w));
