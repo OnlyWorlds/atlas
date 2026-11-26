@@ -67,6 +67,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['home', 'fix'],
       },
       {
+        id: 'strand-no-empty-band',
+        title: 'No empty band under a finished card in the strand',
+        body: 'When a card in the strand became its box, its row kept the card\'s height until the whole strand was done, leaving a wide empty band that looked like something failed to load. The row now closes up in the same press, and nothing moves while you are typing in a card.',
+        tags: ['home', 'fix'],
+      },
+      {
         id: 'strand-whole-offers-the-picture',
         title: 'A finished strand offers its picture, not a tab you cannot see yet',
         body: 'When a strand is whole, its line now links the world\'s picture and the Web directly, instead of naming a Picture tab that only shows the next time you open Home.',

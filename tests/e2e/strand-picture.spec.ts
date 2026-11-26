@@ -762,7 +762,8 @@ test('W5: the story\'s box keeps room for its second line, so the Event make mov
 });
 
 /** How far each box filled before a make moved: after the make settled, and the most in any frame drawn meanwhile. */
-type Moves = Record<string, { end: Record<string, number>; frame: Record<string, number> }>;
+/** Per make, per box: where it ended against before the press, and how far down and how far up any frame took it. */
+type Moves = Record<string, { end: Record<string, number>; frame: Record<string, { down: number; up: number }>; heldBoxes: string[] }>;
 
 /**
  * The journey on a new world, each make answered with a name (and a text where the card has one), every
@@ -822,9 +823,17 @@ async function movesAtEachMake(page: Page, snapTo?: string): Promise<Moves> {
       return w.w5Frames;
     });
     const boxes = Object.keys(before);
+    // A cell holding a box (no card in it) holds no height: the band 1.121.2 left under a made box.
+    const heldBoxes = await page.locator('[data-role="home-strand"] .atlas-home-strand-cell').evaluateAll(cells => cells
+      .filter(c => c.querySelector('[data-box]') && !c.querySelector('[data-card-slot]') && (c as HTMLElement).style.getPropertyValue('--strand-hold'))
+      .map(c => c.getAttribute('data-slot') ?? '?'));
     moves[slot] = {
+      heldBoxes,
       end: Object.fromEntries(boxes.map(b => [b, round(after[b] - before[b])])),
-      frame: Object.fromEntries(boxes.map(b => [b, round(Math.max(0, ...frames.filter(f => b in f).map(f => Math.abs(f[b] - before[b]))))])),
+      frame: Object.fromEntries(boxes.map(b => {
+        const ds = frames.filter(f => b in f).map(f => f[b] - before[b]);
+        return [b, { down: round(Math.max(0, ...ds)), up: round(Math.min(0, ...ds)) }];
+      })),
     };
     if (slot === 'event' && snapTo) await page.screenshot({ path: snapTo, fullPage: true });
   }
@@ -832,25 +841,33 @@ async function movesAtEachMake(page: Page, snapTo?: string): Promise<Moves> {
   return moves;
 }
 
-// W5 at every make (1.121.2): within one visit to Home a strand row never gets shorter when a card in it
-// gives way to a box, so no box already filled moves when another is made. 1.121.1 moved the main
-// character's box 42 px up at the Event make (the Event's card taller than the Location's card beside
-// it) and 116 px at the Location make; and while a make's write ran, its card drew a Pick for the element
-// just made, so that box dropped 38 px for a few frames and came back.
+/**
+ * W5 at every make, as 1.125.39 has it (the designer's ruling): a card that becomes its box lets its row
+ * go in that press's own draw, so the boxes below it may close up, once: never down, never past where
+ * they end, never back. The story's box, above every make, never moves. (1.121.2 held every row instead,
+ * and a stranger read the band it left as a failed load; before that, 1.121.1 dropped the main
+ * character's box 38 px for a few frames during a write and brought it back, which the down check holds.)
+ */
+function expectOnlyClosesUp(moves: Moves, soft = false): void {
+  const e = soft ? expect.soft : expect;
+  for (const [make, m] of Object.entries(moves)) {
+    e(m.heldBoxes, `cells holding a box and a held height after the ${make} make`).toEqual([]);
+    for (const [b, d] of Object.entries(m.end)) {
+      e(d, `the ${b} box after the ${make} make closes up, never down`).toBeLessThan(0.5);
+      if (b === 'narrative') e(Math.abs(d), `the story's box after the ${make} make`).toBeLessThan(0.5);
+    }
+    for (const [b, f] of Object.entries(m.frame)) {
+      e(f.down, `the ${b} box never moves down while the ${make} make runs`).toBeLessThan(0.5);
+      e(f.up, `the ${b} box never goes past where it ends while the ${make} make runs`).toBeGreaterThan(m.end[b] - 0.5);
+    }
+  }
+}
+
 for (const tag of ['', ' @firefox']) {
-  test(`W5 at every make: no filled box moves when another is made, nor while it is made, at 1440; once whole the rows close up to a fresh opening's${tag}`, async ({ page }) => {
+  test(`W5 at every make: a box below closes up once, in the press's draw, never down; once whole the rows close up to a fresh opening's${tag}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const moves = await movesAtEachMake(page, SNAPS ? `${SNAPS}/strand-w5-event-1440${tag ? '-firefox' : '-chromium'}.png` : undefined);
-    for (const [make, m] of Object.entries(moves)) {
-      // The make that makes the strand whole lets the rows go (1.122.0, the lead's ruling): only the rows
-      // below a held row close up; nothing above it moves, and nothing moves down.
-      const free = make === 'now' ? new Set(['character']) : new Set<string>();
-      for (const [b, d] of Object.entries(m.end)) {
-        if (free.has(b)) expect(d, `the ${b} box after the ${make} make closes up, never down`).toBeLessThan(0.5);
-        else expect(Math.abs(d), `the ${b} box after the ${make} make`).toBeLessThan(0.5);
-      }
-      for (const [b, d] of Object.entries(m.frame)) if (!free.has(b)) expect(d, `the ${b} box while the ${make} make ran`).toBeLessThan(0.5);
-    }
+    expectOnlyClosesUp(moves);
     // Whole: once settled, no hold is left and every box stands where a fresh opening of the same world
     // draws it, so no gap between rows is wider than the ordinary spacing (the 1.121.2 band gone).
     const tallerHeld = () => page.evaluate(() => {
@@ -899,7 +916,7 @@ for (const tag of ['', ' @firefox']) {
 // per describe group); Chromium only (the Firefox project runs the tagged tests alone).
 test.describe('W5 with classic scrollbars', () => {
   for (const height of [1100, 1300]) {
-    test(`W5 at every make with classic scrollbars shown, at 1440 x ${height}: no filled box moves beyond the whole strand's let-go`, async ({ playwright }, info) => {
+    test(`W5 at every make with classic scrollbars shown, at 1440 x ${height}: a box below closes up once, never down`, async ({ playwright }, info) => {
       const browser = await playwright.chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
       try {
         const page = await (await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1440, height } })).newPage();
@@ -907,14 +924,7 @@ test.describe('W5 with classic scrollbars', () => {
         // The scrollbar is really drawn: Home's border box is wider than its client box.
         expect(await page.locator('.atlas-world-home').evaluate(h => h.offsetWidth - h.clientWidth), 'a classic scrollbar on Home').toBeGreaterThan(0);
         if (process.env.ATLAS_W5_LOG) console.log(`W5 classic ${height}: ${JSON.stringify(moves)}`);
-        for (const [make, m] of Object.entries(moves)) {
-          const free = make === 'now' ? new Set(['character']) : new Set<string>();
-          for (const [b, d] of Object.entries(m.end)) {
-            if (free.has(b)) expect.soft(d, `the ${b} box after the ${make} make closes up, never down`).toBeLessThan(0.5);
-            else expect.soft(Math.abs(d), `the ${b} box after the ${make} make`).toBeLessThan(0.5);
-          }
-          for (const [b, d] of Object.entries(m.frame)) if (!free.has(b)) expect.soft(d, `the ${b} box while the ${make} make ran`).toBeLessThan(0.5);
-        }
+        expectOnlyClosesUp(moves, true);
       } finally {
         await browser.close();
       }
