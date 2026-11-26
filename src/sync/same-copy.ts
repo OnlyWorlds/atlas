@@ -45,7 +45,7 @@ function kindsOf(type: ElementType): Map<string, Kind> {
   const schema = (FIELD_SCHEMA as Record<string, Record<string, { type?: string }>>)[type] ?? {};
   for (const [name, meta] of Object.entries(schema)) {
     if (meta?.type === 'text') m.set(name, 'text');
-    else if (meta?.type === 'integer' || meta?.type === 'number' || meta?.type === 'integer_max') m.set(name, 'number');
+    else if (meta?.type === 'integer' || meta?.type === 'number') m.set(name, 'number');
   }
   for (const rf of relationFieldsFor(type)) m.set(rf.diskField, rf.kind === 'multi' ? 'links' : 'link');
   kindsCache.set(type, m);
