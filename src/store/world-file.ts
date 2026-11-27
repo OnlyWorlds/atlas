@@ -22,7 +22,7 @@
 import { readWorldFile, writeWorldFile, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
 import { unzipSync } from 'fflate';
 import { PlainError } from '../core/plain-error';
-import { FILE_MAX_DEPTH, tooDeep } from './json-depth';
+import { FILE_MAX_DEPTH } from './json-depth';
 import { ATLAS_INTERNAL_DIR, FOLDER_FORMAT_VERSION } from '../core/constants';
 import { withProvenance, type ExportedAs, type WorldSource } from '../core/provenance';
 import { isTransientPath, walkWorld, worldFileName, WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES } from './world-tree';
@@ -218,6 +218,22 @@ export function leftOutRecords(files: WorldFileEntry[], zip: Uint8Array): string
 /** A world file whose world.json nests past the folder format's bound (serial 148), refused as a folder's is. */
 export const TOO_DEEP_WORLD = `The world.json in that world file is nested more than ${FILE_MAX_DEPTH} levels deep, past what the folder format reads, so Atlas does not open it. Ask for a copy written with less nesting, from the tool that made it or whoever sent it, and open that one.`;
 
+/** A world file whose world.json is there and is not JSON. */
+export const WORLD_NOT_JSON = 'The world.json in that world file cannot be read as JSON, so Atlas does not open it. A broken download or an interrupted copy can do this: ask for a new copy from the tool that made it or whoever sent it.';
+
+/** A world file whose world.json holds a number too large to read as written. */
+export const WORLD_NUMBER_TOO_LARGE = 'The world.json in that world file holds a number too large to read as written, so Atlas does not open it. Ask for a copy from the tool that made it or whoever sent it.';
+
+/**
+ * Why a world.json that is there could not be read (the SDK's `worldFault`, set on
+ * a `not_a_world`), in Atlas's words: never "it has no world.json" for one it has.
+ */
+const WORLD_FAULTS: Record<NonNullable<OwWorldFileError['worldFault']>, string> = {
+  too_deep: TOO_DEEP_WORLD,
+  not_json: WORLD_NOT_JSON,
+  number_out_of_range: WORLD_NUMBER_TOO_LARGE,
+};
+
 /** Each of the SDK's refusals, in Atlas's words. */
 // 'name_case' is listed ahead of the pin that adds it, so the bump typechecks the day it lands.
 const REFUSALS: Record<OwWorldFileReason | 'name_case', string> = {
@@ -271,7 +287,8 @@ export function readWorldZip(
       skip: path => isTransientPath(path) || !isPortable(path),
     });
   } catch (err) {
-    throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
+    if (!(err instanceof OwWorldFileError)) throw new PlainError(NOT_OPENABLE);
+    throw new PlainError(err.worldFault ? WORLD_FAULTS[err.worldFault] ?? NOT_OPENABLE : REFUSALS[err.reason] ?? NOT_OPENABLE);
   }
   // A path under `.atlas/` whose first part is a transient FILE's name
   // (`.atlas/making/x`) would collide with the make's own marker.
@@ -280,10 +297,6 @@ export function readWorldZip(
     const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);
     if (rest.includes('/') && isTransientPath(`${ATLAS_INTERNAL_DIR}/${rest.split('/')[0]}`)) throw new PlainError(NOT_OPENABLE);
   }
-  // The SDK parses world.json at any depth; a folder's world.json past the bound is refused at its open, so a
-  // file's is refused here, before anything lands (it used to land as a world that would never open).
-  const worldJson = read.files.find(f => f.path === WORLD_FILE);
-  if (worldJson && tooDeep(new TextDecoder().decode(worldJson.data))) throw new PlainError(TOO_DEEP_WORLD);
   // `demo: true` is this browser's mark for the tour's sandbox, never a world's
   // own: Atlas writes no file from the tour world, so a file carrying it is a
   // tour folder zipped by hand. It opens as a world of the person's own, the

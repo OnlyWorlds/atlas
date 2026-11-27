@@ -72,6 +72,18 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'In a scene\'s text, a name inside a code span, a code block, an HTML tag or comment, or a link reference line is no longer offered as a mention, counted, linked by Link all or read for Featured. Linking it there broke the markup around it.',
         tags: ['writing', 'fix'],
       },
+      {
+        id: 'calendar-standard-bounds',
+        title: 'Calendars follow the standard\'s size limits',
+        body: 'A calendar is now read by the size limits every OnlyWorlds tool shares, such as at most 256 eras and 64 months, in place of Atlas\'s own looser ones, so Atlas and the other tools show the same dates. A calendar past a limit shows its dates as numbers, and the calendar builder names the limit before you save.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'world-file-unreadable-world-json',
+        title: 'A world file with an unreadable world.json says so',
+        body: 'Opening a world file whose world.json is there but cannot be read, because it is not valid JSON, now says that, instead of saying the file has no world.json.',
+        tags: ['import', 'fix'],
+      },
     ],
   },
   {

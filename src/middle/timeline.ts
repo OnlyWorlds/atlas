@@ -29,7 +29,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { capitalise, nameOrUnnamed, ownName, quotedName, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
-import { CALENDAR_WORD, calendarTooCostly, worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { CALENDAR_WORD, worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
 import { parseLegacySeed } from '../core/calendar-seed';
 import { formatStep } from '@onlyworlds/sdk';
 import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
@@ -574,22 +574,6 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     };
 
     for (const cal of calendars) {
-      // A calendar past Atlas's bound is never the lens: its row says so and opens it to edit (the way back in).
-      const costly = calendarTooCostly(cal.config);
-      if (costly) {
-        item(`${cal.name} (dates as numbers)`, {
-          icon: 'calendar_month',
-          disabled: viewOnly,
-          title: `Its dates show as numbers: it holds more than ${costly.bound.toLocaleString('en-US')} ${costly.what}, and wording every date would slow the page.`
-            + (viewOnly ? '' : ' Open it to edit.'),
-          action: () => new CalendarBuilderModal(toasts, {
-            elementId: cal.id,
-            sampleSteps: previewSamples(),
-            onSaved: () => render(),
-          }).open(),
-        });
-        continue;
-      }
       item(cal.name, { icon: 'calendar_month', active: lens?.id === cal.id, action: () => setLens(cal.id) });
     }
     if (calendars.length > 0) {
