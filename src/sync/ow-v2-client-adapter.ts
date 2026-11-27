@@ -121,6 +121,8 @@ export class OwV2Error extends Error {
   readonly retryAfterMs: number | null;
   /** Why keel answered so, when it says (the 409 resync_required's `role` or `view`); null when absent. */
   readonly reason: string | null;
+  /** Which of keel's limits a 422 `invalid_request` passed (`element_bytes`, `element_link_ids`, `extensions_bytes`; an open string), null when absent. */
+  readonly limit: string | null;
   /**
    * True when the body was keel's error envelope. keel answers every error in
    * it; a body without one (the web host's HTML page) was never keel's.
@@ -138,7 +140,7 @@ export class OwV2Error extends Error {
    */
   current: Record<string, unknown> | null = null;
 
-  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null, opts: { sentBody?: boolean; hostBlocked?: boolean; jsonBody?: boolean } = {}) {
+  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown; limit?: unknown } | null, rawBody: string, retryAfter: string | null = null, opts: { sentBody?: boolean; hostBlocked?: boolean; jsonBody?: boolean } = {}) {
     const serverMsg = envelope?.message ?? (rawBody || 'request failed');
     super(`API Error ${status}: ${serverMsg}`);
     this.name = 'OwV2Error';
@@ -148,6 +150,7 @@ export class OwV2Error extends Error {
     this.param = envelope?.param ?? null;
     this.retryAfterMs = parseRetryAfter(retryAfter);
     this.reason = typeof envelope?.reason === 'string' ? envelope.reason : null;
+    this.limit = typeof envelope?.limit === 'string' ? envelope.limit : null;
     this.enveloped = envelope !== null;
     this.sentBody = opts.sentBody === true;
     this.hostBlocked = opts.hostBlocked === true;
@@ -401,7 +404,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       if (proposal) throw new OwProposed(proposal);
     }
     if (!response.ok) {
-      type Envelope = { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown };
+      type Envelope = { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown; limit?: unknown };
       let envelope: Envelope | null = null;
       let jsonBody = false;
       let current: Record<string, unknown> | null = null;
@@ -767,7 +770,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       items: wireItems,
     }, headers) as {
       errors?: boolean;
-      items?: Array<{ status: number; id: string; updated_at?: string; created_at?: string; error?: { code?: string; message?: string; param?: string | null } }>;
+      items?: Array<{ status: number; id: string; updated_at?: string; created_at?: string; error?: { code?: string; message?: string; param?: string | null; limit?: unknown } }>;
     };
     return {
       errors: !!response?.errors,
@@ -779,7 +782,7 @@ export class OwV2ClientAdapter implements OwApiClient {
         // only read-back-backfills items lacking them.
         updatedAt: typeof it.updated_at === 'string' ? it.updated_at : undefined,
         error: it.error
-          ? { code: it.error.code ?? 'unknown', message: it.error.message ?? '', param: it.error.param ?? null }
+          ? { code: it.error.code ?? 'unknown', message: it.error.message ?? '', param: it.error.param ?? null, ...(typeof it.error.limit === 'string' ? { limit: it.error.limit } : {}) }
           : undefined,
       })),
     };

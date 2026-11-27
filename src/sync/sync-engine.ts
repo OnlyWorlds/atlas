@@ -89,7 +89,8 @@ export interface BulkResult {
      * these on an `errors: true` atomic response (counterfactual echoes).
      */
     updatedAt?: string;
-    error?: { code: string; message: string; param: string | null };
+    /** `limit`: which of keel's limits the slot's 422 passed, when keel names it. */
+    error?: { code: string; message: string; param: string | null; limit?: string };
   }>;
 }
 
@@ -2758,6 +2759,7 @@ export class SyncEngine {
         ...(typeof res?.status === 'number' ? { status: res.status } : {}),
         ...(errObj.code ? { code: errObj.code } : {}),
         ...(errObj.param ? { param: errObj.param } : {}),
+        ...('limit' in errObj && typeof errObj.limit === 'string' ? { limit: errObj.limit } : {}),
         source: 'server',
       });
       onItemDone();
@@ -4727,7 +4729,7 @@ function failureOf(
     // What the details block may print: the server's status and code,
     // never its message, which can quote a name. The web host's refusal has
     // no keel code, and its record has none: that absence is its kind (R6).
-    ...(typed ? { status: typed.status, ...(isHostRefusal(err) ? {} : { code: typed.code }), ...(typed.param ? { param: typed.param } : {}), source: 'server' as const } : {}),
+    ...(typed ? { status: typed.status, ...(isHostRefusal(err) ? {} : { code: typed.code }), ...(typed.param ? { param: typed.param } : {}), ...(typed.limit ? { limit: typed.limit } : {}), source: 'server' as const } : {}),
     ...(!typed && isHostRefusal(err) ? { status: 403, source: 'server' as const } : {}),
     // The host's "Blocked" page, whose cause the words can name.
     ...(isHostBlocked(err) ? { host_blocked: true } : {}),
@@ -4866,11 +4868,11 @@ function emptyResult(): SyncResult {
  * structurally so the engine stays decoupled from the adapter module and
  * so errors that crossed a module boundary still qualify.
  */
-function typedError(err: unknown): { status: number; code: string; param: string | null; message: string } | null {
+function typedError(err: unknown): { status: number; code: string; param: string | null; limit: string | null; message: string } | null {
   if (!(err instanceof Error)) return null;
-  const e = err as Error & { status?: unknown; code?: unknown; param?: unknown };
+  const e = err as Error & { status?: unknown; code?: unknown; param?: unknown; limit?: unknown };
   if (typeof e.status !== 'number' || typeof e.code !== 'string') return null;
-  return { status: e.status, code: e.code, param: typeof e.param === 'string' ? e.param : null, message: e.message };
+  return { status: e.status, code: e.code, param: typeof e.param === 'string' ? e.param : null, limit: typeof e.limit === 'string' ? e.limit : null, message: e.message };
 }
 
 /**

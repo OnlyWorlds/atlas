@@ -31,7 +31,7 @@ import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
 import { elementHash, navigate } from '../core/router';
 import { issuesFor, clearSyncIssues, type SyncIssue } from '../sync/sync-issues';
-import { HOST_REFUSAL_CAUSE } from '../sync/sync-failure-copy';
+import { HOST_REFUSAL_CAUSE, isLinkLimit } from '../sync/sync-failure-copy';
 import { buildFailureDetails } from '../core/problems';
 import { detailsContext } from '../ui/problem-fixes';
 import {
@@ -917,7 +917,7 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
     case 'too_large':
       return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
     case 'over_limit':
-      return /links across all its lists/i.test(f.message ?? '')
+      return isLinkLimit(f)
         ? 'It holds more than 5,000 links, more than OnlyWorlds takes in one element. Remove some links, or split it over more than one element, to let it sync.'
         : 'It holds more than 1 MB of text and links, more than OnlyWorlds takes in one element. Shorten a text, or split it over more than one element, to let it sync.';
     case 'not_yours':

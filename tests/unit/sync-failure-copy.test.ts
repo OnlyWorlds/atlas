@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { classifyFailure, describeFailures, failureToastOnce, __resetFailureToasts } from '../../src/sync/sync-failure-copy';
+import { classifyFailure, describeFailures, failureToastOnce, isLinkLimit, __resetFailureToasts } from '../../src/sync/sync-failure-copy';
 import type { PerElementFailure } from '../../src/core/types';
 import { syncIssueLine } from '../../src/middle/settings-world';
 import { REPLACED_HELD_LINE } from '../../src/sync/sync-engine';
@@ -56,6 +56,27 @@ describe('sync failure copy', () => {
       expect(line).not.toContain('tries again');
       expect(line).not.toContain('—');
     }
+  });
+
+  // keel names the limit in the envelope (`limit`, a key of its API document's limits): read before the
+  // sentence, so a reworded sentence still says which limit, and a server that sends none still reads by the words.
+  it('reads keel\'s limit key first, the sentence only where keel sends none', () => {
+    const NEW_WORDS = 'API Error 422: This element was not saved: it is too large.';
+    const keyed = (id: string, limit: string): PerElementFailure => ({ ...over(id, NEW_WORDS), limit });
+    expect(classifyFailure(over('a', NEW_WORDS))).toBe('other');
+    expect(classifyFailure(keyed('a', 'element_bytes'))).toBe('over_limit');
+    expect(classifyFailure(keyed('a', 'element_link_ids'))).toBe('over_limit');
+    expect(classifyFailure(keyed('a', 'extensions_bytes'))).toBe('too_large');
+    expect(classifyFailure({ ...keyed('a', 'element_bytes'), status: 500 })).toBe('other');
+    // An open string: a limit Atlas does not know yet falls to the mildest reading, or to its sentence.
+    expect(classifyFailure(keyed('a', 'world_bytes'))).toBe('other');
+    expect(classifyFailure({ ...over('a', BYTES), limit: 'world_bytes' })).toBe('over_limit');
+    const row = (failure: PerElementFailure) => syncIssueLine({ kind: 'over_limit', element_id: failure.element_id, type: 'location', failure } as never, 'folder');
+    // The key decides which limit, whatever the sentence says.
+    expect(row(keyed('a', 'element_link_ids'))).toContain('more than 5,000 links');
+    expect(row({ ...over('b', LINKS), limit: 'element_bytes' })).toContain('more than 1 MB of text and links');
+    expect(isLinkLimit({ message: LINKS })).toBe(true);
+    expect(isLinkLimit({ message: BYTES })).toBe(false);
   });
 
   // From the Discord report: Chromium's stock text for a held file reached the toast verbatim.
