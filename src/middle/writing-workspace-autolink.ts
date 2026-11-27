@@ -34,7 +34,7 @@ import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Element } from '../core/types';
-import { buildAutolinkIndex, promotionLabel } from '../core/prose-autolink';
+import { buildAutolinkIndex, promotionLabel, CODE_BLOCK, CODE_MARK } from '../core/prose-autolink';
 import { namedId } from '../core/ow-links';
 import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 
@@ -90,6 +90,8 @@ function scanDocForMatches(
     if (!node.isText) return;
     // If the parent is an elementChip, skip — already linked.
     if (parent?.type.name === 'elementChip') return;
+    // A name inside code stays as it is (the code mark, a code block), as a markdown story's code spans do.
+    if (parent?.type.name === CODE_BLOCK || node.marks.some(m => m.type.name === CODE_MARK)) return;
     const text = node.text ?? '';
     if (text.length === 0) return;
 
