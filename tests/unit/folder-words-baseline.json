@@ -30,7 +30,7 @@
   "src/store/fixed-names.ts": 2,
   "src/store/folder-store-fs.ts": 25,
   "src/store/fs-utils.ts": 2,
-  "src/store/world-file.ts": 4,
+  "src/store/world-file.ts": 6,
   "src/store/world-tree.ts": 4,
   "src/sync/account-worlds.ts": 1,
   "src/sync/sync-attach.ts": 4,
