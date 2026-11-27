@@ -449,7 +449,8 @@ function buildChartStrip(elements: readonly Element[], worldId: string, savedCha
   // exactly one calendar. Resolving it here keeps "home is the zoomed-out
   // truth, the room is the same picture with controls" actually true.
   const activeCalendarId = getState().registry.worlds.find(w => w.id === worldId)?.active_calendar_id;
-  const homeLens = resolveCalendarLens([...elements], activeCalendarId, { fallbackToOnly: true });
+  const homeLens = resolveCalendarLens([...elements], activeCalendarId,
+    { fallbackToOnly: true, world: getState().active?.worldId === worldId ? getState().active?.meta : undefined });
   const chart: ChartConfig = {
     schema_version: 1,
     id: 'home-tableau',

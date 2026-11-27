@@ -29,7 +29,7 @@ import {
   type CalendarConfig, type CalendarEra, type CalendarIntercalary,
   validateCalendarConfig, formatStep,
 } from '@onlyworlds/sdk';
-import { CALENDAR_SUPERTYPE, calendarTooCostly, readCalendarValue } from '../core/calendar-lens';
+import { CALENDAR_SUPERTYPE, readCalendarValue } from '../core/calendar-lens';
 // view-only-ok: opened only from the Charts calendar menu, which a view-only world does not show (timeline.ts) (conv. 149).
 
 export interface CalendarBuilderOpts {
@@ -470,13 +470,6 @@ export class CalendarBuilderModal extends BaseModal {
     const structural = errors.filter(e => e !== 'The calendar needs a name');
     if (structural.length > 0) {
       panel.innerHTML = `<div class="atlas-calbuilder-errors">${structural.map(e => `<div>⚠ ${escapeText(e)}</div>`).join('')}</div>`;
-      return;
-    }
-    const costly = calendarTooCostly(config);
-    if (costly) {
-      panel.innerHTML = `<div class="atlas-calbuilder-errors"><div>⚠ ${escapeText(
-        `Atlas shows this calendar's dates as numbers: it holds more than ${costly.bound.toLocaleString('en-US')} ${costly.what}, and wording every date would slow the page. You can still save it.`,
-      )}</div></div>`;
       return;
     }
     const samples = this.opts.sampleSteps.length > 0 ? this.opts.sampleSteps : [0];

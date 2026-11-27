@@ -131,7 +131,7 @@ function whenField(c: StrandContext, type: string, key: string, value: string, o
   input.setAttribute('data-field', 'when');
   input.setAttribute('data-strand-key', key);
   const wrap = field(w.label, input);
-  const lens = resolveCalendarLens(c.all as Element[], c.entry?.active_calendar_id, { fallbackToOnly: true });
+  const lens = resolveCalendarLens(c.all as Element[], c.entry?.active_calendar_id, { fallbackToOnly: true, world: c.meta });
   if (lens) {
     const reading = document.createElement('p');
     reading.className = 'atlas-home-strand-when-reading';

@@ -98,7 +98,7 @@ function silent(worldId: string, noteId?: NoteId): boolean {
 function speaksCalendar(): boolean {
   const s = getState();
   const id = s.active ? entryOf(s.active.worldId)?.active_calendar_id : null;
-  return resolveCalendarLens(s.data.elements, id, { fallbackToOnly: true }) !== null;
+  return resolveCalendarLens(s.data.elements, id, { fallbackToOnly: true, world: s.active?.meta }) !== null;
 }
 
 /**

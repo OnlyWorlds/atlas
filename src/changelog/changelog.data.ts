@@ -56,9 +56,40 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.42',
+    date: '2026-11-27',
+    theme: 'Dates speak the calendar the world names',
+    entries: [
+      {
+        id: 'world-names-its-calendar',
+        title: 'Dates speak the calendar the world names',
+        body: 'A world can name which of its calendars its dates are in, as other OnlyWorlds tools set it. Where you have not picked a calendar on this device, Atlas now words the dates in that one, also when the world holds several; a name that points at no calendar leaves the dates as numbers. Your own pick still comes first.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'names-in-markup-stay-markup',
+        title: 'A name inside code or markup is left as it is',
+        body: 'In a scene\'s text, a name inside a code span, a code block, an HTML tag or comment, or a link reference line is no longer offered as a mention, counted, linked by Link all or read for Featured. Linking it there broke the markup around it.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'calendar-standard-bounds',
+        title: 'Calendars follow the standard\'s size limits',
+        body: 'A calendar is now read by the size limits every OnlyWorlds tool shares, such as at most 256 eras and 64 months, in place of Atlas\'s own looser ones, so Atlas and the other tools show the same dates. A calendar past a limit shows its dates as numbers, and the calendar builder names the limit before you save.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'world-file-unreadable-world-json',
+        title: 'A world file with an unreadable world.json says so',
+        body: 'Opening a world file whose world.json is there but cannot be read, because it is not valid JSON, now says that, instead of saying the file has no world.json.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.41',
     date: '2026-11-26',
-    theme: 'A room pressed right after a new world opens opens',
+    theme: 'A room button pressed right after making a world opens its room',
     entries: [
       {
         id: 'room-press-after-create',
@@ -112,7 +143,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       },
       {
         id: 'copy-page-json-words',
-        title: 'Copy page as JSON says what it copies',
+        title: 'Copy JSON says what it copies',
         body: 'The tooltip now reads "Copy this page\'s data as JSON", without naming a viewer you would not find anywhere in Atlas.',
         tags: ['sharing', 'fix'],
       },

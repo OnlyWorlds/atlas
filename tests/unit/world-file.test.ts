@@ -156,7 +156,7 @@ describe('the reader refuses before anything is written', () => {
 
   it('no world.json, an unreadable one, one without an id', () => {
     refuses({ 'w/elements/a.json': strToU8('{}') }, /not a world: it has no world\.json/);
-    refuses({ 'w/world.json': strToU8('{nope') }, /not a world: it has no world\.json/);
+    refuses({ 'w/world.json': strToU8('{nope') }, /world\.json in that world file cannot be read as JSON/);
     refuses({ 'w/world.json': strToU8(j({ name: 'no id' })) }, /not a world: it has no world\.json/);
   });
 

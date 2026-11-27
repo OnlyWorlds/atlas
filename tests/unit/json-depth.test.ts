@@ -9,7 +9,7 @@ import { tooDeep, FILE_MAX_DEPTH } from '../../src/store/json-depth';
 import { FsFolderStore } from '../../src/store/folder-store-fs';
 import { memoryDirectoryWith } from '../../src/store/memory-dir';
 import { openWorldFolder } from '../../src/setup/atlas-root-flow';
-import { readWorldZip, TOO_DEEP_WORLD } from '../../src/store/world-file';
+import { NOT_A_WORLD, readWorldZip, TOO_DEEP_WORLD, WORLD_NOT_JSON } from '../../src/store/world-file';
 import { zipSync } from 'fflate';
 
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -85,5 +85,14 @@ describe('a world file whose world.json nests past the bound', () => {
     for (const depth of [FILE_MAX_DEPTH + 1, 100_000]) {
       expect(() => readWorldZip(worldFileAt(depth))).toThrow(TOO_DEEP_WORLD);
     }
+  });
+
+  it('a world.json that is there and is no JSON, is said for what it is, never "no world.json"', () => {
+    const fileWith = (worldJson: string) => zipSync({
+      'w-0192b000/world.json': enc(worldJson),
+      'w-0192b000/elements/character/ana--00000001.json': enc('{"id":"1","name":"Ana"}'),
+    });
+    expect(() => readWorldZip(fileWith('{"id": '))).toThrow(WORLD_NOT_JSON);
+    expect(() => readWorldZip(zipSync({ 'w-0192b000/elements/character/ana--00000001.json': enc('{"id":"1"}') }))).toThrow(NOT_A_WORLD);
   });
 });
