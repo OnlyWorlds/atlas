@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.46',
+    date: '2026-11-27',
+    theme: 'Full page says it is a preview in this tab only',
+    entries: [
+      {
+        id: 'full-page-says-preview',
+        title: 'Full page says its address cannot be sent',
+        body: 'Full page opens a page in a tab of its own, at an address that only this tab can open. The tab now says so above the page, with Publish as the way to share it, and its title ends in "preview".',
+        tags: ['sharing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.45',
     date: '2026-11-27',
     theme: 'An element too large for OnlyWorlds says so',
