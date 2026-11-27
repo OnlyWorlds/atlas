@@ -73,6 +73,8 @@ export const FULL_PIN_HINT = `Included pins share their element's name, type, de
 export const FULL_PIN_ON = `Sharing every filled-in field of this element, ${FULL_PIN_LEAVES}. Click to share only name, type, description and image.`;
 /** The hint drawn above a map block's pins: short, so it points at the switch and the list rather than repeat them. */
 export const FULL_PIN_SHOWN_HINT = 'Checked pins share name, type, description and image. Click Full on a pin to share more of its element: the switch says what, and the list of what this page shares names each field.';
+/** Said at the top of a Full page tab: its address is this browser's own, so it cannot be sent. */
+export const FULL_PAGE_NOTE = 'A preview in this tab only: its address opens nowhere else. To share the page, publish it.';
 export const FULL_PIN_OFF = `Sharing name, type, description and image. Click to share every filled-in field of this element, ${FULL_PIN_LEAVES}.`;
 
 /**
@@ -1529,7 +1531,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const fontLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preconnect"]'))
       .filter(l => l.href.includes('fonts.googleapis') || l.href.includes('fonts.gstatic'))
       .map(l => l.outerHTML).join('');
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeText(page.name || 'Page preview')}</title>${fontLinks}<style>${css}</style></head><body class="atlas-share-fullpreview">${pageEl.outerHTML}</body></html>`;
+    // The tab's address is a blob: of this browser, revoked a minute on: say so where it opens, since nothing
+    // else on the tab tells a person it cannot be sent.
+    const note = `<p class="atlas-share-fullpreview-note" role="note">${FULL_PAGE_NOTE}</p>`;
+    const title = escapeText(`${page.name || 'Page'} · preview`);
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${fontLinks}<style>${css}</style></head><body class="atlas-share-fullpreview">${note}${pageEl.outerHTML}</body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener');

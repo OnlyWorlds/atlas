@@ -16138,6 +16138,12 @@ body.atlas-share-fullpreview > * {
   margin: 0 auto;
   padding: 40px 28px;
 }
+/* What the tab is: a page in this browser only, said above it in the chrome's own grey (the body stays black). */
+body.atlas-share-fullpreview > .atlas-share-fullpreview-note {
+  padding: 16px 28px 12px;
+  color: #a8a8a8;
+  font: 13px/1.5 'Lato', system-ui, sans-serif;
+}
 
 /* ==== The ? overlay (D8) ==== */
 /* The help panel caps at the viewport and scrolls its body — the shortcut

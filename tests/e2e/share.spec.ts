@@ -823,6 +823,9 @@ async function fullPageIconIsAnIcon(page: Page, context: BrowserContext) {
   const [tab] = await Promise.all([context.waitForEvent('page'), page.click('[data-action="full-preview"]')]);
   await tab.waitForLoadState('load');
   await expect(tab.locator('.atlas-share-card-name')).toHaveText('Ireena');
+  // The tab says what its address is, above the page, and its title says preview.
+  await expect(tab.locator('body > .atlas-share-fullpreview-note')).toHaveText(/this tab only: its address opens nowhere else/);
+  await expect(tab).toHaveTitle(/ · preview$/);
   // The ink of the icon's word in the font the page gives it: one glyph in the
   // icon font (about 24 px), the whole word in a fallback font (about 60).
   const icon = tab.locator('.atlas-share-card .material-symbols-outlined').first();
