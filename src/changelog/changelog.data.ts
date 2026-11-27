@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.45',
+    date: '2026-11-27',
+    theme: 'An element too large for OnlyWorlds says so',
+    entries: [
+      {
+        id: 'element-over-limit-said',
+        title: 'An element too large to sync says why and what to do',
+        body: 'OnlyWorlds now takes at most 1 MB of text and links, or 5,000 links, in one element. An element past either limit stays as you wrote it here, and the sync message, Settings and the element\'s own mark now say which limit it passes and that shortening it or splitting it over more than one element lets it sync, instead of a plain "could not sync".',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.44',
     date: '2026-11-27',
     theme: 'A calendar too large to read can be opened again',
