@@ -31,7 +31,7 @@ import { hasFolderMode } from '../core/capabilities';
 import { PublicAskModal } from '../ui/public-ask-modal';
 import { OpenSignInCard } from '../ui/open-sign-in-card';
 import { onlyWorldsSignInOffered } from '../ui/onlyworlds-sign-in-button';
-import { beginOnlyWorldsSignIn, dropStaleResume, type SignInResume } from '../sync/onlyworlds-sign-in';
+import { beginOnlyWorldsSignIn, type SignInResume } from '../sync/onlyworlds-sign-in';
 import { flushBeforeUnloading } from '../core/reload-offer';
 import { problemFor } from '../core/problems';
 import { joinHeldForSignIn } from './join-door';
@@ -163,7 +163,6 @@ function signInWithOnlyWorldsFromCard(toasts: ToastManager, name?: string): void
       await flushBeforeUnloading();
       window.addEventListener('pageshow', (e) => {
         if (!e.persisted) return;
-        dropStaleResume();
         if (heldForSignIn) showSignInCard(toasts, name);
       }, { once: true });
       await beginOnlyWorldsSignIn(resume);

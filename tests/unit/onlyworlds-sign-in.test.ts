@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OwSignInError } from '@onlyworlds/sdk';
 import {
-  SIGN_IN_REDIRECT_URI, SIGN_IN_RESUME_KEY, beginOnlyWorldsSignIn, canSignInWithOnlyWorlds,
+  SIGN_IN_REDIRECT_URI, beginOnlyWorldsSignIn, canSignInWithOnlyWorlds,
   isSignInCallback, readResume, signInCallbackLine, startSignInCallback,
 } from '../../src/sync/onlyworlds-sign-in';
 
@@ -124,6 +124,29 @@ describe('the round trip through the SDK (R3)', () => {
     if (outcome.ok) return;
     expect((outcome.error as OwSignInError).reason).toBe('state_mismatch');
     expect(outcome.cancelled).toBe(false);
+  });
+
+  it("a Cancel carrying another sign-in's state: refused, the route and the held code kept, the pending sign-in left", async () => {
+    const outcome = await pressAndReturn(() => 'error=access_denied&state=an-older-one', new Response('{}', { status: 500 }));
+    expect(sent).toHaveLength(0);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.cancelled).toBe(false);
+    expect((outcome.error as OwSignInError).reason).toBe('state_mismatch');
+    expect(outcome.started).toBe(true);
+    expect(outcome.resume).toEqual({ hash: `#/w/${WORLD}/writing`, door: 'new-api', join: JOIN });
+    expect(location.hash).toBe(`#/w/${WORLD}/writing`);
+    expect(sessionStorage.length).toBe(1);
+  });
+
+  it('a return with no sign-in started in this tab: Home, nothing said as started', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    const outcome = await startSignInCallback(`${SIGN_IN_REDIRECT_URI}?code=c0de&state=s`);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.started).toBe(false);
+    expect(outcome.resume).toEqual({ hash: '#/' });
+    expect(location.pathname + location.hash).toBe('/#/');
   });
 });
 

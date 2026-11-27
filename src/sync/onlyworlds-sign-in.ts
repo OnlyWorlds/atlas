@@ -6,13 +6,14 @@
  * `/signin/callback`. The token is kept as every sign-in keeps it
  * (`after-sign-in.ts`).
  *
- * Atlas keeps its own small resume beside the SDK's record: keel's Cancel
- * comes back with `error=access_denied` and no code, which the SDK refuses
- * as `state_mismatch` and clears with its resume, and a person who cancels
+ * Where the person was rides in the SDK's own record as its `resume`: read
+ * at once on the callback page (`pendingSignInResume`, 4.215.0) so the router
+ * starts on that route, then handed back by `completeSignIn` on every answer,
+ * keel's Cancel and every refusal included (4.214.0), so a person who cancels
  * still lands where they were (contract R5, R7).
  */
 
-import { OwV2Client, OwSignInError } from '@onlyworlds/sdk';
+import { OwV2Client, OwSignInError, pendingSignInResume } from '@onlyworlds/sdk';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 import { JOIN_CODE_RE } from '../core/join-capture';
@@ -24,9 +25,6 @@ export const SIGN_IN_CLIENT_ID = 'atlas';
 export const SIGN_IN_REDIRECT_URI = 'https://atlas.onlyworlds.com/signin/callback';
 export const SIGN_IN_CALLBACK_PATH = '/signin/callback';
 const SIGN_IN_ORIGIN = new URL(SIGN_IN_REDIRECT_URI).origin;
-
-/** Atlas's resume, in this tab's sessionStorage: the SDK keeps its own record beside it. */
-export const SIGN_IN_RESUME_KEY = 'atlas-signin-resume';
 
 /** The doors that come back open after the round trip. */
 export type SignInDoor = 'make-online' | 'new-api';
@@ -80,7 +78,12 @@ const HASH_MAX = 2048;
 export function readResume(raw: string | null | undefined): SignInResume {
   let v: unknown = null;
   try { v = raw ? JSON.parse(raw) : null; } catch { v = null; }
-  const o = (v && typeof v === 'object' && !Array.isArray(v)) ? v as Record<string, unknown> : {};
+  return resumeFrom(v);
+}
+
+/** The same check on a resume the SDK hands back already parsed. */
+export function resumeFrom(v: unknown): SignInResume {
+  const o =(v && typeof v === 'object' && !Array.isArray(v)) ? v as Record<string, unknown> : {};
   const hash = typeof o.hash === 'string' && o.hash.startsWith('#/') && o.hash.length <= HASH_MAX
     && !/[\s<>"]/.test(o.hash) ? o.hash : '#/';
   const out: SignInResume = { hash };
@@ -99,14 +102,6 @@ function sessionStore(): Storage | null {
   try { return globalThis.sessionStorage ?? null; } catch { return null; }
 }
 
-/** Take the resume out of this tab's storage: read once, cleared whatever happens next. `found`: this tab had started one. */
-export function takeResume(): { resume: SignInResume; found: boolean } {
-  const s = sessionStore();
-  let raw: string | null = null;
-  try { raw = s?.getItem(SIGN_IN_RESUME_KEY) ?? null; s?.removeItem(SIGN_IN_RESUME_KEY); } catch { raw = null; }
-  return { resume: readResume(raw), found: raw !== null };
-}
-
 /** How long the exchange may take before the person is told: the SDK reads an abort as offline. */
 export const SIGN_IN_EXCHANGE_LIMIT_MS = 20_000;
 
@@ -118,11 +113,6 @@ function fetchWithin(limitMs: number): typeof fetch {
   };
 }
 
-/** A resume left by a round trip that never came back (Back from onlyworlds.com, then a reload) goes. */
-export function dropStaleResume(): void {
-  try { sessionStore()?.removeItem(SIGN_IN_RESUME_KEY); } catch { /* storage refused */ }
-}
-
 /**
  * Send the tab to onlyworlds.com. The caller has already saved what was
  * pending (R2). Throws when the browser keeps no session storage, since the
@@ -131,19 +121,18 @@ export function dropStaleResume(): void {
 export async function beginOnlyWorldsSignIn(resume: SignInResume, navigate?: (url: string) => void): Promise<void> {
   const s = sessionStore();
   if (!s) throw new OwSignInError('failed', 'no session storage');
-  s.setItem(SIGN_IN_RESUME_KEY, JSON.stringify(resume));
   const client = new OwV2Client({ baseUrl: DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
-  try {
-    await client.signInWithOnlyWorlds({
-      clientId: SIGN_IN_CLIENT_ID,
-      redirectUri: SIGN_IN_REDIRECT_URI,
-      storage: { get: k => s.getItem(k), set: (k, v) => s.setItem(k, v), remove: k => s.removeItem(k) },
-      ...(navigate ? { navigate } : {}),
-    });
-  } catch (err) {
-    dropStaleResume();
-    throw err;
-  }
+  await client.signInWithOnlyWorlds({
+    clientId: SIGN_IN_CLIENT_ID,
+    redirectUri: SIGN_IN_REDIRECT_URI,
+    resume,
+    storage: recordStorage(s),
+    ...(navigate ? { navigate } : {}),
+  });
+}
+
+function recordStorage(s: Storage): { get(k: string): string | null; set(k: string, v: string): void; remove(k: string): void } {
+  return { get: k => s.getItem(k), set: (k, v) => s.setItem(k, v), remove: k => s.removeItem(k) };
 }
 
 export type SignInOutcome =
@@ -155,24 +144,28 @@ export type SignInOutcome =
  * resumed route. Called at module load, before any other request Atlas makes
  * (R3): the SDK takes `code` and `state` out of the address bar before its
  * first await, and this function swaps the path before returning, so the
- * router reads the resumed route.
+ * router reads the resumed route. The route is read from the pending record
+ * before `completeSignIn` is called, since its first, synchronous part
+ * clears a matching record.
  */
 export function startSignInCallback(href: string = location.href, base: string = DEFAULT_V2_BASE): Promise<SignInOutcome> {
-  const cancelled = new URL(href).searchParams.get('error') === 'access_denied';
-  const { resume, found: started } = takeResume();
   const s = sessionStore();
+  const storage = s ? recordStorage(s) : null;
+  const routed = resumeFrom(storage ? pendingSignInResume({ clientId: SIGN_IN_CLIENT_ID, storage }) : null);
   const client = new OwV2Client({ baseUrl: base, client: ATLAS_CLIENT_NAME, fetch: fetchWithin(SIGN_IN_EXCHANGE_LIMIT_MS) });
-  const pending = s
-    ? client.completeSignIn({
-        clientId: SIGN_IN_CLIENT_ID,
-        url: href,
-        storage: { get: k => s.getItem(k), set: (k, v) => s.setItem(k, v), remove: k => s.removeItem(k) },
-      })
+  const pending = storage
+    ? client.completeSignIn({ clientId: SIGN_IN_CLIENT_ID, url: href, storage })
     : Promise.reject(new OwSignInError('state_mismatch', 'no session storage'));
-  try { history.replaceState(null, '', `/${resume.hash}`); } catch { /* the address stays; the router still runs */ }
+  try { history.replaceState(null, '', `/${routed.hash}`); } catch { /* the address stays; the router still runs */ }
   return pending.then(
-    (r): SignInOutcome => ({ ok: true, token: r.token, tokenId: r.tokenId ?? null, username: r.account.username, resume }),
-    (error: unknown): SignInOutcome => ({ ok: false, cancelled, error, resume, started }),
+    (r): SignInOutcome => ({ ok: true, token: r.token, tokenId: r.tokenId ?? null, username: r.account.username, resume: resumeFrom(r.resume) }),
+    (error: unknown): SignInOutcome => {
+      // Every refusal carries the pending record's resume, null when this tab started none (4.214.0).
+      const back = error instanceof OwSignInError ? error.resume : undefined;
+      const started = back !== undefined && back !== null;
+      const cancelled = error instanceof OwSignInError && error.reason === 'cancelled';
+      return { ok: false, cancelled, error, resume: started ? resumeFrom(back) : routed, started };
+    },
   );
 }
 

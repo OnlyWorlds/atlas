@@ -32,16 +32,15 @@ import { applyTheme } from './core/theme';
 import { installUnexpectedErrorReporter } from './ui/unexpected-errors';
 import { captureJoinCode } from './core/join-capture';
 import { captureOpenWorld } from './core/open-capture';
-import { isSignInCallback, startSignInCallback, dropStaleResume, type SignInOutcome } from './sync/onlyworlds-sign-in';
+import { isSignInCallback, startSignInCallback, type SignInOutcome } from './sync/onlyworlds-sign-in';
 import {
   deleteRegistryCopy, restoreRegistryAtBoot, resumeRegistryCopyWrites, stopRegistryCopyWrites,
 } from './registry/registry-copy';
 
 // Sign in with OnlyWorlds' return (contract R3): the code is traded before any
 // other request Atlas makes, and the address becomes `/` plus the route the
-// person pressed from before the router reads it. Anywhere else, a resume a
-// round trip left behind goes.
-const signInReturn: Promise<SignInOutcome> | null = isSignInCallback() ? startSignInCallback() : (dropStaleResume(), null);
+// person pressed from before the router reads it.
+const signInReturn: Promise<SignInOutcome> | null = isSignInCallback() ? startSignInCallback() : null;
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';

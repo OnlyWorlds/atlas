@@ -6,7 +6,7 @@
  * sends the tab to onlyworlds.com.
  */
 
-import { canSignInWithOnlyWorlds, beginOnlyWorldsSignIn, dropStaleResume, type SignInDoor, type SignInResume } from '../sync/onlyworlds-sign-in';
+import { canSignInWithOnlyWorlds, beginOnlyWorldsSignIn, type SignInDoor, type SignInResume } from '../sync/onlyworlds-sign-in';
 import { flushBeforeUnloading } from '../core/reload-offer';
 import { problemFor } from '../core/problems';
 import type { ToastManager } from './toast-manager';
@@ -64,10 +64,9 @@ export function wireOnlyWorldsSignIn(root: ParentNode, toasts: ToastManager, doo
         if (join) resume.join = join;
         await flushBeforeUnloading();
         // Back from onlyworlds.com can bring this very page back from the
-        // browser's cache: the button works again and the parked resume goes.
+        // browser's cache: the button works again.
         window.addEventListener('pageshow', (e) => {
           if (!e.persisted) return;
-          dropStaleResume();
           btn.disabled = false;
           btn.textContent = LABEL;
         }, { once: true });
