@@ -39,7 +39,7 @@ import { toastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
 import { escapeOwned } from '../../core/escape-mark';
 import { proseNamesId } from '../../core/ow-links';
-import { elementSpans, mentionsByName } from '../../core/prose-autolink';
+import { elementSpans, MARKDOWN_TEXT, mentionsByName } from '../../core/prose-autolink';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -106,7 +106,7 @@ export function isElementFeatured(el: Element, narrative: Element): boolean {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (story.length === 0) return false;
   if (proseNamesId(story, el.id, id => getState().data.elements.some(e => e.id === id))) return true;
-  return mentionsByName(el, story);
+  return mentionsByName(el, story, MARKDOWN_TEXT);
 }
 
 function buildPreview(

@@ -55,9 +55,21 @@ export interface AutolinkFound {
   candidate: AutolinkCandidate;
 }
 
+/** How the SDK's finder reads one text: `MARKDOWN_TEXT` for a markdown story, nothing for rich text. */
+export type NameFindOptions = Parameters<OwNameFinder<Element>>[1];
+
+/**
+ * A markdown story, read as markdown by the SDK's finder (4.208.0): no name is
+ * found inside a code span, a fenced code block, an HTML tag or comment, or a
+ * reference definition's line (bare addresses and autolinks it passes over in
+ * any text). Every markdown reader passes it, the count and the write alike;
+ * a rich-text node's text never does, so its literal backticks stay prose.
+ */
+export const MARKDOWN_TEXT: NameFindOptions = Object.freeze({ markdown: true });
+
 export interface AutolinkIndex {
   /** Every whole name in a text, in order, none overlapping; a shared name is never answered. */
-  find(text: string): AutolinkFound[];
+  find(text: string, options?: NameFindOptions): AutolinkFound[];
   /** The ids of every scanned element that holds at least one name the finder keeps, made once with the index. */
   ids: ReadonlySet<string>;
 }
@@ -163,10 +175,10 @@ const ownFinders = new WeakMap<Element, OwNameFinder<Element> | null>();
  * when no mention is left). Before, those three read an ASCII word edge with
  * case as written: `Éowyn` was never found, `kira` never `Kira`.
  */
-export function mentionsByName(el: Element, text: string): boolean {
+export function mentionsByName(el: Element, text: string, options?: NameFindOptions): boolean {
   if (text === '') return false;
   const finder = ownFinderOf(el);
-  return finder !== null && finder(text).length > 0;
+  return finder !== null && finder(text, options).length > 0;
 }
 
 /**
@@ -186,7 +198,7 @@ export function ownFinderOf(el: Element): OwNameFinder<Element> | null {
 }
 
 /** `[from, to)` UTF-16 offsets into the text it is given, ascending, none overlapping, none with white space at an edge. */
-export type SpanFinder = (text: string) => Array<[number, number]>;
+export type SpanFinder = (text: string, options?: NameFindOptions) => Array<[number, number]>;
 
 /**
  * Where this element is named in a text, by its own finder ({@link ownFinderOf}):
@@ -198,7 +210,7 @@ export type SpanFinder = (text: string) => Array<[number, number]>;
 export function elementSpans(el: Element): SpanFinder | null {
   const finder = ownFinderOf(el);
   if (!finder) return null;
-  return text => (text === '' ? [] : finder(text).map(f => [f.start, f.end] as [number, number]));
+  return (text, options) => (text === '' ? [] : finder(text, options).map(f => [f.start, f.end] as [number, number]));
 }
 
 function makeAutolinkIndex(elements: readonly Element[]): AutolinkIndex {
@@ -217,8 +229,8 @@ function makeAutolinkIndex(elements: readonly Element[]): AutolinkIndex {
   const finder = nameFinder(scanned, { case: 'folded', names: el => namesOf.get(el) ?? [] });
   return {
     ids,
-    find(text: string): AutolinkFound[] {
-      return finder(text).map(f => ({
+    find(text: string, options?: NameFindOptions): AutolinkFound[] {
+      return finder(text, options).map(f => ({
         start: f.start,
         end: f.end,
         candidate: {
@@ -331,7 +343,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
   const replacements: Array<{ from: number; to: number; cand: AutolinkCandidate; label: string }> = [];
   const proposed = new Set<string>();
   const passedOver = markdownPassesOver(story);
-  for (const { start, end, candidate: cand } of index.find(story)) {
+  for (const { start, end, candidate: cand } of index.find(story, MARKDOWN_TEXT)) {
     if (only && cand.id !== only) continue;
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
     const label = promotionLabel(story.slice(start, end), cand);
@@ -630,7 +642,7 @@ function markdownPassesOver(story: string): (from: number, to: number) => boolea
 export function findSpansMarkdown(story: string, spansOf: SpanFinder, opts: MarkdownSpanOptions): Array<[number, number]> {
   if (!story) return [];
   const passedOver = markdownPassesOver(story);
-  return spansOf(story).filter(([a, b]) =>
+  return spansOf(story, MARKDOWN_TEXT).filter(([a, b]) =>
     !passedOver(a, b) && !(opts.safeLabels && markdownCannotLinkAt(story, a, b)));
 }
 
@@ -665,10 +677,10 @@ export function linkTermMarkdown(
  * with its escapes inside it, and `labelFromSpan` writes them as read.
  */
 function overReading(spansOf: SpanFinder): SpanFinder {
-  return story => {
-    if (!story.includes('\\')) return spansOf(story);
+  return (story, options) => {
+    if (!story.includes('\\')) return spansOf(story, options);
     const r = readingOf(story);
-    return spansOf(r.text)
+    return spansOf(r.text, options)
       .filter(([a, b]) => b > a)
       .map(([a, b]): [number, number] => [r.from[a], r.to[b - 1]]);
   };

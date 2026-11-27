@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A world can name which of its calendars its dates are in, as other OnlyWorlds tools set it. Where you have not picked a calendar on this device, Atlas now words the dates in that one, also when the world holds several; a name that points at no calendar leaves the dates as numbers. Your own pick still comes first.',
         tags: ['charts', 'fix'],
       },
+      {
+        id: 'names-in-markup-stay-markup',
+        title: 'A name inside code or markup is left as it is',
+        body: 'In a scene\'s text, a name inside a code span, a code block, an HTML tag or comment, or a link reference line is no longer offered as a mention, counted, linked by Link all or read for Featured. Linking it there broke the markup around it.',
+        tags: ['writing', 'fix'],
+      },
     ],
   },
   {
