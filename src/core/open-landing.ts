@@ -68,7 +68,7 @@ export function peekOpenLanding(): OpenLanding | null {
   return landing;
 }
 
-/** A landing as the sign-in round trip parks it (`atlas-signin-resume`): read back by shape there. */
+/** A landing as the sign-in round trip parks it (in the resume the SDK keeps): read back by shape there. */
 export type ParkedLanding =
   | { kind: 'elements'; ids: string[]; at: number }
   | { kind: 'writing'; narrativeId: string | null; at: number };

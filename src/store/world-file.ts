@@ -19,7 +19,7 @@
  * files it leaves out (sync and transient).
  */
 
-import { readWorldFile, writeWorldFile, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
+import { readWorldFile, writeWorldFile, misnamedFixedName, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
 import { unzipSync } from 'fflate';
 import { PlainError } from '../core/plain-error';
 import { FILE_MAX_DEPTH } from './json-depth';
@@ -49,6 +49,10 @@ const NAME_CASE = 'That file is not a world Atlas can open: it holds world.json,
 // The writer refuses a name or a collision as the reader would; when Atlas writes, the names are this world's own.
 const WRITE_NAME = 'This world holds a file whose name cannot go in a world file, so no file was made.';
 const WRITE_COLLISION = 'This world holds two files whose names differ only in capitals or accents, so no file was made.';
+/** The writer refuses a fixed name in other capitals (SDK 4.212.3), as the open does: a folder made in another app after the world opened. */
+export function writeNameCaseSentence(found: string, wanted: string): string {
+  return `This world's folder holds ${found} where the folder format names ${wanted}, so no file was made: rename it ${wanted} and download again.`;
+}
 
 export { WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES };
 
@@ -182,6 +186,10 @@ export function zipWorld(files: WorldFileEntry[], topDir: string, opts: { includ
     if (err instanceof TypeError && !includePrivateRecords && files.some(f => f.path === RECORDS_MANIFEST)) throw new RecordsListUnreadable();
     if (err instanceof OwWorldFileError && err.reason === 'name') throw new PlainError(WRITE_NAME);
     if (err instanceof OwWorldFileError && err.reason === 'collision') throw new PlainError(WRITE_COLLISION);
+    if (err instanceof OwWorldFileError && err.reason === 'name_case') {
+      const m = misnamedFixedName(files.map(f => f.path));
+      throw new PlainError(m ? writeNameCaseSentence(m.found, m.wanted) : WRITE_NAME);
+    }
     throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
   }
 }

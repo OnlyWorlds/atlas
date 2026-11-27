@@ -215,16 +215,14 @@ describe('R1: signed out, one card that holds the sign-in', () => {
     expect(said.filter(s => s.kind === 'error')).toHaveLength(1);
   });
 
-  it('a Back out of the browser cache drops the parked resume and shows the card again', async () => {
+  it('a Back out of the browser cache shows the card again, the id still held', async () => {
     signedOut();
     await runOpenLink(ID, fakeToasts().t);
     cardButton('sign-in-onlyworlds').click();
     await vi.waitFor(() => expect(calls.order).toEqual(['flush', 'begin']));
-    sessionStorage.setItem('atlas-signin-resume', '{"hash":"#/"}');
     const ev = new Event('pageshow') as Event & { persisted?: boolean };
     Object.defineProperty(ev, 'persisted', { value: true });
     window.dispatchEvent(ev);
-    expect(sessionStorage.getItem('atlas-signin-resume')).toBeNull();
     expect(card()).not.toBeNull();
     expect(openHeldForSignIn()).toBe(ID);
   });

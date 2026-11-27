@@ -82,7 +82,8 @@ test('Settings: signed in with no password typed, back on the same route, the ex
   expect(keel.keelOrder[0]).toBe('POST /api/v2/auth/token');
   // The settings block flips to signed in, and the button is gone (R8).
   await expect(page.locator('[data-action="sign-in-onlyworlds"]')).toHaveCount(0);
-  expect(await page.evaluate(() => sessionStorage.getItem('atlas-signin-resume'))).toBeNull();
+  // The SDK's pending record (and the resume inside it) is gone with the return.
+  expect(await page.evaluate(() => sessionStorage.getItem('ow_signin:atlas'))).toBeNull();
 });
 
 test('cancelled on onlyworlds.com: said as a cancel, nothing kept, back on the same route', async ({ page }) => {
