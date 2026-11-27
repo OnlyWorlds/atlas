@@ -35,6 +35,29 @@ describe('sync failure copy', () => {
     expect(text).not.toContain('—');
   });
 
+  // keel's limit on one element (keel pull request 656): a 422 with no param, its sentence in the message,
+  // as the adapter writes it ("API Error 422: ..."), in its two forms.
+  const BYTES = 'API Error 422: This location was not saved: an element holds at most 1 MB of text and links. Shorten a text, or split it over more than one element.';
+  const LINKS = 'API Error 422: This character was not saved: an element holds at most 5,000 links across all its lists. Remove some links, or split it over more than one element.';
+  const over = (id: string, message: string): PerElementFailure => ({ ...f(id, message), operation: 'update', status: 422, code: 'invalid_request' });
+
+  it('names keel\'s limit on one element and the way to sync it, never "tries again"', () => {
+    expect(classifyFailure(over('a', BYTES))).toBe('over_limit');
+    expect(classifyFailure(over('a', LINKS))).toBe('over_limit');
+    expect(classifyFailure({ ...over('a', BYTES), status: 500 })).toBe('other');
+    const text = describeFailures([over('a', BYTES), over('a', BYTES), over('b', LINKS)]);
+    expect(text).toBe('2 elements hold more than OnlyWorlds takes in one element: 1 MB of text and links, or 5,000 links. Shorten a text or remove some links, or split them over more than one element, to let them sync. They stay on your disk.');
+    expect(describeFailures([over('a', BYTES)], 'browser')).toContain('1 element holds more than OnlyWorlds takes in one element');
+    expect(describeFailures([over('a', BYTES)], 'browser')).toContain('It stays in this browser.');
+    const row = (failure: PerElementFailure) => syncIssueLine({ kind: 'over_limit', element_id: failure.element_id, type: 'location', failure } as never, 'folder');
+    expect(row(over('a', BYTES))).toBe('It holds more than 1 MB of text and links, more than OnlyWorlds takes in one element. Shorten a text, or split it over more than one element, to let it sync.');
+    expect(row(over('b', LINKS))).toBe('It holds more than 5,000 links, more than OnlyWorlds takes in one element. Remove some links, or split it over more than one element, to let it sync.');
+    for (const line of [text, row(over('a', BYTES)), row(over('b', LINKS))]) {
+      expect(line).not.toContain('tries again');
+      expect(line).not.toContain('—');
+    }
+  });
+
   // From the Discord report: Chromium's stock text for a held file reached the toast verbatim.
   const HELD = 'An operation that depends on state cached in an interface object was made but the state had changed since it was read from disk.';
   const busy = (id: string): PerElementFailure => ({ ...f(id, HELD), error_name: 'InvalidStateError' });

@@ -916,6 +916,10 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
         : 'Its id is already in use on OnlyWorlds. Give it a new id above.';
     case 'too_large':
       return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
+    case 'over_limit':
+      return /links across all its lists/i.test(f.message ?? '')
+        ? 'It holds more than 5,000 links, more than OnlyWorlds takes in one element. Remove some links, or split it over more than one element, to let it sync.'
+        : 'It holds more than 1 MB of text and links, more than OnlyWorlds takes in one element. Shorten a text, or split it over more than one element, to let it sync.';
     case 'not_yours':
       return issue.type === 'world'
         ? `Only the world's owner can change its details on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`

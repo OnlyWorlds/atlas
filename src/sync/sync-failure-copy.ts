@@ -14,7 +14,7 @@
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_only' | 'review_mark' | 'replaced_held' | 'other';
+export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'over_limit' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_only' | 'review_mark' | 'replaced_held' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -42,6 +42,9 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   // way out, as for another world's, but nothing about another world is true.
   if (f.code === 'id_conflict' && /\bis already in use\b/i.test(m)) return 'id_in_use';
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
+  // keel's limit on one element (1 MB of text and links, 5,000 links): a 422 with no param, so by its
+  // sentence ("This location was not saved: an element holds at most ..."), the way the 64 KB rule is read.
+  if (f.status === 422 && /an element holds at most/i.test(m)) return 'over_limit';
   // A member seat's refusals (#104): by keel's code, never its text.
   if (f.status === 403 && (f.code === 'not_author' || f.code === 'owner_only')) return 'not_yours';
   // keel's keeper rule: a world's Charter Laws, every Object a Law's text names, and the charter mark
@@ -98,6 +101,11 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const large = byKind.get('too_large');
   if (large) {
     parts.push(`${plural(large.length, 'element holds', 'elements hold')} more than 64 KB of custom fields, which is more than OnlyWorlds accepts per element. Shorten a custom field to let ${large.length === 1 ? 'it' : 'them'} sync.`);
+  }
+  const overLimit = byKind.get('over_limit');
+  if (overLimit) {
+    const n = new Set(overLimit.map(f => f.element_id)).size;
+    parts.push(`${plural(n, 'element holds', 'elements hold')} more than OnlyWorlds takes in one element: 1 MB of text and links, or 5,000 links. Shorten a text or remove some links, or split ${n === 1 ? 'it' : 'them'} over more than one element, to let ${n === 1 ? 'it' : 'them'} sync. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
   }
   // Counted by element: the world's own sync record can report twice in one
   // round (the world step and the round's end), and it is one change.
