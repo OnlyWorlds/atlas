@@ -572,6 +572,8 @@ export interface PerElementFailure {
   status?: number;
   code?: string;
   param?: string;
+  /** Which of keel's limits a 422 passed (`element_bytes`, `element_link_ids`, `extensions_bytes`), when keel names it. */
+  limit?: string;
   source?: 'server' | 'disk';
   /**
    * The web host's refusal (status 403, no code) was its page titled

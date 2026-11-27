@@ -28,6 +28,11 @@ export function isBusyFailure(f: Pick<PerElementFailure, 'error_name' | 'message
   return isFileBusyError({ name: f.error_name }) || HELD_FILE_TEXT.test(f.message ?? '');
 }
 
+/** An `over_limit` failure that passed the limit on links, by keel's `limit` when it names one, else by its sentence. */
+export function isLinkLimit(f: Pick<PerElementFailure, 'limit' | 'message'>): boolean {
+  return f.limit ? f.limit === 'element_link_ids' : /links across all its lists/i.test(f.message ?? '');
+}
+
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
   if (isBusyFailure(f)) return 'file_busy';
@@ -41,6 +46,10 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   // keel's words for an id a membership holds (the engine's `ID_IN_USE_LINE`, or keel's own): a new id is the
   // way out, as for another world's, but nothing about another world is true.
   if (f.code === 'id_conflict' && /\bis already in use\b/i.test(m)) return 'id_in_use';
+  // keel names which limit a 422 passed (`limit`, a key of its API document's limits): read first. The
+  // sentences below are the fallback for a server that does not send it.
+  if (f.status === 422 && f.limit === 'extensions_bytes') return 'too_large';
+  if (f.status === 422 && (f.limit === 'element_bytes' || f.limit === 'element_link_ids')) return 'over_limit';
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
   // keel's limit on one element (1 MB of text and links, 5,000 links): a 422 with no param, so by its
   // sentence ("This location was not saved: an element holds at most ..."), the way the 64 KB rule is read.
