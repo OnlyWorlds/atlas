@@ -202,7 +202,7 @@ export function bornOrFounded(el: Element, c: StrandContext): string | null {
   if (!w || w.label === 'When') return null;
   const n = parseTemporalValue((el as unknown as Record<string, unknown>)[w.field]);
   if (n === null || !Number.isInteger(n)) return null;
-  const lens = resolveCalendarLens(c.all as Element[], c.entry?.active_calendar_id, { fallbackToOnly: true });
+  const lens = resolveCalendarLens(c.all as Element[], c.entry?.active_calendar_id, { fallbackToOnly: true, world: c.meta });
   const reading = calendarDateText({ name: w.field, widget: 'number' } as never, n, lens);
   return `${w.label} ${reading ?? String(n)}`;
 }

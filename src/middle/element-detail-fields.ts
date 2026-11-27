@@ -916,7 +916,7 @@ function activeCalendarLens(): WorldCalendar | null {
   const s = getState();
   const worldId = s.active?.worldId;
   const entry = worldId ? s.registry.worlds.find(w => w.id === worldId) : undefined;
-  return resolveCalendarLens(s.data.elements, entry?.active_calendar_id, { fallbackToOnly: true });
+  return resolveCalendarLens(s.data.elements, entry?.active_calendar_id, { fallbackToOnly: true, world: s.active?.meta });
 }
 
 /** "image_url" → "Image URL": the SDK's `fieldLabel` after the prefix step. */

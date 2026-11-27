@@ -12,7 +12,7 @@
  */
 
 import type { Element } from './types';
-import { readCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
+import { readCalendarConfig, speakingCalendar, type CalendarConfig } from '@onlyworlds/sdk';
 import { nameOrUnnamed, ownName } from './type-words';
 
 /** The calendar room's own word for its Construct: a calendar with no name is "the unnamed calendar". */
@@ -122,29 +122,43 @@ export function calendarTooCostly(cfg: CalendarConfig): CalendarTooCostly | null
 export function resolveCalendarLens(
   elements: Element[],
   activeId: string | null | undefined,
-  opts?: {
-    /**
-     * When no lens has EVER been chosen and the world holds exactly one
-     * calendar, speak it. A user who mints a calendar has said what their
-     * world's dates mean, and answering them with bare numbers until they
-     * also pick it from a menu is a worse default than simply using it.
-     *
-     * Deliberately keyed on `undefined` (never chosen), not on falsiness:
-     * `null` is an explicit "no calendar" from the menu and must survive, or
-     * the choice would be un-makeable while one calendar exists.
-     *
-     * Opt-in, because the saved-chart restore path resolves a chart's OWN
-     * stored `calendarId`: a chart saved with no lens should reopen with no
-     * lens, not silently adopt one that was minted afterwards.
-     */
-    fallbackToOnly?: boolean;
-  },
+  opts?:
+    | { fallbackToOnly?: false }
+    | {
+      /**
+       * When no lens has EVER been chosen on this device, speak the calendar
+       * the World itself names (the calendar profile, "Which calendar
+       * speaks", by the SDK's `speakingCalendar`): the element its
+       * `x_calendar` names, or, when it names none, the world's only
+       * calendar. A user who mints a calendar has said what their world's
+       * dates mean, and answering them with bare numbers until they also
+       * pick it from a menu is a worse default than simply using it.
+       *
+       * Deliberately keyed on `undefined` (never chosen), not on falsiness:
+       * `null` is an explicit "no calendar" from the menu and must survive, or
+       * the choice would be un-makeable while one calendar exists. A person's
+       * own pick wins over the World's, as the profile allows.
+       *
+       * Opt-in, because the saved-chart restore path resolves a chart's OWN
+       * stored `calendarId`: a chart saved with no lens should reopen with no
+       * lens, not silently adopt one that was minted afterwards.
+       */
+      fallbackToOnly: true;
+      /**
+       * The World's keys (`world.json`, the active world's meta), so its
+       * `x_calendar` is read. Required with the fallback, so no caller can
+       * forget it; null or undefined when no World is known (it then names
+       * none).
+       */
+      world: object | null | undefined;
+    },
 ): WorldCalendar | null {
   const wordable = (c: WorldCalendar | undefined): WorldCalendar | null =>
     c && !calendarTooCostly(c.config) ? c : null;
   if (activeId === undefined && opts?.fallbackToOnly) {
-    const all = worldCalendars(elements);
-    return all.length === 1 ? wordable(all[0]) : null;
+    const world = opts.world && typeof opts.world === 'object' && !Array.isArray(opts.world) ? opts.world : {};
+    const spoken = speakingCalendar(world, elements as unknown as Parameters<typeof speakingCalendar>[1]);
+    return spoken ? wordable(worldCalendars(elements).find(c => c.id === spoken.id)) : null;
   }
   if (!activeId) return null;
   return wordable(worldCalendars(elements).find(c => c.id === activeId));

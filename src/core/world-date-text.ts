@@ -18,7 +18,7 @@ export function worldDateFormatter(): (n: number) => string {
   const s = getState();
   const worldId = s.active?.worldId;
   const reg = worldId ? s.registry.worlds.find(w => w.id === worldId) : undefined;
-  const lens = resolveCalendarLens(s.data.elements, reg?.active_calendar_id, { fallbackToOnly: true });
+  const lens = resolveCalendarLens(s.data.elements, reg?.active_calendar_id, { fallbackToOnly: true, world: s.active?.meta });
   return n => (lens && Number.isInteger(n) ? formatStep(lens.config, n) : String(n));
 }
 

@@ -72,14 +72,14 @@ describe('resolveCalendarLens', () => {
   // A world holding exactly one calendar, whose owner has never opened
   // the lens menu, should speak that calendar rather than bare numbers.
   it('falls back to the ONLY calendar when a lens was never chosen', () => {
-    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true })?.name)
+    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: null })?.name)
       .toBe('Imperial');
   });
 
   it('respects an EXPLICIT no-calendar choice even when one exists', () => {
     // null is the menu's "no calendar"; falling back here would make the
     // choice impossible to hold while the world has a calendar.
-    expect(resolveCalendarLens(elements, null, { fallbackToOnly: true })).toBe(null);
+    expect(resolveCalendarLens(elements, null, { fallbackToOnly: true, world: null })).toBe(null);
   });
 
   it('does not guess when the world has more than one calendar', () => {
@@ -87,7 +87,38 @@ describe('resolveCalendarLens', () => {
       ...elements,
       el({ id: 'c2', type: 'construct', name: 'Guild', atlas_calendar: CONFIG } as never),
     ];
-    expect(resolveCalendarLens(two, undefined, { fallbackToOnly: true })).toBe(null);
+    expect(resolveCalendarLens(two, undefined, { fallbackToOnly: true, world: null })).toBe(null);
+  });
+
+  // The calendar profile's "Which calendar speaks" (serial 147): the World
+  // names its calendar in x_calendar, and a reader with no choice made on this
+  // device speaks that one.
+  describe("the World's own x_calendar", () => {
+    const two: Element[] = [
+      ...elements,
+      el({ id: 'c2', type: 'construct', name: 'Guild', atlas_calendar: CONFIG } as never),
+      el({ id: 'lore', type: 'construct', name: 'No calendar here' }),
+    ];
+    it('speaks the calendar the World names, among several', () => {
+      expect(resolveCalendarLens(two, undefined, { fallbackToOnly: true, world: { x_calendar: 'c2' } })?.name).toBe('Guild');
+    });
+    it('a person\'s own pick on this device wins over the World\'s', () => {
+      expect(resolveCalendarLens(two, 'c1', { fallbackToOnly: true, world: { x_calendar: 'c2' } })?.name).toBe('Imperial');
+      expect(resolveCalendarLens(two, null, { fallbackToOnly: true, world: { x_calendar: 'c2' } })).toBe(null);
+    });
+    it('a name that points at nothing usable speaks no calendar, never the only one in its place', () => {
+      for (const x of ['gone', 'lore', '', 'C1', 42, {}]) {
+        expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: { x_calendar: x } })).toBe(null);
+      }
+    });
+    it('a World that names none (absent or null) falls back to the only calendar', () => {
+      expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: {} })?.id).toBe('c1');
+      expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: { x_calendar: null } })?.id).toBe('c1');
+      expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: undefined })?.id).toBe('c1');
+    });
+    it('the saved-chart path reads no World', () => {
+      expect(resolveCalendarLens(two, undefined)).toBe(null);
+    });
   });
 
   it('is opt-in: the saved-chart path keeps resolving strictly', () => {

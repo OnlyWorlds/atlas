@@ -55,13 +55,13 @@ describe('resolveCalendarLens: a calendar past the bound is no lens, and stays a
   it('chosen by id, or the only calendar of the world: null, so dates show as numbers', () => {
     const elements = [calendarEl('big', big)];
     expect(resolveCalendarLens(elements, 'big')).toBeNull();
-    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true })).toBeNull();
+    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: null })).toBeNull();
   });
 
   it('at the bound it is the lens', () => {
     const elements = [calendarEl('ok', ok)];
     expect(resolveCalendarLens(elements, 'ok')?.id).toBe('ok');
-    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true })?.id).toBe('ok');
+    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true, world: null })?.id).toBe('ok');
   });
 
   it('worldCalendars still lists it, and the builder still reads it whole', () => {

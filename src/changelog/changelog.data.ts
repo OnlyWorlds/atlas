@@ -56,9 +56,22 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.42',
+    date: '2026-11-27',
+    theme: 'Dates speak the calendar the world names',
+    entries: [
+      {
+        id: 'world-names-its-calendar',
+        title: 'Dates speak the calendar the world names',
+        body: 'A world can name which of its calendars its dates are in, as other OnlyWorlds tools set it. Where you have not picked a calendar on this device, Atlas now words the dates in that one, also when the world holds several; a name that points at no calendar leaves the dates as numbers. Your own pick still comes first.',
+        tags: ['charts', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.41',
     date: '2026-11-26',
-    theme: 'A room pressed right after a new world opens opens',
+    theme: 'A room button pressed right after making a world opens its room',
     entries: [
       {
         id: 'room-press-after-create',
@@ -112,7 +125,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       },
       {
         id: 'copy-page-json-words',
-        title: 'Copy page as JSON says what it copies',
+        title: 'Copy JSON says what it copies',
         body: 'The tooltip now reads "Copy this page\'s data as JSON", without naming a viewer you would not find anywhere in Atlas.',
         tags: ['sharing', 'fix'],
       },

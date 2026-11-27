@@ -485,7 +485,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   function activeLens(): WorldCalendar | null {
     return resolveCalendarLens(getState().data.elements, registryEntry()?.active_calendar_id,
-      { fallbackToOnly: true });
+      { fallbackToOnly: true, world: getState().active?.meta });
   }
 
   function setLens(calendarId: string | null): void {
