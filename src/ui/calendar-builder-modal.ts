@@ -29,7 +29,7 @@ import {
   type CalendarConfig, type CalendarEra, type CalendarIntercalary,
   validateCalendarConfig, formatStep,
 } from '@onlyworlds/sdk';
-import { CALENDAR_SUPERTYPE, readCalendarValue } from '../core/calendar-lens';
+import { CALENDAR_SUPERTYPE, readCalendarValue, readCalendarShapeValue } from '../core/calendar-lens';
 // view-only-ok: opened only from the Charts calendar menu, which a view-only world does not show (timeline.ts) (conv. 149).
 
 export interface CalendarBuilderOpts {
@@ -108,7 +108,10 @@ export class CalendarBuilderModal extends BaseModal {
     if (!el) return empty;
     // Tolerant read (object OR JSON string) — an object-only read here would
     // load an EMPTY draft for a string-config calendar and save would blank it.
-    const cfg = readCalendarValue((el as Record<string, unknown>)['atlas_calendar']);
+    const raw = (el as Record<string, unknown>)['atlas_calendar'];
+    // A calendar past the standard's limits loads by its shape, to be cut down: the preview and Save
+    // stay refused while validateCalendarConfig names a limit, so it never reaches a formatter.
+    const cfg = readCalendarValue(raw) ?? readCalendarShapeValue(raw)?.config ?? null;
     if (!cfg) return { ...empty, name: el.name };
     this.stored = structuredClone(cfg);
     return {

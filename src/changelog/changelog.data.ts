@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.44',
+    date: '2026-11-27',
+    theme: 'A calendar too large to read can be opened again',
+    entries: [
+      {
+        id: 'calendar-past-limits-opens',
+        title: 'A calendar past the size limits is back in the calendar menu',
+        body: 'A calendar past one of the size limits every OnlyWorlds tool shares shows its dates as numbers, and since 1.125.42 it had dropped out of the calendar menu with no word. Its row is back, naming the limit it passes, and opens it in the calendar builder with its own eras and months, so you can cut it down; the builder saves it once it fits.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'download-folder-capitals',
+        title: 'A download over a folder in other capitals says which one',
+        body: 'If a world\'s folder gains Elements, World.json or Spatial in other capitals after it was opened, for example made in another app, Download now names that folder and asks you to rename it, instead of a sentence about unzipping a file.',
+        tags: ['import', 'fix'],
+      },
+      {
+        id: 'sign-in-older-page-cancel',
+        title: 'A Cancel on an older sign-in page is not read as this one',
+        body: 'If you pressed Sign in with OnlyWorlds twice and then cancelled on the first onlyworlds.com page, Atlas now says that sign-in was not started in this tab instead of calling it cancelled. Either way nothing changes, and you land where you were with any invitation or Open link you held still held.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.43',
     date: '2026-11-27',
     theme: 'Names inside code in the editor, too',

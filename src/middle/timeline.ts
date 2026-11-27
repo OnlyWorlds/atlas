@@ -29,7 +29,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { capitalise, nameOrUnnamed, ownName, quotedName, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
-import { CALENDAR_WORD, worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { CALENDAR_WORD, worldCalendars, calendarsPastLimits, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
 import { parseLegacySeed } from '../core/calendar-seed';
 import { formatStep } from '@onlyworlds/sdk';
 import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
@@ -575,6 +575,20 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
     for (const cal of calendars) {
       item(cal.name, { icon: 'calendar_month', active: lens?.id === cal.id, action: () => setLens(cal.id) });
+    }
+    // A calendar past the standard's limits is never the lens: its row says which limit and opens it to edit.
+    for (const big of calendarsPastLimits(getState().data.elements)) {
+      item(`${big.name} (dates as numbers)`, {
+        icon: 'calendar_month',
+        disabled: viewOnly,
+        title: `Its dates show as numbers: ${big.limit.charAt(0).toLowerCase()}${big.limit.slice(1)}, the limit every OnlyWorlds tool reads by.`
+          + (viewOnly ? '' : ' Open it to edit.'),
+        action: () => new CalendarBuilderModal(toasts, {
+          elementId: big.id,
+          sampleSteps: previewSamples(),
+          onSaved: () => render(),
+        }).open(),
+      });
     }
     if (calendars.length > 0) {
       item('None (dates as numbers)', { icon: 'tag', active: !lens, action: () => setLens(null) });

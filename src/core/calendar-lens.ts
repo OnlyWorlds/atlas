@@ -12,7 +12,7 @@
  */
 
 import type { Element } from './types';
-import { readCalendarConfig, speakingCalendar, type CalendarConfig } from '@onlyworlds/sdk';
+import { readCalendarConfig, readCalendarShape, speakingCalendar, type CalendarConfig, type CalendarShape } from '@onlyworlds/sdk';
 import { nameOrUnnamed, ownName } from './type-words';
 
 /** The calendar room's own word for its Construct: a calendar with no name is "the unnamed calendar". */
@@ -40,12 +40,48 @@ export interface WorldCalendar {
  * would silently blank a string-config calendar (the paired-readers trap).
  */
 export function readCalendarValue(raw: unknown): CalendarConfig | null {
-  if (raw == null) return null;
-  let value: unknown = raw;
-  if (typeof raw === 'string') {
-    try { value = JSON.parse(raw); } catch { return null; }
+  const value = parsedCalendarValue(raw);
+  return value === undefined ? null : readCalendarConfig(value);
+}
+
+/** The stored value as JSON (an object, or a JSON string), or undefined when there is none or it does not parse. */
+function parsedCalendarValue(raw: unknown): unknown {
+  if (raw == null) return undefined;
+  if (typeof raw !== 'string') return raw;
+  try { return JSON.parse(raw); } catch { return undefined; }
+}
+
+/**
+ * The calendar read but for the standard's size limits (SDK 4.217.0), for
+ * the builder alone: a config whose `limit` is set never reaches a formatter.
+ * Null for a broken shape.
+ */
+export function readCalendarShapeValue(raw: unknown): CalendarShape | null {
+  const value = parsedCalendarValue(raw);
+  return value === undefined ? null : readCalendarShape(value);
+}
+
+export interface CalendarPastLimit {
+  id: string;
+  name: string;
+  /** The first limit it passes, in the SDK's words ("A calendar holds at most 256 eras"). */
+  limit: string;
+}
+
+/**
+ * The calendars every reader refuses for their size alone: listed so their
+ * owner can open them to cut them down (1.125.38's way back in, kept by the
+ * standard's own limits).
+ */
+export function calendarsPastLimits(elements: Element[]): CalendarPastLimit[] {
+  const out: CalendarPastLimit[] = [];
+  for (const el of elements) {
+    const raw = (el as Record<string, unknown>)['atlas_calendar'];
+    if (raw == null || readCalendarValue(raw)) continue;
+    const limit = readCalendarShapeValue(raw)?.limit;
+    if (limit) out.push({ id: el.id, name: nameOrUnnamed(el, { start: true, word: CALENDAR_WORD }), limit });
   }
-  return readCalendarConfig(value);
+  return out;
 }
 
 /**
