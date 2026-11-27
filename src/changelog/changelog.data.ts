@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.43',
+    date: '2026-11-27',
+    theme: 'Names inside code in the editor, too',
+    entries: [
+      {
+        id: 'names-in-editor-code',
+        title: 'In the scene editor, a name inside code is left as it is',
+        body: 'A name you format as code in the scene editor, inline or as a code block, no longer gets the dotted mention hint, and Link all leaves it as text. 1.125.42 did this for a scene\'s Markdown text; the editor\'s own hints still offered it.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.42',
     date: '2026-11-27',
     theme: 'Dates speak the calendar the world names',

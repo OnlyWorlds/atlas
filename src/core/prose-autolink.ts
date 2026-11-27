@@ -441,8 +441,10 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex, only?: stri
     if (!Array.isArray(n.content)) return;
     const next: RtNode[] = [];
     for (const child of n.content) {
-      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0 && !inWebLink(child)) {
+      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0 && !inWebLink(child) && !inCode(child)) {
         next.push(...splitTextNode(child, index, already, proposed, linked, only));
+      } else if (child.type === CODE_BLOCK) {
+        next.push(child);
       } else {
         transform(child);
         next.push(child);
@@ -463,6 +465,14 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex, only?: stri
  */
 function inWebLink(node: RtNode): boolean {
   return Array.isArray(node.marks) && node.marks.some(m => (m as { type?: string } | null)?.type === 'link');
+}
+
+/** The editor's code block node and code mark: a name inside code is left as it is, as a markdown story's code spans are. */
+export const CODE_BLOCK = 'codeBlock';
+export const CODE_MARK = 'code';
+
+function inCode(node: RtNode): boolean {
+  return Array.isArray(node.marks) && node.marks.some(m => (m as { type?: string } | null)?.type === CODE_MARK);
 }
 
 function splitTextNode(
