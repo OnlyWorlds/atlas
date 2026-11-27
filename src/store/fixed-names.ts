@@ -7,17 +7,14 @@
  * new element made `elements/` beside `Elements/`: the old elements unread,
  * the new ones in the other folder.
  *
- * The rule and the fold are the SDK's (`misnamedFixedName`, its folder
- * reader, from 4.204.0): NFC, then simple case folding, so `spatial/` with a
- * long s first is `spatial/` in another case. That function is not exported
- * at the root yet, so this is its copy over the SDK's own fold; it goes when
- * the root exports it.
+ * The rule and the fold are the SDK's (`misnamedFixedName`): NFC, then
+ * simple case folding, so `spatial/` with a long s first is `spatial/` in
+ * another case. The SDK reads paths and Atlas lists a folder's own entries,
+ * so a folder's entry goes in with its `/`.
  */
 
-import { nfc, simpleCaseFold } from '@onlyworlds/sdk';
+import { misnamedFixedName as sdkMisnamedFixedName } from '@onlyworlds/sdk';
 import { PlainError } from '../core/plain-error';
-
-const FIXED_NAMES = [['world.json', false], ['elements', true], ['spatial', true]] as const;
 
 export interface Misnamed {
   /** The name as the folder writes it (a folder's with its `/`). */
@@ -32,17 +29,9 @@ export interface Misnamed {
  * misnamed, whatever sits beside it.
  */
 export function misnamedFixedName(entries: Iterable<{ name: string; folder: boolean }>): Misnamed | null {
-  const firsts = new Map<string, boolean>();
-  for (const e of entries) firsts.set(e.name, (firsts.get(e.name) ?? false) || e.folder);
-  for (const [name, isFolder] of FIXED_NAMES) {
-    if (firsts.get(name) === isFolder) continue;
-    for (const [first, folder] of firsts) {
-      if (folder === isFolder && first !== name && simpleCaseFold(nfc(first)) === name) {
-        return isFolder ? { found: `${first}/`, wanted: `${name}/` } : { found: first, wanted: name };
-      }
-    }
-  }
-  return null;
+  const paths: string[] = [];
+  for (const e of entries) paths.push(e.folder ? `${e.name}/` : e.name);
+  return sdkMisnamedFixedName(paths);
 }
 
 /** The refusal, in the SDK's words for a folder. */
