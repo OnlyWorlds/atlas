@@ -48,6 +48,7 @@ import { editedSince, editedSinceBaseline, stampOrder } from '../store/sync-stam
 import { BASELINE_UNKNOWN, hasNoBaseline, isBaselineUnknown, readableBaseline } from '../core/baseline-unknown';
 import { copyDiff, narratorMayBeFilled, theirsOf } from './same-copy';
 import { numberFieldsFor } from '../editor/field-schema';
+import { KIND_WAITS_MESSAGE, KindFaultError, kindFailure, kindFaultOf } from './kind-fault';
 import { changeSeqOf, preconditionCurrent } from './change-seq';
 import type {
   Conflict,
@@ -1178,6 +1179,10 @@ export class SyncEngine {
       // runs with every branch it has: a proposal, keel's delete, a guest's 404, a 412 (M3).
       noBaseline = !!conflict.no_baseline || hasNoBaseline(local);
       if (noBaseline && this.readOnly) throw new PlainError(VIEW_ONLY_KEEP_THIS);
+      // Keep this copy sends the whole file: an integer field keel would store cut is said and nothing
+      // is written or sent, before the row's stamp or a hide moves anything.
+      const fault = kindFaultOf(local.type, local);
+      if (fault) throw new KindFaultError(fault);
       if (noBaseline && !local.server_updated_at) {
         await this.folder.stampServerUpdatedAt(id, local.type, conflict.server_updated_at, local.local_updated_at ?? '', { [BASELINE_UNKNOWN]: true });
         local = (await this.folder.getElement(id)) ?? local;
@@ -3069,13 +3074,30 @@ export class SyncEngine {
     // A hidden element this key cannot put online (folder spec §4.8, conv. 170) is held with what is
     // anchored on it: worked out from the key's role each round, never sent, said once.
     const hiddenHeld = await this.hiddenHeldNow(allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id)));
-    const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id) && !heldNoBaseline.has(e.id));
+    const createsToSend = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id) && !heldNoBaseline.has(e.id));
     // A version keel holds as a proposal is sent once (conv. 163, P3): an edit after it is a new version.
     // A proposal keel did not take waits in the review: its edit is not sent again on its own (P5).
     const inProposalReview = new Set((stateAtStart.conflicts ?? []).filter(c => c.proposal).map(c => c.element_id));
     const heldAsProposed = allChanged.filter(e => !!e.server_updated_at
       && (alreadyProposed(this.proposedNow(stateAtStart.proposed), e.id, e.local_updated_at) || inProposalReview.has(e.id)));
-    const updatesOnly = allChanged.filter(e => !!e.server_updated_at && !heldAsProposed.includes(e) && !heldNoBaseline.has(e.id));
+    const updatesToSend = allChanged.filter(e => !!e.server_updated_at && !heldAsProposed.includes(e) && !heldNoBaseline.has(e.id));
+    // An integer field holding what keel would store cut or refuse (2.5, a word) is never sent unsaid:
+    // the element waits here as a sync issue naming the field, and so does a create that links one
+    // held. An update linking a held create waits through `refusedCreates` below, as for any refusal.
+    const kindHeld = new Map<string, PerElementFailure>();
+    for (const e of [...createsToSend, ...updatesToSend]) {
+      if (keptAtStart.has(e.id)) continue;
+      const fault = kindFaultOf(e.type, e);
+      if (fault) kindHeld.set(e.id, kindFailure(e.id, e.type, e.server_updated_at ? 'update' : 'create', fault));
+    }
+    if (kindHeld.size > 0) {
+      const heldCreates = new Set(createsToSend.filter(e => kindHeld.has(e.id)).map(e => e.id));
+      for (const e of splitByRefusedLinks(createsToSend.filter(c => !kindHeld.has(c.id)), heldCreates).blocked) {
+        kindHeld.set(e.id, { element_id: e.id, type: e.type, operation: 'create', message: KIND_WAITS_MESSAGE });
+      }
+    }
+    const allCreates = createsToSend.filter(e => !kindHeld.has(e.id));
+    const updatesOnly = updatesToSend.filter(e => !kindHeld.has(e.id));
     const heldRowsNow = allChanged.filter(e => heldNoBaseline.has(e.id) && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id)).length;
     const total = allChanged.length + tombstones.length;
     let done = heldRowsNow;
@@ -3086,7 +3108,7 @@ export class SyncEngine {
     const conflicts: Conflict[] = [...settled.refused];
     /** Updates held for review whatever the policy: a baseline that cannot be read (conv. 190, R3). */
     const reviewHeld: Conflict[] = [];
-    const failures: PerElementFailure[] = [...settleFailures];
+    const failures: PerElementFailure[] = [...settleFailures, ...kindHeld.values()];
     /**
      * Server-side deletes detected DURING push (pre-update GET returned null,
      * or PATCH returned 404). Symmetric to pullPhase server-delete detection.
@@ -3125,7 +3147,7 @@ export class SyncEngine {
     this.roundKeptAdd = [];
     const keptAdd = this.roundKeptAdd;
     const keptEdits: string[] = keptCreates.map(e => e.id);
-    done += keptCreates.length + heldAsProposed.length + hiddenHeld.size;
+    done += keptCreates.length + heldAsProposed.length + hiddenHeld.size + kindHeld.size;
     /** Elements whose edit keel took as a proposal this round (conv. 163, P2), for the round's report. */
     const proposedIds: string[] = [];
     /** Deletes keel refused as `proposed_only`, each element back from keel (P6). */

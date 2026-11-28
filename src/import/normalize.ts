@@ -14,7 +14,7 @@
  * spatial relations to disk shape (map → map_id) when it resolves them.
  */
 
-import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
+import { knownFieldsFor, numberFieldsFor, relationFieldsFor, scalarKindsFor } from '../editor/field-schema';
 import { isExtensionField, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SPATIAL_TYPES } from '../core/constants';
 import type { ElementType } from '../core/types';
 import type { RawRecord } from './types';
@@ -92,6 +92,7 @@ export function normalizeRecord(
 ): { record: RawRecord; droppedUnknown: number } {
   const known = knownFieldsFor(type);
   const numbers = numberFieldsFor(type);
+  const integers = new Set([...scalarKindsFor(type)].filter(([, kind]) => kind === 'integer').map(([name]) => name));
   const isSpatial = SPATIAL_TYPES.has(type);
   const singleLinks = new Set(
     relationFieldsFor(type).filter(r => r.kind === 'single').map(r => r.schemaField),
@@ -131,8 +132,13 @@ export function normalizeRecord(
     const isNumber = numbers.has(k) || (isSpatial && SPATIAL_NUMERIC.has(k));
     if (isNumber) {
       if (v === '' || v === null) continue; // unset numeric → omit
-      if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
-        record[k] = Number(v);
+      const n = typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v)) ? Number(v) : v;
+      // A field the standard types integer takes a whole number only: anything else (2.5, a word) is
+      // left out, as the review says, since OnlyWorlds would store it cut or refuse it, and a guess
+      // at a rounding would be a value nobody wrote.
+      if (integers.has(k) && !(typeof n === 'number' && Number.isInteger(n))) continue;
+      if (n !== v) {
+        record[k] = n;
         continue;
       }
     }

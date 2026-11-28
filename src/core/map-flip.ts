@@ -15,8 +15,12 @@
 import type { FolderStore } from '../store/folder-store';
 import { PlainError } from './plain-error';
 
+/**
+ * Rounded: y is an integer field, and a fractional height or y (another tool's file) would otherwise
+ * write a fraction OnlyWorlds stores cut. Whole inputs stay exactly their own inverse.
+ */
 export function flippedY(y: number, height: number): number {
-  return height - y;
+  return Math.round(height - y);
 }
 
 export interface MapFlipResult {

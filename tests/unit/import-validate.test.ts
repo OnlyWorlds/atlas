@@ -151,8 +151,8 @@ describe('validatePayload — a text or number field holding the wrong kind of v
   it('says each one with the element and the field, before anything is added', () => {
     const issues = validatePayload(parsePayload(FIXTURE));
     const typed = (field: string) => issues.find(i => i.path === `Character[0].${field}` && /takes/.test(i.issue));
-    expect(typed('birth_date')?.issue).toBe('"Vera": Birth date takes a whole number; here it holds "the spring of 1899"');
-    expect(typed('height')?.issue).toBe('"Vera": Height takes a whole number; here it holds "tall"');
+    expect(typed('birth_date')?.issue).toBe('"Vera": Birth date takes a whole number; here it holds "the spring of 1899", so the import leaves it out');
+    expect(typed('height')?.issue).toBe('"Vera": Height takes a whole number; here it holds "tall", so the import leaves it out');
     expect(typed('physicality')?.issue).toBe('"Vera": Physicality takes text; here it holds a group of fields');
     // The link faults are said as before, once each.
     expect(issues.filter(i => i.field === 'birthplace' || i.field === 'friends')).toHaveLength(2);
@@ -168,7 +168,7 @@ describe('validatePayload — a text or number field holding the wrong kind of v
 
   it('a whole-number field refuses a fraction; a list in a text field is said as a list', () => {
     const issues = validatePayload(parsePayload({ Character: [{ name: 'A', height: 180.5, background: ['a', 'b'] }] }));
-    expect(issues.find(i => i.field === 'height')?.issue).toBe('"A": Height takes a whole number; here it holds 180.5');
+    expect(issues.find(i => i.field === 'height')?.issue).toBe('"A": Height takes a whole number; here it holds 180.5, so the import leaves it out');
     expect(issues.find(i => i.field === 'background')?.issue).toBe('"A": Background takes text; here it holds a list');
   });
 

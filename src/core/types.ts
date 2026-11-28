@@ -596,6 +596,11 @@ export interface PerElementFailure {
    * The words say "tries again by itself" only where this is set.
    */
   retry_armed?: true;
+  /**
+   * An integer field holding what OnlyWorlds would not keep as written (2.5, a word): the element
+   * was not sent (`sync/kind-fault.ts`), and the words name this field and value.
+   */
+  kind_fault?: { field: string; value: string };
 }
 
 // ---- Registry ----

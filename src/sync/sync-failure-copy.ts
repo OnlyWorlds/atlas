@@ -13,8 +13,9 @@
  */
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
+import { KIND_WAITS_MESSAGE, faultFieldWords } from './kind-fault';
 
-export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'over_limit' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_only' | 'review_mark' | 'replaced_held' | 'other';
+export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'over_limit' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_only' | 'review_mark' | 'replaced_held' | 'wrong_kind' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -36,6 +37,9 @@ export function isLinkLimit(f: Pick<PerElementFailure, 'limit' | 'message'>): bo
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
   if (isBusyFailure(f)) return 'file_busy';
+  // Held here, never sent: an integer field keel would store cut (2.5) or refuse (a word), or a create
+  // that links one held so (`sync/kind-fault.ts`).
+  if (f.kind_fault || m === KIND_WAITS_MESSAGE) return 'wrong_kind';
   // The web host in front of keel refused the write for its text: a 403 with
   // no keel code (keel names every refusal). By status and the absent code,
   // never the page's text.
@@ -110,6 +114,19 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const large = byKind.get('too_large');
   if (large) {
     parts.push(`${plural(large.length, 'element holds', 'elements hold')} more than 64 KB of custom fields, which is more than OnlyWorlds accepts per element. Shorten a custom field to let ${large.length === 1 ? 'it' : 'them'} sync.`);
+  }
+  const wrongKind = byKind.get('wrong_kind');
+  if (wrongKind) {
+    const named = wrongKind.filter(f => f.kind_fault);
+    const n = new Set(named.map(f => f.element_id)).size;
+    const waiting = new Set(wrongKind.filter(f => !f.kind_fault).map(f => f.element_id)).size;
+    if (n > 0) {
+      // The first two by field and value, so the person can find them; Settings lists every one.
+      const shown = named.slice(0, 2).map(f => `${faultFieldWords(f.kind_fault!)} ${f.kind_fault!.value}`).join(', ');
+      const more = n > 2 ? `, and ${n - 2} more` : '';
+      parts.push(`${plural(n, 'element was', 'elements were')} not sent: ${n === 1 ? 'a field that takes' : 'fields that take'} only a whole number ${n === 1 ? 'holds' : 'hold'} something else (${shown}${more}), which OnlyWorlds would not keep as written. Change ${n === 1 ? 'it' : 'each'} to a whole number, such as 12, to let ${n === 1 ? 'it' : 'them'} sync. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+    }
+    if (waiting > 0) parts.push(`${plural(waiting, 'new element waits', 'new elements wait')} for ${n === 1 ? 'that one' : 'those'}, since ${waiting === 1 ? 'it links' : 'they link'} to ${n === 1 ? 'it' : 'them'}.`);
   }
   const overLimit = byKind.get('over_limit');
   if (overLimit) {

@@ -14,7 +14,7 @@ import type { ValidationIssue } from '../../src/import/types';
 
 const ISSUE: ValidationIssue = {
   path: 'Character[0].birth_date', field: 'birth_date', value: 'spring',
-  issue: '"Vera": Birth date takes a whole number; here it holds "spring"',
+  issue: '"Vera": Birth date takes a whole number; here it holds "spring", so the import leaves it out',
   expected: 'A whole number, like 12', suggestion: 'Write "birth_date" as a whole number.',
 };
 

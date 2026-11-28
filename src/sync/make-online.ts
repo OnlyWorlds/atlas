@@ -36,6 +36,7 @@ import { isHiddenMark } from '../core/hidden-mark';
 import { stampWordOf } from '../core/door-trail';
 import { isOwProposed, withProposed } from './proposals';
 import { slicePushRefusal } from '../core/provenance';
+import { KindFaultError, kindFaultFrom, kindFaultOf } from './kind-fault';
 
 /** Test seam: override the OW base URL; buildV2Adapter derives its /api/v2 from it. */
 export function setMakeOnlineBaseUrl(url: string): void {
@@ -421,6 +422,9 @@ export async function mergeLocalIntoApi(
   const sendable = async (id: string): Promise<{ body: Record<string, unknown>; sent: string } | null> => {
     const current = await folder.updateElementWith(id, () => null);
     if (!current) return null;
+    // An integer field keel would store cut or refuse (2.5, a word) is that element's failure, named.
+    const fault = kindFaultOf(current.type, current);
+    if (fault) throw new KindFaultError(fault);
     const { local_updated_at, server_updated_at: _s, ...body } = current;
     return { body, sent: local_updated_at ?? '' }; // '' = sent with none (never "passed nothing")
   };
@@ -438,7 +442,7 @@ export async function mergeLocalIntoApi(
       await folder.stampServerUpdatedAt(c.local.id, c.type, response.updated_at, s.sent, stampWordOf(response));
       counts.creates++;
     } catch (err) {
-      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err), ...serverOf(err) });
+      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err), ...serverOf(err), ...kindFaultFrom(err) });
     } finally {
       tick();
     }
@@ -456,7 +460,7 @@ export async function mergeLocalIntoApi(
       try {
         s = await sendable(dec.local.id);
       } catch (err) {
-        failures.push({ element_id: dec.local.id, type: dec.type, operation: 'create', message: errText(err) });
+        failures.push({ element_id: dec.local.id, type: dec.type, operation: 'create', message: errText(err), ...kindFaultFrom(err) });
         tick();
         continue;
       }
@@ -689,7 +693,7 @@ export async function mergeLocalIntoApi(
         counts.skipped++;
       }
     } catch (err) {
-      failures.push({ element_id: m.id, type: m.type, operation: 'update', message: errText(err) });
+      failures.push({ element_id: m.id, type: m.type, operation: 'update', message: errText(err), ...kindFaultFrom(err) });
     } finally {
       tick();
     }
