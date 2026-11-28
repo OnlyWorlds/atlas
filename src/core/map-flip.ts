@@ -5,7 +5,8 @@
  * OnlyWorlds tool, counts from the BOTTOM-left. Titus ruled no migration:
  * old Atlas maps are few. This is the remedy a user reaches for when a map
  * placed in older Atlas shows upside down: `y = height - y` for every pin and
- * marker on the map. It is its own inverse, so pressing it again undoes it.
+ * marker on the map. It is its own inverse for whole positions, so pressing it again undoes it;
+ * a position that was not whole is rounded (counted, and the words say so).
  *
  * Writes go through the store one element at a time (stamps, per-id chain,
  * sync all apply as for any edit). Pins or markers without a finite y are
@@ -26,6 +27,8 @@ export function flippedY(y: number, height: number): number {
 export interface MapFlipResult {
   pins: number;
   points: number;
+  /** Positions that were not whole before the flip: rounded, so a second flip does not bring them back exactly. */
+  rounded: number;
 }
 
 export async function flipMapVertically(store: FolderStore, mapId: string): Promise<MapFlipResult> {
@@ -34,12 +37,13 @@ export async function flipMapVertically(store: FolderStore, mapId: string): Prom
   if (!Number.isFinite(height) || height <= 0) {
     throw new PlainError('This map has no height above 0, so it cannot be flipped. Give it a height on its page first.');
   }
-  const result: MapFlipResult = { pins: 0, points: 0 };
+  const result: MapFlipResult = { pins: 0, points: 0, rounded: 0 };
   for (const type of ['pin', 'marker'] as const) {
     const items = await store.listElements(type);
     for (const el of items) {
       const rec = el as unknown as { id: string; map_id?: unknown; y?: unknown };
       if (rec.map_id !== mapId || typeof rec.y !== 'number' || !Number.isFinite(rec.y)) continue;
+      if (!Number.isInteger(height - rec.y)) result.rounded++;
       await store.updateElement(rec.id, { y: flippedY(rec.y, height) } as never);
       if (type === 'pin') result.pins++; else result.points++;
     }

@@ -101,6 +101,18 @@ export function canonicalMetaValue(kind: MetaFieldKind, v: unknown): string | Me
   }
 }
 
+/**
+ * A local setting of another kind than its field takes ("7" or 2.5 in `time_current`, 12 in
+ * `description`; another tool's world.json): its canonical form is the empty one, so a push would
+ * clear what OnlyWorlds holds. It is never read as a local change.
+ */
+export function metaWrongKind(kind: MetaFieldKind, v: unknown): boolean {
+  if (v === null || v === undefined) return false;
+  if (kind === 'int') return !(typeof v === 'number' && Number.isInteger(v));
+  if (kind === 'text' || kind === 'label') return typeof v !== 'string';
+  return false;
+}
+
 export function metaEquals(kind: MetaFieldKind, a: unknown, b: unknown): boolean {
   const ca = canonicalMetaValue(kind, a);
   const cb = canonicalMetaValue(kind, b);
@@ -171,7 +183,7 @@ export function threeWayMetaDiff(
   const contested: string[] = [];
   const converged: string[] = [];
   for (const [field, kind] of Object.entries(META_SYNC_FIELDS)) {
-    const localChanged = !metaEquals(kind, local[field], baseline[field]);
+    const localChanged = !metaWrongKind(kind, local[field]) && !metaEquals(kind, local[field], baseline[field]);
     const serverChanged = !metaEquals(kind, server[field], baseline[field]);
     if (!localChanged && !serverChanged) continue;
     if (serverChanged && !localChanged) {

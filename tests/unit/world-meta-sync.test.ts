@@ -89,6 +89,16 @@ describe('pickSyncedMeta / isMetaEmpty', () => {
 });
 
 describe('threeWayMetaDiff', () => {
+  it('a local setting of another kind is never pushed, so OnlyWorlds keeps its value (census S663)', () => {
+    const baseline = { time_current: 7, time_range_min: 0, description: 'Cold.' };
+    const d = threeWayMetaDiff({ time_current: '7', time_range_min: 2.5, description: 12 }, { ...baseline }, baseline);
+    expect(d.pushFields).toEqual({});
+    expect(d.contested).toEqual([]);
+    // A cleared setting still goes, as null; a setting OnlyWorlds moved is still pulled over the odd one.
+    expect(threeWayMetaDiff({ time_current: null }, { time_current: 7 }, { time_current: 7 }).pushFields).toEqual({ time_current: null });
+    expect(threeWayMetaDiff({ time_current: '7' }, { time_current: 9 }, { time_current: 7 }).pullFields).toEqual({ time_current: 9 });
+  });
+
   const baseline = pickSyncedMeta({ description: 'old', time_current: 10 });
 
   it('no changes → all buckets empty (a fresh world never PATCHes)', () => {

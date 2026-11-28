@@ -128,8 +128,8 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
     }
     // Said on their own: a waiter may link any held one, and the named ones may not be in this list.
     if (waiting > 0) parts.push(waiting === 1
-      ? '1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else, there or in an element it links to.'
-      : `${waiting} elements wait for new elements they link to, which were not sent because a field that takes a whole number holds something else, there or in an element they link to.`);
+      ? '1 element links to a new element that was not sent, and syncs when that one does.'
+      : `${waiting} elements link to new elements that were not sent, and sync when those do.`);
   }
   const overLimit = byKind.get('over_limit');
   if (overLimit) {
