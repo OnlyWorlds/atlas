@@ -93,6 +93,7 @@ export function normalizeRecord(
   const known = knownFieldsFor(type);
   const numbers = numberFieldsFor(type);
   const integers = new Set([...scalarKindsFor(type)].filter(([, kind]) => kind === 'integer').map(([name]) => name));
+  const texts = new Set([...scalarKindsFor(type)].filter(([, kind]) => kind === 'text').map(([name]) => name));
   const isSpatial = SPATIAL_TYPES.has(type);
   const singleLinks = new Set(
     relationFieldsFor(type).filter(r => r.kind === 'single').map(r => r.schemaField),
@@ -141,6 +142,12 @@ export function normalizeRecord(
         record[k] = n;
         continue;
       }
+    }
+
+    // A number in a field the standard types text becomes its text, as OnlyWorlds would store it.
+    if (texts.has(k) && typeof v === 'number' && Number.isFinite(v)) {
+      record[k] = String(v);
+      continue;
     }
 
     record[k] = v;

@@ -652,14 +652,15 @@ describe('where a 409 slot\'s id is held is keel\'s words, never whether a read 
 });
 
 describe('I6: one decision whichever door', () => {
-  type Case = { name: string; file: Record<string, unknown>; keel: Record<string, unknown>; same: boolean; fields?: string[]; setup?: () => Promise<void> };
+  type Case = { name: string; file: Record<string, unknown>; keel: Record<string, unknown>; same: boolean; fields?: string[]; heldOnPush?: true; setup?: () => Promise<void> };
   const cases: Case[] = [
     { name: 'a sparse file and keel\'s whole body of the same content', file: { name: 'Ada', description: 'd' }, keel: {}, same: true },
     { name: 'keel\'s review mark on its own create (M1)', file: { name: 'Ada', description: 'd' }, keel: { x_review_proposed: { by: 'seat-0001', evidence: 'seat', expires: '2099-01-01' } }, same: true },
     { name: 'link ids in another case and a repeat in a list (S1)', file: { name: 'Ada', description: 'd', birthplace: L.toUpperCase(), friends: [F, F.toUpperCase()] }, keel: { birthplace: L, friends: [F] }, same: true },
     { name: 'a kept link keel\'s read leaves out (S1)', file: { name: 'Ada', description: 'd', friends: [F, L] }, keel: { friends: [F] }, same: true,
       setup: async () => { await store.updateSyncState(() => ({ kept_outside_view: [L] })); } },
-    { name: 'a number keel coerced from a text (S1: a row, said)', file: { name: 'Ada', description: 'd', height: '5' }, keel: { height: 5 }, same: false, fields: ['height'] },
+    // A push holds "5" before it is sent (conv. 200, the SDK's kind rule), so only a pull meets it as a row.
+    { name: 'a number keel coerced from a text (S1: a row, said)', file: { name: 'Ada', description: 'd', height: '5' }, keel: { height: 5 }, same: false, fields: ['height'], heldOnPush: true },
     { name: 'other content', file: { name: 'Ada', description: 'mine' }, keel: { description: 'theirs' }, same: false, fields: ['description'] },
   ];
   const doors = ['post', 'bulk', 'pull', 'pull-then-push'] as const;
@@ -687,9 +688,14 @@ describe('I6: one decision whichever door', () => {
         const engine = engineFor('local-wins');
         const said: unknown[] = [];
         if (door === 'pull' || door === 'pull-then-push') said.push(...(await engine.pullNow()).conflicts);
-        if (door !== 'pull') said.push(...(await engine.pushOnce()).conflicts);
+        const pushed = door !== 'pull' ? await engine.pushOnce() : null;
+        if (pushed) said.push(...pushed.conflicts);
         expect(onKeel(A).updated_at).toBe(keelStamp);
-        if (c.same) {
+        if (c.heldOnPush && (door === 'post' || door === 'bulk')) {
+          // Never sent, so no row: the element is a sync issue naming the field.
+          expect(await rows()).toEqual([]);
+          expect(pushed!.failures.find(f => f.element_id === A)?.kind_fault?.field).toBe('height');
+        } else if (c.same) {
           // Nothing to choose: no row kept and none in the round's own word (the attach would say it).
           expect(said).toEqual([]);
           expect(await rows()).toEqual([]);

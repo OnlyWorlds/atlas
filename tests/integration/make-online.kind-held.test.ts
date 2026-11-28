@@ -39,7 +39,7 @@ for (const bulk of [false, true]) {
     expect(sent()).not.toContain(WREN);
     expect((await client.listElements('character')).map(e => e.id)).toEqual([ADA]);
     expect(r.failures).toHaveLength(1);
-    expect(r.failures[0]).toEqual(expect.objectContaining({ element_id: WREN, operation: 'create', kind_fault: { field: 'birth_date', value: '2.5' } }));
+    expect(r.failures[0]).toEqual(expect.objectContaining({ element_id: WREN, operation: 'create', kind_fault: { field: 'birth_date', value: '2.5', kind: 'integer' } }));
     expect(classifyFailure(r.failures[0])).toBe('wrong_kind');
   });
 }
@@ -65,6 +65,6 @@ it('a matched element holding a word in an integer field is not sent over the on
   await folder.createElement('character', { id: WREN, name: 'Wren', height: 'tall' } as never);
   const r = await mergeLocalIntoApi(folder, client, 'b');
   expect(client.calls.filter(c => c.method === 'update')).toEqual([]);
-  expect(r.failures).toEqual([expect.objectContaining({ element_id: WREN, operation: 'update', kind_fault: { field: 'height', value: '"tall"' } })]);
+  expect(r.failures).toEqual([expect.objectContaining({ element_id: WREN, operation: 'update', kind_fault: { field: 'height', value: '"tall" as text', kind: 'integer' } })]);
   expect(((await client.listElements('character'))[0] as Record<string, unknown>).height).toBe(170);
 });

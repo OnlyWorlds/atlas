@@ -47,24 +47,27 @@ for (const bulk of [false, true]) {
       expect(createdIds()).not.toContain(WREN);
       expect(createdIds()).not.toContain(ADA);
       expect(await onServer(WREN)).toBeUndefined();
-      // A whole number written as text goes: keel stores the same number.
-      expect((await client.listElements('location')).map(e => e.id)).toEqual([DOCK]);
+      // A whole number written as text is held too (the SDK's rule): keel would store a number, not what was written.
+      expect(createdIds()).not.toContain(DOCK);
+      expect(r.failures.find(f => f.element_id === DOCK)?.kind_fault).toEqual({ field: 'founding_date', value: '"12" as text', kind: 'integer' });
       const wren = r.failures.find(f => f.element_id === WREN)!;
-      expect(wren.kind_fault).toEqual({ field: 'birth_date', value: '2.5' });
+      expect(wren.kind_fault).toEqual({ field: 'birth_date', value: '2.5', kind: 'integer' });
       expect(classifyFailure(wren)).toBe('wrong_kind');
       const ada = r.failures.find(f => f.element_id === ADA)!;
       expect(ada.message).toBe(KIND_WAITS_MESSAGE);
       expect(classifyFailure(ada)).toBe('wrong_kind');
-      expect(r.failures).toHaveLength(2);
+      expect(r.failures).toHaveLength(3);
       expect((await folder.getElement(WREN))!.server_updated_at).toBeFalsy();
-      expect(describeFailures(r.failures)).toBe('1 element was not sent: a field that takes only a whole number holds something else (birth date 2.5), which OnlyWorlds would not keep as written. Change it to a whole number, such as 12, to let it sync. It stays on your disk. 1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else, there or in an element it links to.');
+      expect(describeFailures(r.failures)).toBe('2 elements were not sent: fields that take only a whole number hold something else (birth date 2.5, founding date "12" as text), which OnlyWorlds would not keep as written. Change each to a whole number, such as 12, to let them sync. They stay on your disk. 1 element links to a new element that was not sent, and syncs when that one does.');
 
       // Made whole, both go on the next round, the link with them.
       await folder.updateElement(WREN, { birth_date: 2 } as never);
+      await folder.updateElement(DOCK, { founding_date: 12 } as never);
       const r2 = await new SyncEngine({ folder, client }).syncNow();
       expect(r2.failures).toEqual([]);
       expect((await onServer(WREN))?.birth_date).toBe(2);
       expect((await onServer(ADA))?.friends).toEqual([WREN]);
+      expect((await client.listElements('location')).find(e => e.id === DOCK)?.founding_date).toBe(12);
     });
 
     it('a value written between the round\'s list and the send is read as sent, and held', async () => {
@@ -79,7 +82,7 @@ for (const bulk of [false, true]) {
       }) as typeof folder.getElement;
       const r = await new SyncEngine({ folder, client }).syncNow();
       expect(await onServer(WREN)).toBeUndefined();
-      expect(r.failures).toEqual([expect.objectContaining({ element_id: WREN, kind_fault: { field: 'birth_date', value: '2.5' } })]);
+      expect(r.failures).toEqual([expect.objectContaining({ element_id: WREN, kind_fault: { field: 'birth_date', value: '2.5', kind: 'integer' } })]);
       expect((await client.listElements('location')).map(e => e.id)).toEqual([DOCK]);
     });
   });
@@ -136,7 +139,7 @@ describe('an update', () => {
     client.calls.length = 0;
     const r = await engine.syncNow();
     expect(updatedIds()).toEqual([]);
-    expect(r.failures).toEqual([expect.objectContaining({ element_id: WREN, operation: 'update', kind_fault: { field: 'height', value: '"tall"' } })]);
+    expect(r.failures).toEqual([expect.objectContaining({ element_id: WREN, operation: 'update', kind_fault: { field: 'height', value: '"tall" as text', kind: 'integer' } })]);
     expect((await onServer(WREN))?.height).toBe(170);
     await folder.updateElement(WREN, { height: 180 } as never);
     expect((await engine.syncNow()).failures).toEqual([]);

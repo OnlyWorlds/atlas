@@ -597,10 +597,11 @@ export interface PerElementFailure {
    */
   retry_armed?: true;
   /**
-   * An integer field holding what OnlyWorlds would not keep as written (2.5, a word): the element
-   * was not sent (`sync/kind-fault.ts`), and the words name this field and value.
+   * A standard field holding a value of a kind OnlyWorlds would not keep as written (2.5 or "7" in an
+   * integer field, 12 in a text field): the element was not sent (`sync/kind-fault.ts`), and the words
+   * name this field and value. `kind` is what the field takes; absent on a record from 1.125.49 (integer).
    */
-  kind_fault?: { field: string; value: string };
+  kind_fault?: { field: string; value: string; kind?: 'integer' | 'text' };
 }
 
 // ---- Registry ----

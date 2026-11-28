@@ -124,12 +124,16 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
       // The first two by field and value, so the person can find them; Settings lists every one.
       const shown = named.slice(0, 2).map(f => `${faultFieldWords(f.kind_fault!)} ${f.kind_fault!.value}`).join(', ');
       const more = n > 2 ? `, and ${n - 2} more` : '';
-      parts.push(`${plural(n, 'element was', 'elements were')} not sent: ${n === 1 ? 'a field that takes' : 'fields that take'} only a whole number ${n === 1 ? 'holds' : 'hold'} something else (${shown}${more}), which OnlyWorlds would not keep as written. Change ${n === 1 ? 'it' : 'each'} to a whole number, such as 12, to let ${n === 1 ? 'it' : 'them'} sync. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+      const stays = `${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`;
+      // Whole numbers alone keep their own words; a text field among them gets the words for both kinds.
+      parts.push(named.every(f => f.kind_fault!.kind !== 'text')
+        ? `${plural(n, 'element was', 'elements were')} not sent: ${n === 1 ? 'a field that takes' : 'fields that take'} only a whole number ${n === 1 ? 'holds' : 'hold'} something else (${shown}${more}), which OnlyWorlds would not keep as written. Change ${n === 1 ? 'it' : 'each'} to a whole number, such as 12, to let ${n === 1 ? 'it' : 'them'} sync. ${stays}`
+        : `${plural(n, 'element was', 'elements were')} not sent: ${n === 1 ? 'a field holds' : 'fields hold'} a value of another kind than ${n === 1 ? 'it takes' : 'they take'} (${shown}${more}), which OnlyWorlds would not keep as written. Settings, under This world, says how to set ${n === 1 ? 'it' : 'each'} right. ${stays}`);
     }
     // Said on their own: a waiter may link any held one, and the named ones may not be in this list.
     if (waiting > 0) parts.push(waiting === 1
-      ? '1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else, there or in an element it links to.'
-      : `${waiting} elements wait for new elements they link to, which were not sent because a field that takes a whole number holds something else, there or in an element they link to.`);
+      ? '1 element links to a new element that was not sent, and syncs when that one does.'
+      : `${waiting} elements link to new elements that were not sent, and sync when those do.`);
   }
   const overLimit = byKind.get('over_limit');
   if (overLimit) {
