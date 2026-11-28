@@ -127,7 +127,9 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
       parts.push(`${plural(n, 'element was', 'elements were')} not sent: ${n === 1 ? 'a field that takes' : 'fields that take'} only a whole number ${n === 1 ? 'holds' : 'hold'} something else (${shown}${more}), which OnlyWorlds would not keep as written. Change ${n === 1 ? 'it' : 'each'} to a whole number, such as 12, to let ${n === 1 ? 'it' : 'them'} sync. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
     }
     // Said on their own: a waiter may link any held one, and the named ones may not be in this list.
-    if (waiting > 0) parts.push(`${plural(waiting, 'element waits', 'elements wait')} for a new element that was not sent for this reason, since ${waiting === 1 ? 'it links' : 'they link'} to it.`);
+    if (waiting > 0) parts.push(waiting === 1
+      ? '1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else.'
+      : `${waiting} elements wait for new elements they link to, which were not sent because a field that takes a whole number holds something else.`);
   }
   const overLimit = byKind.get('over_limit');
   if (overLimit) {

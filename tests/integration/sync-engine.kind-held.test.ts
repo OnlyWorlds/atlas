@@ -57,7 +57,7 @@ for (const bulk of [false, true]) {
       expect(classifyFailure(ada)).toBe('wrong_kind');
       expect(r.failures).toHaveLength(2);
       expect((await folder.getElement(WREN))!.server_updated_at).toBeFalsy();
-      expect(describeFailures(r.failures)).toBe('1 element was not sent: a field that takes only a whole number holds something else (birth date 2.5), which OnlyWorlds would not keep as written. Change it to a whole number, such as 12, to let it sync. It stays on your disk. 1 element waits for a new element that was not sent for this reason, since it links to it.');
+      expect(describeFailures(r.failures)).toBe('1 element was not sent: a field that takes only a whole number holds something else (birth date 2.5), which OnlyWorlds would not keep as written. Change it to a whole number, such as 12, to let it sync. It stays on your disk. 1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else.');
 
       // Made whole, both go on the next round, the link with them.
       await folder.updateElement(WREN, { birth_date: 2 } as never);
@@ -84,6 +84,32 @@ for (const bulk of [false, true]) {
     });
   });
 }
+
+describe('a value written after the round\'s list that reads like keel\'s answer', () => {
+  it('is the element\'s fault, never a dead key, a delete online or another world\'s id', async () => {
+    await folder.createElement('character', { id: ADA, name: 'Ada' } as never);
+    const engine = new SyncEngine({ folder, client, policy: 'local-wins' });
+    expect((await engine.syncNow()).failures).toEqual([]);
+    await folder.updateElement(ADA, { description: 'Edited.' } as never);
+    await folder.createElement('character', { id: WREN, name: 'Wren' } as never);
+    await folder.createElement('character', { id: DOCK, name: 'Dock' } as never);
+    const late: Record<string, unknown> = { [ADA]: '404 not found', [WREN]: 401.5, [DOCK]: 'id_conflict' };
+    const read = folder.getElement.bind(folder);
+    folder.getElement = (async (id: string) => {
+      const el = await read(id);
+      return el && id in late ? { ...el, height: late[id] } : el;
+    }) as typeof folder.getElement;
+    client.calls.length = 0;
+    const r = await engine.syncNow();
+    expect(r.auth_blocked).toBeFalsy();
+    expect(r.failures.map(f => [f.element_id, classifyFailure(f)]).sort()).toEqual([[ADA, 'wrong_kind'], [DOCK, 'wrong_kind'], [WREN, 'wrong_kind']].sort());
+    const state = await folder.readSyncState();
+    expect(state.server_deletes ?? []).toEqual([]);
+    expect(state.foreign ?? []).toEqual([]);
+    expect(state.conflicts ?? []).toEqual([]);
+    expect(client.calls.filter(c => c.method !== 'list' && c.method !== 'getWorldMeta')).toEqual([]);
+  });
+});
 
 describe('an update linking a new element held for its kind', () => {
   it('waits, told as waiting on that one, never as refused by OnlyWorlds', async () => {

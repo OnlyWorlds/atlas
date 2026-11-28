@@ -48,7 +48,7 @@ import { editedSince, editedSinceBaseline, stampOrder } from '../store/sync-stam
 import { BASELINE_UNKNOWN, hasNoBaseline, isBaselineUnknown, readableBaseline } from '../core/baseline-unknown';
 import { copyDiff, narratorMayBeFilled, theirsOf } from './same-copy';
 import { numberFieldsFor } from '../editor/field-schema';
-import { KIND_WAITS_MESSAGE, KindFaultError, kindFailure, kindFaultFrom, kindFaultOf } from './kind-fault';
+import { KIND_WAITS_MESSAGE, KindFaultError, kindFailure, kindFaultOf } from './kind-fault';
 import { changeSeqOf, preconditionCurrent } from './change-seq';
 import type {
   Conflict,
@@ -686,10 +686,6 @@ export class SyncEngine {
 
   /** An element's body as sent: sync stamps off, links to kept or left elements left out (keel keeps them). */
   private outgoing(elem: Element): Record<string, unknown> {
-    // conv. 200: the body as read now, never only the round's snapshot (an outside write can land between):
-    // an integer field keel would store cut or refuse throws, and the caller records the element's fault.
-    const fault = kindFaultOf(elem.type, elem);
-    if (fault) throw new KindFaultError(fault);
     // The mark of a copy with no record of what OnlyWorlds held is sync's own note (conv. 192): never sent.
     const { [BASELINE_UNKNOWN]: _mark, ...body } = stripSyncFields(elem);
     // A number held as "" (an outside writer's empty) is unset: keel refuses `int("")` and takes null,
@@ -2604,17 +2600,14 @@ export class SyncEngine {
           });
         }
       }
-      let element: Record<string, unknown>;
-      try {
-        element = this.outgoing(current);
-      } catch (err) {
-        // conv. 200: written since the round began; a slot of its own would only fail the batch.
-        if (!(err instanceof KindFaultError)) throw err;
-        failures.push(kindFailure(current.id, current.type, 'create', err.fault));
+      // conv. 200, read as it is now (written since the round began): a slot of its own would only fail the batch.
+      const lateFault = kindFaultOf(current.type, current);
+      if (lateFault) {
+        failures.push(kindFailure(current.id, current.type, 'create', lateFault));
         onItemDone();
         continue;
       }
-      items.push({ type: current.type, element });
+      items.push({ type: current.type, element: this.outgoing(current) });
       sentStamps.set(current.id, current.local_updated_at ?? ''); // '' = sent with none (never "passed nothing")
     }
     if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false, heldHere };
@@ -3306,6 +3299,13 @@ export class SyncEngine {
               });
             }
           }
+          // conv. 200, read as it is now: recorded here, never thrown into the catch below, whose
+          // predicates read an error's text and would take a value such as "404" for keel's answer.
+          const lateFault = kindFaultOf(current.type, current);
+          if (lateFault) {
+            failures.push(kindFailure(current.id, current.type, 'create', lateFault));
+            continue;
+          }
           const body = this.outgoing(current);
           attemptedCreates.add(current.id);
           const response = await this.client.createElement(current.type, body);
@@ -3341,6 +3341,13 @@ export class SyncEngine {
             // Could happen if elem was silently removed by an id-swap (unlikely
             // for an UPDATE path since UPDATE implies server_updated_at present,
             // but defensive).
+            continue;
+          }
+          // conv. 200, read as it is now (an outside write can land after the round's list), before keel is
+          // read, a conflict is noted or a hide is sent: nothing of an unsent edit moves.
+          const lateFault = kindFaultOf(current.type, current);
+          if (lateFault) {
+            failures.push(kindFailure(current.id, current.type, 'update', lateFault));
             continue;
           }
 
@@ -4774,8 +4781,6 @@ function failureOf(
     ...(!typed && isHostRefusal(err) ? { status: 403, source: 'server' as const } : {}),
     // The host's "Blocked" page, whose cause the words can name.
     ...(isHostBlocked(err) ? { host_blocked: true } : {}),
-    // conv. 200: an element `outgoing()` would not send, named by field and value.
-    ...kindFaultFrom(err),
   };
 }
 

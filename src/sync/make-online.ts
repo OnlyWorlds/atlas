@@ -621,8 +621,10 @@ export async function mergeLocalIntoApi(
   const kindHeld = new Set<string>();
   {
     const now: Element[] = [];
+    // Read as `sendable` reads (from disk, in the element's chain), not the cache, so what is held is what would go up.
+    // A file that will not read now is left to `sendable`, which makes it that element's failure as before.
     for (const c of creates) {
-      const cur = await folder.getElement(c.local.id);
+      const cur = await folder.updateElementWith(c.local.id, () => null).catch(() => null);
       if (cur) now.push(cur);
     }
     for (const cur of now) {
@@ -669,7 +671,7 @@ export async function mergeLocalIntoApi(
       // not a duplicate: its local copy wins whatever the policy.
       if (policy === 'b' || ownUploads.has(m.id)) {
         // A link to a new element held for its kind would have keel refuse the whole update: it waits.
-        if (kindHeld.size > 0 && splitByRefusedLinks([(await folder.getElement(m.id)) ?? m.local], kindHeld).blocked.length > 0) {
+        if (kindHeld.size > 0 && splitByRefusedLinks([(await folder.updateElementWith(m.id, () => null)) ?? m.local], kindHeld).blocked.length > 0) {
           failures.push({ element_id: m.id, type: m.type, operation: 'update', message: KIND_WAITS_MESSAGE });
           continue;
         }
