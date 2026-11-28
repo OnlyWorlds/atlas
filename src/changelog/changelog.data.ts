@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.47',
+    date: '2026-11-28',
+    theme: 'Which size limit, as OnlyWorlds names it',
+    entries: [
+      {
+        id: 'size-limit-by-name',
+        title: 'An element too large is told by the limit OnlyWorlds names',
+        body: 'OnlyWorlds now names which limit an element passed (its text and links, its links, or its custom fields). Atlas reads that name to say which limit and how to let the element sync, so the message stays right if OnlyWorlds changes its own words.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.46',
     date: '2026-11-27',
     theme: 'Full page says it is a preview in this tab only',
