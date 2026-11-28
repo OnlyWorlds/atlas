@@ -581,7 +581,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       item(`${big.name} (dates as numbers)`, {
         icon: 'calendar_month',
         disabled: viewOnly,
-        title: `Its dates show as numbers: ${big.limit.charAt(0).toLowerCase()}${big.limit.slice(1)}, the limit every OnlyWorlds tool reads by.`
+        title: `Its dates show as numbers: ${big.limit.charAt(0).toLowerCase()}${big.limit.slice(1)}, a limit every OnlyWorlds tool shares.`
           + (viewOnly ? '' : ' Open it to edit.'),
         action: () => new CalendarBuilderModal(toasts, {
           elementId: big.id,

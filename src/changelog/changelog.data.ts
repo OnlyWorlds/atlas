@@ -58,13 +58,25 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.125.48',
     date: '2026-11-28',
-    theme: 'A whole-number field takes whole numbers',
+    theme: 'Whole numbers, and the size limit by name',
     entries: [
       {
         id: 'integer-field-whole-number',
         title: 'A field that holds whole numbers says so when given 2.5',
         body: 'Fields such as a birth date, a height or a pin\'s place hold whole numbers on OnlyWorlds, which would have stored 2.5 as 2 while Atlas kept 2.5. Typing a number that is not whole into one now says the field takes a whole number, such as 12, and writes nothing. Custom number fields still take any number.',
         tags: ['editor', 'fix'],
+      },
+      {
+        id: 'size-limit-message-names-one',
+        title: 'The sync message names the size limit an element passed',
+        body: 'When every element OnlyWorlds refused for its size passed the same limit, the sync message now names that one limit and its own fix, as Settings does. It names both only when they differ.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'calendar-limit-plain',
+        title: 'A calendar past its limits says so plainly',
+        body: 'The hover on a calendar too large to show its dates now calls it a limit every OnlyWorlds tool shares.',
+        tags: ['charts', 'fix'],
       },
     ],
   },
@@ -102,7 +114,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'element-over-limit-said',
         title: 'An element too large to sync says why and what to do',
-        body: 'OnlyWorlds now takes at most 1 MB of text and links, or 5,000 links, in one element. An element past either limit stays as you wrote it here, and the sync message, Settings and the element\'s own mark now say which limit it passes and that shortening it or splitting it over more than one element lets it sync, instead of a plain "could not sync".',
+        body: 'OnlyWorlds now takes at most 1 MB of text and links, or 5,000 links, in one element. An element past either limit stays as you wrote it here, and Settings and the element\'s own mark now say which limit it passes (the sync message names both) and that shortening it or splitting it over more than one element lets it sync, instead of a plain "could not sync".',
         tags: ['sync', 'fix'],
       },
     ],
