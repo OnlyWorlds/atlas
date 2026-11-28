@@ -48,6 +48,12 @@ const BASE_FIELDS: Array<{ name: string; widget: WidgetKind; required?: boolean 
 /** Field names that should use a short text input even when type is `text`. */
 const SHORT_TEXT_FIELDS = new Set(['name', 'supertype', 'subtype', 'image_url']);
 
+/** A standard field the schema types `integer`: OnlyWorlds stores a number that is not whole there cut, so editors take only whole ones. */
+export function isIntegerField(type: ElementType, fieldName: string): boolean {
+  const fields = (FIELD_SCHEMA as Record<string, Record<string, { type?: string } | undefined> | undefined>)[type];
+  return fields?.[fieldName]?.type === 'integer';
+}
+
 function resolveWidget(fieldName: string, rawType: string | undefined): WidgetKind {
   if (rawType === 'single_link') return 'single-link';
   if (rawType === 'multi_link') return 'multi-link';

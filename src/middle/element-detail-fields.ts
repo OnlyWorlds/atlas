@@ -34,6 +34,7 @@ import { AliasesEditModal } from '../ui/aliases-edit-modal';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import type { FieldMeta, SectionLayout } from '../editor/field-schema';
+import { isIntegerField } from '../editor/field-schema';
 import { reportGesture } from '../ui/guide-note';
 import { getFieldDescription } from '../editor/field-descriptions';
 import { unitLabelFor } from '../core/world-units';
@@ -341,11 +342,14 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     const mode = editorSettings.field_edit_mode;
     const initialValue = raw === undefined || raw === null ? '' : String(raw);
     const editWidget = meta.widget === 'number' ? 'number' : (meta.widget === 'text-long' ? 'text-long' : 'text-short');
+    // A standard integer field takes a whole number only: OnlyWorlds would store 2.5 as 2 and the copies would differ.
+    const whole = editWidget === 'number' && isIntegerField(el.type, meta.name);
     if (mode === 'inline-single') {
       openFieldEditInline({
         anchor: valueEl,
         value: initialValue,
         widget: editWidget,
+        whole,
         mode: 'single',
         onSave: async (nextValue) => {
           await saveKeepingFocus(valueEl, meta.name, () => persistFieldPatch(el, meta.name, nextValue));
@@ -358,6 +362,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
         anchor: valueEl,
         value: initialValue,
         widget: editWidget,
+        whole,
         mode: 'multi',
         onSave: async (nextValue) => {
           await saveKeepingFocus(valueEl, meta.name, () => persistFieldPatch(el, meta.name, nextValue));
@@ -374,6 +379,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
       ...(fieldDesc ? { description: fieldDesc } : {}),
       value: initialValue,
       widget: editWidget,
+      whole,
       ...(suggestions ? { suggestions } : {}),
       onSave: async (nextValue) => {
         await saveKeepingFocus(valueEl, meta.name, () => persistFieldPatch(el, meta.name, nextValue));

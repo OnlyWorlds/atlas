@@ -114,7 +114,12 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const overLimit = byKind.get('over_limit');
   if (overLimit) {
     const n = new Set(overLimit.map(f => f.element_id)).size;
-    parts.push(`${plural(n, 'element holds', 'elements hold')} more than OnlyWorlds takes in one element: 1 MB of text and links, or 5,000 links. Shorten a text or remove some links, or split ${n === 1 ? 'it' : 'them'} over more than one element, to let ${n === 1 ? 'it' : 'them'} sync. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+    // Which limit, when every refusal passed the same one; both only when they differ.
+    const links = overLimit.some(f => isLinkLimit(f));
+    const bytes = overLimit.some(f => !isLinkLimit(f));
+    const which = links && bytes ? '1 MB of text and links, or 5,000 links' : links ? '5,000 links' : '1 MB of text and links';
+    const fix = links && bytes ? 'Shorten a text or remove some links' : links ? 'Remove some links' : 'Shorten a text';
+    parts.push(`${plural(n, 'element holds', 'elements hold')} more than OnlyWorlds takes in one element: ${which}. ${fix}, or split ${n === 1 ? 'it' : 'them'} over more than one element, to let ${n === 1 ? 'it' : 'them'} sync. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
   }
   // Counted by element: the world's own sync record can report twice in one
   // round (the world step and the round's end), and it is one change.

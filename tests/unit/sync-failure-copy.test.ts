@@ -48,6 +48,9 @@ describe('sync failure copy', () => {
     const text = describeFailures([over('a', BYTES), over('a', BYTES), over('b', LINKS)]);
     expect(text).toBe('2 elements hold more than OnlyWorlds takes in one element: 1 MB of text and links, or 5,000 links. Shorten a text or remove some links, or split them over more than one element, to let them sync. They stay on your disk.');
     expect(describeFailures([over('a', BYTES)], 'browser')).toContain('1 element holds more than OnlyWorlds takes in one element');
+    // One limit for every refusal: the message names that one and its own fix.
+    expect(describeFailures([over('a', BYTES)])).toBe('1 element holds more than OnlyWorlds takes in one element: 1 MB of text and links. Shorten a text, or split it over more than one element, to let it sync. It stays on your disk.');
+    expect(describeFailures([over('b', LINKS), over('c', LINKS)])).toBe('2 elements hold more than OnlyWorlds takes in one element: 5,000 links. Remove some links, or split them over more than one element, to let them sync. They stay on your disk.');
     expect(describeFailures([over('a', BYTES)], 'browser')).toContain('It stays in this browser.');
     const row = (failure: PerElementFailure) => syncIssueLine({ kind: 'over_limit', element_id: failure.element_id, type: 'location', failure } as never, 'folder');
     expect(row(over('a', BYTES))).toBe('It holds more than 1 MB of text and links, more than OnlyWorlds takes in one element. Shorten a text, or split it over more than one element, to let it sync.');
