@@ -459,7 +459,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    * honest toast confirms the write instead of it silently vanishing.
    */
   function showDatedElement(id: string, name: string, date: number, verb: 'Dated' | 'Created' = 'Dated'): void {
-    const phrase = verb === 'Created' ? `Created ${name} at ${date}` : `Dated ${name} to ${date}`;
+    // The notice speaks the date as the chart does: "Year 17 YSL" under a calendar, the bare step under none.
+    const lens = activeLens();
+    const said = lens ? formatStep(lens.config, date) : String(date);
+    const phrase = verb === 'Created' ? `Created ${name} at ${said}` : `Dated ${name} to ${said}`;
     if (lastScoped.some(n => n.id === id)) {
       peekId = id;
       handle?.setSelection(id);
