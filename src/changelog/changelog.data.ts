@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.51',
+    date: '2026-11-28',
+    theme: 'A date said in the calendar of the chart',
+    entries: [
+      {
+        id: 'dated-notice-speaks-calendar',
+        title: 'The notice after dating on the timeline speaks the calendar',
+        body: 'After you drop or drag an element to a date on the timeline, the notice said the bare number, such as "Dated Treaty of Soft Landings to 267", while the chart beside it said Year 17 YSL. It now says the date in the calendar the chart is using, and the number only when there is none.',
+        tags: ['charts', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.50',
     date: '2026-11-28',
     theme: 'Settings kept, and a flip that says what it rounded',

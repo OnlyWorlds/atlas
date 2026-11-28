@@ -159,6 +159,37 @@ test('dragging a placed dot re-dates it (glyph drag → popover → write)', asy
   await expect(page.locator('.ow-toast', { hasText: 'Dated The Wandering to 12' })).toBeVisible();
 });
 
+test('the notice after a re-date speaks the calendar, as the chart does', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'construct', { name: 'First reckoning', supertype: 'calendar',
+    atlas_calendar: { version: 1, grain: 'Year', eras: [{ name: 'First Age', abbrev: 'FA', start: 0 }], format: '{year} {era}' } });
+  await createElement(page, 'event', { name: 'The Sundering', start_date: -20 });
+  await createElement(page, 'event', { name: 'The Long War', start_date: 30 });
+  const movableId = await createElement(page, 'event', { name: 'The Wandering', start_date: 5 });
+  await openCharts(page);
+
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  const dotX = cb.x + cb.width * 0.5;
+  const dotY = cb.y + bandMidY(cb.height);
+  await page.mouse.move(dotX, dotY);
+  await page.mouse.down();
+  await page.mouse.move(dotX + 12, dotY);
+  await page.mouse.move(dotX + 80, dotY, { steps: 5 });
+  await page.mouse.up();
+
+  const input = page.locator('.atlas-edit-popover input');
+  await expect(input).toBeVisible();
+  await input.fill('12 FA');
+  await input.press('Enter');
+
+  await expect.poll(async () => page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
+  }, movableId)).not.toBe(5);
+  const toast = page.locator('.ow-toast', { hasText: 'Dated The Wandering to' });
+  await expect(toast).toBeVisible();
+  await expect(toast).toContainText(/Dated The Wandering to \S+ FA/);
+});
+
 test('a range start cannot pass its recorded end (popover rejects, nothing written)', async ({ page }) => {
   await setupWorld(page);
   await createElement(page, 'event', { name: 'The Sundering', start_date: -20 });
