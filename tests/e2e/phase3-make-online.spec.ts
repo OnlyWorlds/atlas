@@ -197,6 +197,63 @@ test('Create new on a copy whose ids keel refuses: the fix on the toast and in S
   await expect(page.locator('[data-action="give-new-ids"]')).toHaveText('Give them new ids');
 });
 
+// A file another tool wrote can hold 2.5 in a whole-number field, which keel stores cut (conv. 200):
+// the element is never sent, and the toast and Settings name the field and its value.
+test('Create new holds an element whose whole-number field holds 2.5, and names it', async ({ page }) => {
+  const V2 = 'https://www.onlyworlds.com/api/v2';
+  const sent: string[] = [];
+  await page.route(`${V2}/**`, async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace('/api/v2', '');
+    // Stamped at keel's own now, as keel does: a stamp older than the edit reads as a change still waiting.
+    const at = new Date().toISOString();
+    if (path === '/account/worlds' && req.method() === 'POST') {
+      return route.fulfill({ status: 201, json: { id: '0e2e0000-0000-4000-8000-0000000000d9', name: 'Kinds', key: 'ow_w_' + 'd'.repeat(40) } });
+    }
+    if (path === '/account') return route.fulfill({ json: { username: 'e2e-member', email: null } });
+    if (path === '/world') return route.fulfill({ json: { id: '0e2e0000-0000-4000-8000-0000000000d9', name: 'Kinds', updated_at: at } });
+    if (path === '/bulk' && req.method() === 'POST') {
+      const body = req.postDataJSON() as { items: Array<{ element: { id: string; name?: string } }> };
+      for (const it of body.items) sent.push(it.element.name ?? it.element.id);
+      return route.fulfill({ json: { errors: false, items: body.items.map(it => ({ status: 201, id: it.element.id, created_at: at, updated_at: at })) } });
+    }
+    if (req.method() !== 'GET') {
+      const el = (req.postDataJSON?.() ?? {}) as { id?: string; name?: string };
+      sent.push(el.name ?? el.id ?? path);
+      return route.fulfill({ status: req.method() === 'POST' ? 201 : 200, json: { ...el, id: el.id ?? path.split('/').filter(Boolean)[1], created_at: at, updated_at: at } });
+    }
+    return route.fulfill({ json: { data: [] } });
+  });
+  await setupAtlasRoot(page);
+  await createLocalWorld(page, 'Kinds');
+  await page.evaluate(async () => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    await store.createElement('location', { name: 'Rivendell' });
+    await store.createElement('location', { name: 'Lorien' });
+    // As another tool would write it: the store keeps what it is given.
+    await store.createElement('character', { name: 'Elrond', birth_date: 2.5 });
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry')!);
+    reg.account_token = 'ow_a_' + 'e'.repeat(40);
+    reg.account_username = 'e2e-member';
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  });
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await worldInAddressOpen(page);
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+  await page.click('[data-action="make-online"]');
+  const pane = page.locator('[data-route-pane="create"]');
+  await pane.locator('input[name="create-pin"]').fill('1234');
+  await pane.locator('[data-action="create-submit"]').click();
+  await expect(page.locator('[data-modal="make-online"]')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator('.ow-toast', { hasText: 'Kinds is online.' })).toContainText('1 element was not sent: a field that takes only a whole number holds something else (birth date 2.5)');
+  const issues = page.locator('.atlas-settings-issue-line');
+  await expect(issues.filter({ hasText: 'Its birth date field holds 2.5' })).toBeVisible({ timeout: 5_000 });
+  await expect(issues).toHaveCount(1);
+  expect(sent.sort()).toEqual(['Lorien', 'Rivendell']);
+});
+
 test('Tab switching toggles the active route pane', async ({ page }) => {
   await setupAtlasRoot(page);
   await createLocalWorld(page, 'Sandbox');

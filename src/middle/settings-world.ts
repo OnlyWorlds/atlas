@@ -32,6 +32,7 @@ import { showProblem } from '../ui/problem-fixes';
 import { elementHash, navigate } from '../core/router';
 import { issuesFor, clearSyncIssues, type SyncIssue } from '../sync/sync-issues';
 import { HOST_REFUSAL_CAUSE, isLinkLimit } from '../sync/sync-failure-copy';
+import { faultFieldWords } from '../sync/kind-fault';
 import { buildFailureDetails } from '../core/problems';
 import { detailsContext } from '../ui/problem-fixes';
 import {
@@ -920,6 +921,10 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       return isLinkLimit(f)
         ? 'It holds more than 5,000 links, more than OnlyWorlds takes in one element. Remove some links, or split it over more than one element, to let it sync.'
         : 'It holds more than 1 MB of text and links, more than OnlyWorlds takes in one element. Shorten a text, or split it over more than one element, to let it sync.';
+    case 'wrong_kind':
+      return f.kind_fault
+        ? `Its ${faultFieldWords(f.kind_fault)} field holds ${f.kind_fault.value}, and OnlyWorlds takes only a whole number there, such as 12, so it was not sent. Change it to a whole number to let it sync. It stays ${inBrowser ? 'in this browser' : 'in the folder'}.`
+        : 'It links to a new element that was not sent, because a field that takes a whole number holds something else, there or in an element it links to. It waits for that one.';
     case 'not_yours':
       return issue.type === 'world'
         ? `Only the world's owner can change its details on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`

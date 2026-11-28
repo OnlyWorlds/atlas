@@ -2134,6 +2134,8 @@ function openDropDatePopover(
     label: edge === 'end' ? 'End date' : 'Date',
     value: prefill,
     widget: cal ? 'text-short' : 'number',
+    // A date is an integer field: 2.5 is refused with the field row's sentence, never rounded unsaid.
+    whole: !cal,
     liveHint: cal
       ? (raw) => {
           if (raw.trim() === '') return null;

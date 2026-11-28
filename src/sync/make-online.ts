@@ -36,6 +36,9 @@ import { isHiddenMark } from '../core/hidden-mark';
 import { stampWordOf } from '../core/door-trail';
 import { isOwProposed, withProposed } from './proposals';
 import { slicePushRefusal } from '../core/provenance';
+import { KIND_WAITS_MESSAGE, KindFaultError, kindFailure, kindFaultFrom, kindFaultOf } from './kind-fault';
+import { splitByRefusedLinks } from './sync-engine';
+import { numberFieldsFor } from '../editor/field-schema';
 
 /** Test seam: override the OW base URL; buildV2Adapter derives its /api/v2 from it. */
 export function setMakeOnlineBaseUrl(url: string): void {
@@ -421,7 +424,12 @@ export async function mergeLocalIntoApi(
   const sendable = async (id: string): Promise<{ body: Record<string, unknown>; sent: string } | null> => {
     const current = await folder.updateElementWith(id, () => null);
     if (!current) return null;
+    // An integer field keel would store cut or refuse (2.5, a word) is that element's failure, named.
+    const fault = kindFaultOf(current.type, current);
+    if (fault) throw new KindFaultError(fault);
     const { local_updated_at, server_updated_at: _s, ...body } = current;
+    // A number held as "" (an outside writer's empty) is unset: keel refuses `int("")`, as the push says.
+    for (const f of numberFieldsFor(current.type)) if (body[f] === '') body[f] = null;
     return { body, sent: local_updated_at ?? '' }; // '' = sent with none (never "passed nothing")
   };
 
@@ -438,7 +446,7 @@ export async function mergeLocalIntoApi(
       await folder.stampServerUpdatedAt(c.local.id, c.type, response.updated_at, s.sent, stampWordOf(response));
       counts.creates++;
     } catch (err) {
-      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err), ...serverOf(err) });
+      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err), ...serverOf(err), ...kindFaultFrom(err) });
     } finally {
       tick();
     }
@@ -456,7 +464,7 @@ export async function mergeLocalIntoApi(
       try {
         s = await sendable(dec.local.id);
       } catch (err) {
-        failures.push({ element_id: dec.local.id, type: dec.type, operation: 'create', message: errText(err) });
+        failures.push({ element_id: dec.local.id, type: dec.type, operation: 'create', message: errText(err), ...kindFaultFrom(err) });
         tick();
         continue;
       }
@@ -608,19 +616,45 @@ export async function mergeLocalIntoApi(
     await processBulkCreates(survivors, /* isRetry */ true);
   }
 
-  if (creates.length > 0) {
-    const ids = creates.map(c => c.local.id);
+  // conv. 200: a new element whose integer field holds what keel would store cut or refuse is held here,
+  // named, and so is one that links it (keel would refuse the link), read from disk after the kernel's rewrite.
+  const kindHeld = new Set<string>();
+  {
+    const now: Element[] = [];
+    // Read as `sendable` reads (from disk, in the element's chain), not the cache, so what is held is what would go up.
+    // A file that will not read now is left to `sendable`, which makes it that element's failure as before.
+    for (const c of creates) {
+      const cur = await folder.updateElementWith(c.local.id, () => null).catch(() => null);
+      if (cur) now.push(cur);
+    }
+    for (const cur of now) {
+      const fault = kindFaultOf(cur.type, cur);
+      if (!fault) continue;
+      failures.push(kindFailure(cur.id, cur.type, 'create', fault));
+      kindHeld.add(cur.id);
+    }
+    if (kindHeld.size > 0) {
+      for (const e of splitByRefusedLinks(now.filter(e => !kindHeld.has(e.id)), kindHeld).blocked) {
+        failures.push({ element_id: e.id, type: e.type, operation: 'create', message: KIND_WAITS_MESSAGE });
+        kindHeld.add(e.id);
+      }
+    }
+    for (let i = 0; i < kindHeld.size; i++) tick();
+  }
+  const toCreate = creates.filter(c => !kindHeld.has(c.local.id));
+  if (toCreate.length > 0) {
+    const ids = toCreate.map(c => c.local.id);
     await folder.updateSyncState(st => ({ route2_created: [...new Set([...(st.route2_created ?? []), ...ids])] }));
   }
-  if (typeof adapter.bulkCreate === 'function' && creates.length >= 2) {
-    await processBulkCreates(creates);
+  if (typeof adapter.bulkCreate === 'function' && toCreate.length >= 2) {
+    await processBulkCreates(toCreate);
   } else {
-    for (const c of creates) await createOne(c);
+    for (const c of toCreate) await createOne(c);
   }
   // An id keel answered 409 for (another place sent it first, or another world holds it) was never this
   // route's upload: a rerun must not take it as its own and write over it. Nor is a slot keel answered 200
   // (it replaced what it held, never counted as created).
-  const createdIds = new Set(creates.map(c => c.local.id));
+  const createdIds = new Set(toCreate.map(c => c.local.id));
   const raced = new Set(failures.filter(f => f.operation === 'create' && createdIds.has(f.element_id) && (f.code === 'id_conflict' || f.status === 409 || f.status === 200)).map(f => f.element_id));
   if (raced.size > 0) {
     await folder.updateSyncState(st => ({ route2_created: (st.route2_created ?? []).filter(id => !raced.has(id)) }));
@@ -636,6 +670,11 @@ export async function mergeLocalIntoApi(
       // An element this route itself uploaded on an earlier, unfinished run is
       // not a duplicate: its local copy wins whatever the policy.
       if (policy === 'b' || ownUploads.has(m.id)) {
+        // A link to a new element held for its kind would have keel refuse the whole update: it waits.
+        if (kindHeld.size > 0 && splitByRefusedLinks([(await folder.updateElementWith(m.id, () => null)) ?? m.local], kindHeld).blocked.length > 0) {
+          failures.push({ element_id: m.id, type: m.type, operation: 'update', message: KIND_WAITS_MESSAGE });
+          continue;
+        }
         const s = await sendable(m.id);
         if (!s) continue;
         let response: Awaited<ReturnType<typeof adapter.updateElement>>;
@@ -689,7 +728,7 @@ export async function mergeLocalIntoApi(
         counts.skipped++;
       }
     } catch (err) {
-      failures.push({ element_id: m.id, type: m.type, operation: 'update', message: errText(err) });
+      failures.push({ element_id: m.id, type: m.type, operation: 'update', message: errText(err), ...kindFaultFrom(err) });
     } finally {
       tick();
     }

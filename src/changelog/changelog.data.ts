@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.49',
+    date: '2026-11-28',
+    theme: 'Whole numbers on the way out',
+    entries: [
+      {
+        id: 'whole-number-not-sent',
+        title: 'An element holding 2.5 in a whole-number field is not sent without a word',
+        body: 'A file written by another tool or an earlier import can hold 2.5, or a word, in a field such as a birth date or a pin\'s place, which OnlyWorlds would store cut or refuse. Syncing, Make online and Keep this copy now leave such an element unsent and name the field and its value, in the sync message and in Settings under This world, until it holds a whole number. An element that links to a new one held this way waits with it. A whole number written as text, such as "7", is sent as before, and an empty number field goes up as unset from Make online too.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'import-whole-number-left-out',
+        title: 'Import leaves out a whole-number field that holds anything else',
+        body: 'A field that takes a whole number and holds 2.5 or a word in the file being imported is left out, and the review says so for each one. It was kept as written. Any other value of the wrong kind is still kept as written.',
+        tags: ['import', 'fix'],
+      },
+      {
+        id: 'timeline-date-box-whole',
+        title: 'The timeline\'s date box refuses 2.5',
+        body: 'On a timeline with no calendar, typing 2.5 into a card\'s date box now says the field takes a whole number, as the element\'s own page does. It rounded to 3 without a word. Flip this map now writes whole positions too.',
+        tags: ['charts', 'maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.48',
     date: '2026-11-28',
     theme: 'Whole numbers, and the size limit by name',

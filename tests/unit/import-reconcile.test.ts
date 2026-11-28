@@ -431,13 +431,14 @@ describe('reconcile — adversarial review regressions', () => {
     expect(plan.report.ambiguousNames).toEqual([{ type: 'location', name: 'Town' }]);
   });
 
-  it('coerces numeric edge strings (zero, negative, decimal)', () => {
+  it('coerces numeric edge strings (zero, negative); a decimal in an integer field is left out', () => {
     const parsed = parsePayload({ Map: [{ id: U.map, name: 'M', width: '0', height: '-5', depth: '2.5' }] });
     const plan = reconcile(parsed, [], { genId: genIdFactory() });
     const m = plan.creates[0];
     expect(m.data.width).toBe(0);
     expect(m.data.height).toBe(-5);
-    expect(m.data.depth).toBe(2.5);
+    // depth is an integer field: OnlyWorlds would store 2.5 cut, so the import leaves it out (conv. 200).
+    expect('depth' in m.data).toBe(false);
   });
 
   it('matches names differing only by internal whitespace', () => {

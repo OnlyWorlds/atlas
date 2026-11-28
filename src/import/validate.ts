@@ -228,7 +228,8 @@ function scalarIssue(
     field,
     value,
     // The path already names the key; the line names the field once, as the editor labels it.
-    issue: `${who}: ${fieldLabel(field)} takes ${takes}; here it holds ${shown}`,
+    // An integer field's wrong kind is left out by the import (normalize), so the line says so.
+    issue: `${who}: ${fieldLabel(field)} takes ${takes}; here it holds ${shown}${kind === 'integer' ? ', so the import leaves it out' : ''}`,
     expected: kind === 'text' ? 'A string of text' : kind === 'integer' ? 'A whole number, like 12' : 'A number, like 1.5',
     suggestion: kind === 'text'
       ? `Write "${field}" as one string of text.`
