@@ -11,10 +11,10 @@ import type { PerElementFailure } from '../../src/core/types';
 
 describe('keepsAsWhole', () => {
   it('takes a whole number, a whole number as text, and an unset field', () => {
-    for (const v of [12, -3, 0, '7', ' 7 ', '+7', '-7', '7.0', null, undefined, '']) expect(keepsAsWhole(v)).toBe(true);
+    for (const v of [12, -3, 0, '7', ' 7 ', '+7', '-7', '07', null, undefined, '']) expect(keepsAsWhole(v)).toBe(true);
   });
-  it('refuses a fraction, a word, a yes or no, a list and a group of fields', () => {
-    for (const v of [2.5, '2.5', 'tall', true, false, [1], { n: 1 }, Number.NaN, '1e3']) expect(keepsAsWhole(v)).toBe(false);
+  it('refuses a fraction, a word, a yes or no, a list and a group of fields, and text keel\'s int() refuses', () => {
+    for (const v of [2.5, '2.5', 'tall', true, false, [1], { n: 1 }, Number.NaN, '1e3', '7.0', '7.']) expect(keepsAsWhole(v)).toBe(false);
   });
 });
 

@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'whole-number-not-sent',
         title: 'An element holding 2.5 in a whole-number field is not sent without a word',
-        body: 'A file written by another tool or an earlier import can hold 2.5, or a word, in a field such as a birth date or a pin\'s place, which OnlyWorlds would store cut or refuse. Syncing, Make online and Keep this copy now leave such an element unsent and name the field and its value, in the sync message and in Settings under This world, until it holds a whole number. A new element that links to it waits with it. A whole number written as text, such as "7", is sent as before.',
+        body: 'A file written by another tool or an earlier import can hold 2.5, or a word, in a field such as a birth date or a pin\'s place, which OnlyWorlds would store cut or refuse. Syncing, Make online and Keep this copy now leave such an element unsent and name the field and its value, in the sync message and in Settings under This world, until it holds a whole number. An element that links to a new one held this way waits with it. A whole number written as text, such as "7", is sent as before, and an empty number field goes up as unset from Make online too.',
         tags: ['sync', 'fix'],
       },
       {

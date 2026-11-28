@@ -48,7 +48,7 @@ import { editedSince, editedSinceBaseline, stampOrder } from '../store/sync-stam
 import { BASELINE_UNKNOWN, hasNoBaseline, isBaselineUnknown, readableBaseline } from '../core/baseline-unknown';
 import { copyDiff, narratorMayBeFilled, theirsOf } from './same-copy';
 import { numberFieldsFor } from '../editor/field-schema';
-import { KIND_WAITS_MESSAGE, KindFaultError, kindFailure, kindFaultOf } from './kind-fault';
+import { KIND_WAITS_MESSAGE, KindFaultError, kindFailure, kindFaultFrom, kindFaultOf } from './kind-fault';
 import { changeSeqOf, preconditionCurrent } from './change-seq';
 import type {
   Conflict,
@@ -686,6 +686,10 @@ export class SyncEngine {
 
   /** An element's body as sent: sync stamps off, links to kept or left elements left out (keel keeps them). */
   private outgoing(elem: Element): Record<string, unknown> {
+    // conv. 200: the body as read now, never only the round's snapshot (an outside write can land between):
+    // an integer field keel would store cut or refuse throws, and the caller records the element's fault.
+    const fault = kindFaultOf(elem.type, elem);
+    if (fault) throw new KindFaultError(fault);
     // The mark of a copy with no record of what OnlyWorlds held is sync's own note (conv. 192): never sent.
     const { [BASELINE_UNKNOWN]: _mark, ...body } = stripSyncFields(elem);
     // A number held as "" (an outside writer's empty) is unset: keel refuses `int("")` and takes null,
@@ -2600,7 +2604,17 @@ export class SyncEngine {
           });
         }
       }
-      items.push({ type: current.type, element: this.outgoing(current) });
+      let element: Record<string, unknown>;
+      try {
+        element = this.outgoing(current);
+      } catch (err) {
+        // conv. 200: written since the round began; a slot of its own would only fail the batch.
+        if (!(err instanceof KindFaultError)) throw err;
+        failures.push(kindFailure(current.id, current.type, 'create', err.fault));
+        onItemDone();
+        continue;
+      }
+      items.push({ type: current.type, element });
       sentStamps.set(current.id, current.local_updated_at ?? ''); // '' = sent with none (never "passed nothing")
     }
     if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false, heldHere };
@@ -3096,6 +3110,8 @@ export class SyncEngine {
         kindHeld.set(e.id, { element_id: e.id, type: e.type, operation: 'create', message: KIND_WAITS_MESSAGE });
       }
     }
+    /** The new elements held for their kind or waiting on one: keel would refuse a link to any of them. */
+    const kindHeldCreates = new Set([...kindHeld.values()].filter(f => f.operation === 'create').map(f => f.element_id));
     const allCreates = createsToSend.filter(e => !kindHeld.has(e.id));
     const updatesOnly = updatesToSend.filter(e => !kindHeld.has(e.id));
     const heldRowsNow = allChanged.filter(e => heldNoBaseline.has(e.id) && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id)).length;
@@ -3245,7 +3261,10 @@ export class SyncEngine {
           element_id: elem.id,
           type: elem.type,
           operation: isCreate ? 'create' : 'update',
-          message: byHost ? HOST_HELD_MESSAGE : 'waits for an element OnlyWorlds refused in the same upload',
+          // One that waits on a create held here for its kind (conv. 200) is told so: OnlyWorlds refused nothing.
+          message: byHost ? HOST_HELD_MESSAGE
+            : kindHeldCreates.size > 0 && splitByRefusedLinks([elem], kindHeldCreates).blocked.length > 0 ? KIND_WAITS_MESSAGE
+            : 'waits for an element OnlyWorlds refused in the same upload',
         });
         done++;
         this.onPushProgress(done, total);
@@ -4755,6 +4774,8 @@ function failureOf(
     ...(!typed && isHostRefusal(err) ? { status: 403, source: 'server' as const } : {}),
     // The host's "Blocked" page, whose cause the words can name.
     ...(isHostBlocked(err) ? { host_blocked: true } : {}),
+    // conv. 200: an element `outgoing()` would not send, named by field and value.
+    ...kindFaultFrom(err),
   };
 }
 

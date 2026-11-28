@@ -44,6 +44,22 @@ for (const bulk of [false, true]) {
   });
 }
 
+for (const bulk of [false, true]) {
+  it(`${bulk ? 'through /bulk' : 'one at a time'}: a new element linking a held one waits, and so does a matched one`, async () => {
+    if (bulk) client.__enable_bulk(true);
+    await client.createElement('location', { id: DOCK, name: 'The dock' });
+    await folder.createElement('character', { id: WREN, name: 'Wren', birth_date: 2.5 } as never);
+    await folder.createElement('character', { id: ADA, name: 'Ada', friends: [WREN] } as never);
+    await folder.createElement('location', { id: DOCK, name: 'The dock', description: 'Mine.', characters: [WREN] } as never);
+    client.calls.length = 0;
+    const r = await mergeLocalIntoApi(folder, client, 'b');
+    expect(sent()).toEqual([]);
+    expect(r.failures.map(f => [f.element_id, f.operation, classifyFailure(f)]).sort()).toEqual([
+      [WREN, 'create', 'wrong_kind'], [ADA, 'create', 'wrong_kind'], [DOCK, 'update', 'wrong_kind'],
+    ].sort());
+  });
+}
+
 it('a matched element holding a word in an integer field is not sent over the online one', async () => {
   await client.createElement('character', { id: WREN, name: 'Wren', height: 170 });
   await folder.createElement('character', { id: WREN, name: 'Wren', height: 'tall' } as never);

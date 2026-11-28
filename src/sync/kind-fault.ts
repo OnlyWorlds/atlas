@@ -9,8 +9,10 @@
  * holding one is not sent: it is a sync issue naming the field and the value,
  * until the person makes it whole.
  *
- * A whole number written as text ("7", "7.0") is sent: keel stores the same
- * number. A fraction, a word, a yes or no, a list or a group of fields is not.
+ * A whole number written as text ("7", " 7 ", "+7") is sent: keel's `int()`
+ * reads the same number. "7.0" is not: `int("7.0")` raises, and keel answers
+ * 400. Nor is a fraction, a word, a yes or no, a list or a group of fields.
+ * An empty text is unset: the senders write it as null.
  */
 import type { ElementType, PerElementFailure } from '../core/types';
 import { PlainError } from '../core/plain-error';
@@ -26,11 +28,11 @@ export interface KindFault {
 /** The record's message for an element held for its kind (never shown: the words read `kind_fault`). */
 export const KIND_FAULT_MESSAGE = 'an integer field holds a value OnlyWorlds would not keep as written, so it was not sent';
 
-/** The record's message for a create held because it links one held for its kind (keel would refuse the link). */
+/** The record's message for an element held because it links a new one held for its kind (keel would refuse the link). */
 export const KIND_WAITS_MESSAGE = 'waits for an element Atlas held back for a value OnlyWorlds would not keep';
 
-/** A whole number as text, as keel reads it into the same integer. */
-const WHOLE_TEXT = /^\s*[-+]?\d+(\.0*)?\s*$/;
+/** A whole number as text, as keel's `int()` reads it (Python's: no decimal point, no exponent). */
+const WHOLE_TEXT = /^\s*[-+]?\d+\s*$/;
 
 /** Whether keel keeps this value in an integer field as written (absent and empty are unset). */
 export function keepsAsWhole(v: unknown): boolean {
