@@ -19,6 +19,7 @@
  */
 
 import { toastManager } from './toast-manager';
+import { WHOLE_NUMBER_KEPT } from './field-edit-popover';
 
 export interface FieldEditInlineOptions {
   /** The .atlas-field-value cell. Replaced in place. */
@@ -27,6 +28,8 @@ export interface FieldEditInlineOptions {
   value: string;
   /** Widget controls input type + parsing. */
   widget: 'text-short' | 'text-long' | 'number';
+  /** A number widget for a field the standard types integer: a number that is not whole is refused. */
+  whole?: boolean;
   /** 'single' = one-line input; 'multi' = 4-row textarea (regardless of widget hint). */
   mode: 'single' | 'multi';
   /** Called with parsed value on save. */
@@ -105,6 +108,12 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
       if (bad || (nextValue !== '' && !Number.isFinite(n))) {
         restoreAnchor();
         toastManager.info('That is not a number. The old value is kept.');
+        onCancel?.();
+        return;
+      }
+      if (opts.whole && nextValue !== '' && !Number.isInteger(n)) {
+        restoreAnchor();
+        toastManager.info(WHOLE_NUMBER_KEPT);
         onCancel?.();
         return;
       }

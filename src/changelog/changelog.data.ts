@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.48',
+    date: '2026-11-28',
+    theme: 'A whole-number field takes whole numbers',
+    entries: [
+      {
+        id: 'integer-field-whole-number',
+        title: 'A field that holds whole numbers says so when given 2.5',
+        body: 'Fields such as a birth date, a height or a pin\'s place hold whole numbers on OnlyWorlds, which would have stored 2.5 as 2 while Atlas kept 2.5. Typing a number that is not whole into one now says the field takes a whole number, such as 12, and writes nothing. Custom number fields still take any number.',
+        tags: ['editor', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.47',
     date: '2026-11-28',
     theme: 'Which size limit, as OnlyWorlds names it',

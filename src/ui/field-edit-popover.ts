@@ -28,6 +28,11 @@ import { showProblem } from './problem-fixes';
 import { problemWasShown } from '../core/problems';
 import { forPointer } from '../core/pointer';
 
+/** A number that is not whole, in a field the standard types integer: OnlyWorlds would store it cut, so it is refused here. */
+export const WHOLE_NUMBER_POINTER = 'This field takes a whole number, such as 12. Fix it, or press Esc to keep the old value.';
+export const WHOLE_NUMBER_TOUCH = 'This field takes a whole number, such as 12. Fix it, or tap Cancel to keep the old value.';
+export const WHOLE_NUMBER_KEPT = 'This field takes a whole number, such as 12. The old value is kept.';
+
 export interface FieldEditOptions {
   /** Element whose bounding rect anchors the popover. */
   anchor: HTMLElement;
@@ -40,6 +45,8 @@ export interface FieldEditOptions {
   value: string;
   /** Widget kind controls input vs textarea + parsing. */
   widget: 'text-short' | 'text-long' | 'number';
+  /** A number widget for a field the standard types integer: a number that is not whole is refused (OnlyWorlds would store it cut). */
+  whole?: boolean;
   /** Called with the parsed value when user saves. */
   onSave: (nextValue: any) => Promise<void> | void;
   /** Optional cancel callback. */
@@ -215,6 +222,12 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       const n = Number(nextValue);
       if (bad || (nextValue !== '' && !Number.isFinite(n))) {
         errorLine.textContent = forPointer('That is not a number. Fix it, or press Esc to keep the old value.', 'That is not a number. Fix it, or tap Cancel to keep the old value.');
+        errorLine.dataset.active = 'true';
+        input.focus();
+        return;
+      }
+      if (opts.whole && nextValue !== '' && !Number.isInteger(n)) {
+        errorLine.textContent = forPointer(WHOLE_NUMBER_POINTER, WHOLE_NUMBER_TOUCH);
         errorLine.dataset.active = 'true';
         input.focus();
         return;
