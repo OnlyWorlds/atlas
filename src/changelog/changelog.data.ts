@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'flip-says-rounded',
         title: 'Flip pins and zones says when a position was rounded',
-        body: 'A pin or zone point that was not at a whole number is rounded when the map flips, so pressing again brings it back to a whole number rather than where it was. The message now says how many were rounded, and the hint says it before you press.',
+        body: 'A pin or zone point that was not at a whole number is rounded when the map flips, so pressing again brings it back to a whole number rather than where it was. The message now says how many were not whole, and the hint says it before you press.',
         tags: ['maps', 'fix'],
       },
       {

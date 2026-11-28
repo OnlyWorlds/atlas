@@ -227,4 +227,13 @@ describe('a setting of another kind, held at the seed', () => {
     expect(server.time_current === null || server.description === '').toBe(false);
     await expect(engine.resolveMetaConflict('time_current', 'mine')).rejects.toThrow(/another kind than it takes, so it was not sent/);
   });
+
+  it('at the seed it reads as unset: the file takes OnlyWorlds\' value and nothing is sent', async () => {
+    await folder.writeWorldMeta({ description: 12, time_current: '7', time_format_names: 'Year' } as never);
+    client.__server_mutate_world_meta({ description: 'Cold.', time_current: 7, time_format_names: ['Year'] });
+    await makeEngine('local-wins').syncNow();
+    expect(patchBodies()).toEqual([]);
+    const local = await localMeta();
+    expect([local.description, local.time_current, local.time_format_names]).toEqual(['Cold.', 7, ['Year']]);
+  });
 });
