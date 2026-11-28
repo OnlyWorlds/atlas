@@ -101,6 +101,36 @@ export function canonicalMetaValue(kind: MetaFieldKind, v: unknown): string | Me
   }
 }
 
+/**
+ * A setting of another kind than its field takes ("7" or 2.5 in `time_current`, 12 in
+ * `description`, a word in `time_format_names`; another tool's world.json). Its canonical form
+ * would push as a clear ("7" as null, 12 as '', a word as []) or as a value OnlyWorlds refuses
+ * (2.5), so sync never reads it as a local change (`settledKindsOf`).
+ */
+export function metaWrongKind(kind: MetaFieldKind, v: unknown): boolean {
+  if (v === null || v === undefined) return false;
+  if (kind === 'int') return !(typeof v === 'number' && Number.isInteger(v));
+  if (kind === 'text' || kind === 'label') return typeof v !== 'string';
+  return !Array.isArray(v) || v.some(x => !(typeof x === 'string' || (typeof x === 'number' && Number.isFinite(x))));
+}
+
+/**
+ * The local settings as sync reads them: a setting of another kind than its field takes reads as
+ * `agreed`'s value for it (the baseline's, then OnlyWorlds' own where the step has read it), so it
+ * is no local change, or as unset where `agreed` holds none. Every reader of the local settings in
+ * sync reads through this, so no path pushes such a setting. The file itself is untouched.
+ */
+export function settledKindsOf(local: Record<string, unknown>, agreed: Record<string, unknown> | null): Record<string, unknown> {
+  let out = local;
+  for (const [field, kind] of Object.entries(META_SYNC_FIELDS)) {
+    if (!metaWrongKind(kind, local[field])) continue;
+    if (out === local) out = { ...local };
+    if (agreed && field in agreed) out[field] = agreed[field];
+    else delete out[field];
+  }
+  return out;
+}
+
 export function metaEquals(kind: MetaFieldKind, a: unknown, b: unknown): boolean {
   const ca = canonicalMetaValue(kind, a);
   const cb = canonicalMetaValue(kind, b);

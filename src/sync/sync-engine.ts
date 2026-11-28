@@ -22,9 +22,11 @@ import {
   isWorldExtensionKey,
   metaEquals,
   metaFieldLengthError,
+  metaWrongKind,
   pickExtensionBaseline,
   pickSyncedMeta,
   setExtBaseline,
+  settledKindsOf,
   threeWayExtDiff,
   threeWayMetaDiff,
 } from './world-meta-sync';
@@ -1539,9 +1541,13 @@ export class SyncEngine {
     let baselineValue: unknown;
     if (choice === 'mine') {
       if (this.readOnly) throw new PlainError('This world is view-only here, so its settings cannot be sent to OnlyWorlds.');
-      const local = await this.folder.readWorldMeta({ strict: true });
+      const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
+      // A setting of another kind would go as a clear or a refused value: said, nothing sent.
+      if (metaWrongKind(kind, local[field])) {
+        throw new PlainError('This copy\'s setting holds a value of another kind than it takes, so it was not sent. Take the one on OnlyWorlds, or set it again in Atlas.');
+      }
       const resp = await this.client.patchWorldMeta(
-        encodeMetaFieldsForPush({ [field]: (local as unknown as Record<string, unknown>)[field] }),
+        encodeMetaFieldsForPush({ [field]: local[field] }),
       );
       baselineValue = canonicalMetaValue(kind, (resp as unknown as Record<string, unknown>)[field]);
     } else {
@@ -1647,7 +1653,7 @@ export class SyncEngine {
       const baseline = syncState.meta_baseline ?? null;
       const extBaseline = syncState.meta_ext_baseline ?? null;
       if (!baseline || !extBaseline) return 'unknown';
-      const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
+      const local = settledKindsOf(await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>, baseline);
       const dirty = META_SYNC_FIELD_NAMES.some(
         f => !metaEquals(META_SYNC_FIELDS[f], local[f], baseline[f])
       ) || extDirty(local, extBaseline);
@@ -1744,6 +1750,10 @@ export class SyncEngine {
     }
     const syncState = await this.folder.readSyncState();
     const baseline = syncState.meta_baseline ?? null;
+    // A setting of another kind than its field takes reads as no local change: the baseline's value,
+    // or OnlyWorlds' own for a setting left unsettled at the seed. At the seed itself it reads as unset,
+    // so the seed fills the file from OnlyWorlds, as it fills any empty setting.
+    local = settledKindsOf(local, baseline ? { ...pickSyncedMeta(serverRec), ...baseline } : null);
     // A profile's x_ keys: their own three-way, beside the fields.
     // Settings and keys both sides held differently at the seed, not yet agreed or chosen.
     const unsettled = new Set(syncState.meta_unsettled ?? []);

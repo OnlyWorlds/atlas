@@ -132,6 +132,22 @@ describe('three-way rounds', () => {
     expect(patchBodies()).toEqual([]);
   });
 
+  it('a setting of another kind (another tool\'s world.json) is never pushed, costs no read per save, and a change there still comes back', async () => {
+    client.__server_mutate_world_meta({ time_current: 7, description: 'Cold.', time_format_names: ['Age'] });
+    const engine = await seeded();
+    await folder.writeWorldMeta({ time_current: '7', description: 12, time_format_names: 'Age' } as never);
+    await engine.syncNow();
+    for (let i = 0; i < 3; i++) await engine.pushOnce();
+    expect(patchBodies()).toEqual([]);
+    expect(client.calls.filter(c => (c as { method: string }).method === 'getWorldMeta')).toHaveLength(1);
+    const server = client.__get_world_meta_state() as Record<string, unknown>;
+    expect([server.time_current, server.description, server.time_format_names]).toEqual([7, 'Cold.', ['Age']]);
+    client.__server_mutate_world_meta({ time_current: 9 });
+    await engine.syncNow();
+    expect((await folder.readWorldMeta()).time_current).toBe(9);
+    expect(patchBodies()).toEqual([]);
+  });
+
   it('a cleared now goes out as EXPLICIT null (never omitted — the resurrect fix)', async () => {
     client.__server_mutate_world_meta({ time_current: 42 });
     const engine = await seeded();

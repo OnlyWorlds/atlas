@@ -285,7 +285,7 @@ export function visualSettingsTemplate(prefs: MapViewPrefs, hasOverride: boolean
       ${viewOnly ? '' : `<section class="atlas-popover-section">
         <div class="atlas-popover-section-divider">Upside down?</div>
         <button type="button" class="atlas-btn-ghost" data-action="flip-map">Flip pins and zones</button>
-        <p class="atlas-popover-hint">Maps placed in Atlas before 1.8 can show upside down. This mirrors every pin and zone point on this map top to bottom. Press it again to undo.</p>
+        <p class="atlas-popover-hint">Maps placed in Atlas before 1.8 can show upside down. This mirrors every pin and zone point on this map top to bottom. Press it again to undo; a position that is not a whole number is rounded on the way.</p>
       </section>`}
     </div>
 
@@ -415,7 +415,7 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
     }
     flipBtn.disabled = true;
     try {
-      const { pins, points } = await flipMapVertically(store, mapId);
+      const { pins, points, rounded } = await flipMapVertically(store, mapId);
       await refreshElementsAfterWrite(store); // re-renders the map, requests the push
       const parts = [
         pins ? `${pins} pin${pins === 1 ? '' : 's'}` : '',
@@ -423,7 +423,9 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
       ].filter(Boolean);
       toastManager.success(parts.length === 0
         ? 'Nothing to flip on this map'
-        : `Flipped ${parts.join(' and ')}. Press again to undo`);
+        : rounded === 0
+          ? `Flipped ${parts.join(' and ')}. Press again to undo`
+          : `Flipped ${parts.join(' and ')}. ${rounded === 1 ? '1 position was not a whole number and is' : `${rounded} positions were not whole numbers and are`} now rounded, so pressing again will not bring ${rounded === 1 ? 'it' : 'them'} back exactly`);
     } catch (err) {
       // No retry: the flip is its own inverse, so running it twice undoes it.
       console.error('[map-visual] flip failed:', err);

@@ -40,7 +40,7 @@ describe('the words', () => {
     expect(syncIssueLine({ kind: classifyFailure(f), type: 'character', failure: f } as never, 'browser'))
       .toBe('Its hit points field holds "lots", and OnlyWorlds takes only a whole number there, such as 12, so it was not sent. Change it to a whole number to let it sync. It stays in this browser.');
     const w: PerElementFailure = { element_id: 'b', type: 'character', operation: 'create', message: KIND_WAITS_MESSAGE };
-    expect(syncIssueLine({ kind: classifyFailure(w), type: 'character', failure: w } as never)).toMatch(/^It links to a new element that was not sent/);
+    expect(syncIssueLine({ kind: classifyFailure(w), type: 'character', failure: w } as never)).toBe('It links to a new element that was not sent, and syncs when that one does.');
   });
   it('the toast names two by field and value and counts the rest', () => {
     const fs = [held('a', 'height', '2.5'), held('b', 'x', '412.6'), held('c', 'level', '"high"'), held('d', 'level', '1.5')];
