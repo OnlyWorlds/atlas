@@ -46,6 +46,21 @@ export const META_SYNC_FIELDS: Readonly<Record<string, MetaFieldKind>> = {
 
 export const META_SYNC_FIELD_NAMES: readonly string[] = Object.keys(META_SYNC_FIELDS);
 
+/** Each synced setting as a person reads it, in the words of the screens that set it (the world clock, Settings). */
+export const META_FIELD_WORDS: Readonly<Record<string, string>> = {
+  description: 'The description',
+  image_url: 'The picture',
+  time_basic_unit: 'The step of time',
+  time_format_names: 'The names of the time units',
+  time_format_equivalents: 'The lengths of the time units',
+  time_range_min: 'Where recorded history starts',
+  time_range_max: 'Where recorded history ends',
+  time_current: 'The now',
+  length_unit: 'The length unit',
+  mass_unit: 'The mass unit',
+  distance_unit: 'The distance unit',
+};
+
 /**
  * The one disk↔wire rename, and the direction matters (ruled 2026-07-28,
  * folder-format v0.3.5).

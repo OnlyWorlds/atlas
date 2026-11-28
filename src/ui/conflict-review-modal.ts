@@ -27,6 +27,7 @@ import { escapeText } from '../core/dom-utils';
 import { proposalReviewLine } from '../sync/proposal-lines';
 import { memberIds, storedMark } from '../core/strand';
 import { STRAND_KEY } from '../core/strand-mark';
+import { META_FIELD_WORDS } from '../sync/world-meta-sync';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
@@ -382,7 +383,7 @@ export function noBaselineRowHtml(c: Conflict, name: string, viewOnly = false): 
 export function metaFieldWord(field: string): string {
   if (field === 'x_names') return "The world's words for the types";
   if (field === STRAND_KEY) return "The world's strand";
-  return field;
+  return META_FIELD_WORDS[field] ?? field;
 }
 
 /** The story a strand mark names, by name where this copy holds it. */

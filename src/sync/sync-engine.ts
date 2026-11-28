@@ -12,6 +12,7 @@ import { nowIso } from '../store/folder-store';
 import {
   META_SYNC_FIELDS,
   META_SYNC_FIELD_NAMES,
+  META_FIELD_WORDS,
   EXT_MAX_BYTES,
   canonicalExtValue,
   canonicalMetaValue,
@@ -1544,7 +1545,7 @@ export class SyncEngine {
       const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
       // A setting of another kind would go as a clear or a refused value: said, nothing sent.
       if (metaWrongKind(kind, local[field])) {
-        throw new PlainError('This copy\'s setting holds a value of another kind than it takes, so it was not sent. Take the one on OnlyWorlds, or set it again in Atlas.');
+        throw new PlainError(`${META_FIELD_WORDS[field] ?? 'This setting'} in this copy holds a value of another kind than it takes, so it was not sent. Take the one on OnlyWorlds, or set it again in Atlas.`);
       }
       const resp = await this.client.patchWorldMeta(
         encodeMetaFieldsForPush({ [field]: local[field] }),

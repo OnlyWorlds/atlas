@@ -14,6 +14,8 @@ describe('the strand in the conflict review', () => {
     expect(metaFieldWord('x_strand')).toBe("The world's strand");
     expect(metaFieldWord('x_names')).toBe("The world's words for the types");
     expect(metaFieldWord('x_other')).toBe('x_other');
+    expect(metaFieldWord('time_current')).toBe('The now');
+    expect(metaFieldWord('length_unit')).toBe('The length unit');
   });
 
   it('names each side by its story: one this copy holds, one it does not, and none', () => {

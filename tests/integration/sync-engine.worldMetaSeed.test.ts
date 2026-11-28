@@ -225,7 +225,7 @@ describe('a setting of another kind, held at the seed', () => {
     }
     const server = await serverMeta();
     expect(server.time_current === null || server.description === '').toBe(false);
-    await expect(engine.resolveMetaConflict('time_current', 'mine')).rejects.toThrow(/another kind than it takes, so it was not sent/);
+    await expect(engine.resolveMetaConflict('time_current', 'mine')).rejects.toThrow(/^The now in this copy holds a value of another kind than it takes, so it was not sent\./);
   });
 
   it('at the seed it reads as unset: the file takes OnlyWorlds\' value and nothing is sent', async () => {
