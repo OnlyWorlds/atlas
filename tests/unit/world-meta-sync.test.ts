@@ -17,7 +17,9 @@ import {
   isMetaEmpty,
   metaEquals,
   metaFieldLengthError,
+  metaWrongKind,
   pickSyncedMeta,
+  settledKindsOf,
   threeWayMetaDiff,
 } from '../../src/sync/world-meta-sync';
 
@@ -89,14 +91,21 @@ describe('pickSyncedMeta / isMetaEmpty', () => {
 });
 
 describe('threeWayMetaDiff', () => {
-  it('a local setting of another kind is never pushed, so OnlyWorlds keeps its value (census S663)', () => {
-    const baseline = { time_current: 7, time_range_min: 0, description: 'Cold.' };
-    const d = threeWayMetaDiff({ time_current: '7', time_range_min: 2.5, description: 12 }, { ...baseline }, baseline);
+  it('a local setting of another kind reads as no change, so it is never pushed and OnlyWorlds keeps its value', () => {
+    const baseline = { time_current: 7, time_range_min: 0, description: 'Cold.', time_format_names: ['Age'] };
+    const odd = { time_current: '7', time_range_min: 2.5, description: 12, time_format_names: 'Age' };
+    for (const [f, v] of Object.entries(odd)) expect(metaWrongKind(META_SYNC_FIELDS[f], v)).toBe(true);
+    const d = threeWayMetaDiff(settledKindsOf(odd, baseline), { ...baseline }, baseline);
     expect(d.pushFields).toEqual({});
     expect(d.contested).toEqual([]);
-    // A cleared setting still goes, as null; a setting OnlyWorlds moved is still pulled over the odd one.
-    expect(threeWayMetaDiff({ time_current: null }, { time_current: 7 }, { time_current: 7 }).pushFields).toEqual({ time_current: null });
-    expect(threeWayMetaDiff({ time_current: '7' }, { time_current: 9 }, { time_current: 7 }).pullFields).toEqual({ time_current: 9 });
+    // Before a baseline, such a setting reads as unset; a cleared setting still goes, as null;
+    // a setting OnlyWorlds moved is still pulled over the odd one.
+    expect(settledKindsOf({ time_current: '7', description: 'Kept.' }, null)).toEqual({ description: 'Kept.' });
+    expect(threeWayMetaDiff(settledKindsOf({ time_current: null }, { time_current: 7 }), { time_current: 7 }, { time_current: 7 }).pushFields).toEqual({ time_current: null });
+    expect(threeWayMetaDiff(settledKindsOf({ time_current: '7' }, { time_current: 7 }), { time_current: 9 }, { time_current: 7 }).pullFields).toEqual({ time_current: 9 });
+    for (const v of [7, null, undefined]) expect(metaWrongKind('int', v)).toBe(false);
+    for (const v of [['Age', 2], []]) expect(metaWrongKind('list', v)).toBe(false);
+    expect(metaWrongKind('list', ['Age', true])).toBe(true);
   });
 
   const baseline = pickSyncedMeta({ description: 'old', time_current: 10 });

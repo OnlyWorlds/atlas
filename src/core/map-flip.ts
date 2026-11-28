@@ -27,7 +27,7 @@ export function flippedY(y: number, height: number): number {
 export interface MapFlipResult {
   pins: number;
   points: number;
-  /** Positions that were not whole before the flip: rounded, so a second flip does not bring them back exactly. */
+  /** Positions whose y was not whole: rounded, so a second flip does not bring them back exactly. */
   rounded: number;
 }
 
@@ -43,7 +43,8 @@ export async function flipMapVertically(store: FolderStore, mapId: string): Prom
     for (const el of items) {
       const rec = el as unknown as { id: string; map_id?: unknown; y?: unknown };
       if (rec.map_id !== mapId || typeof rec.y !== 'number' || !Number.isFinite(rec.y)) continue;
-      if (!Number.isInteger(height - rec.y)) result.rounded++;
+      // A whole y always comes back whole on a second flip, whatever the height; one that was not never does.
+      if (!Number.isInteger(rec.y)) result.rounded++;
       await store.updateElement(rec.id, { y: flippedY(rec.y, height) } as never);
       if (type === 'pin') result.pins++; else result.points++;
     }

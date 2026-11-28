@@ -49,7 +49,8 @@ describe('flipMapVertically', () => {
     await store.createElement('pin', { map_id: map.id, element_id: loc.id, element_type: 'location', x: 10, y: 100 } as never);
     const zone = await store.createElement('zone', { name: 'Marsh' });
     await store.createElement('marker', { map_id: map.id, zone_id: zone.id, x: 1, y: 250.25, order: 1 } as never);
-    expect((await flipMapVertically(store, map.id)).rounded).toBe(2);
+    // The pin's y is whole and comes back; the zone point's is not, and only it is counted.
+    expect((await flipMapVertically(store, map.id)).rounded).toBe(1);
     expect(await ys('pin', map.id)).toEqual([901]);
     expect(await ys('marker', map.id)).toEqual([750]);
   });

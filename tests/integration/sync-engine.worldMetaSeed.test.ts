@@ -208,3 +208,23 @@ describe('a folder linked to a world with its own settings', () => {
     expect((await serverMeta()).description).toBe('New words');
   });
 });
+
+describe('a setting of another kind, held at the seed', () => {
+  it('under local-wins it is never pushed as a clear or a refused value, and Mine says so', async () => {
+    await folder.writeWorldMeta({ time_current: 5, description: 'Warm.' } as never);
+    client.__server_mutate_world_meta({ time_current: 7, description: 'Cold.' });
+    const engine = makeEngine('local-wins');
+    await engine.syncNow();
+    client.calls.length = 0;
+    await folder.writeWorldMeta({ time_current: '9', description: 12 } as never);
+    await engine.syncNow();
+    await engine.syncNow();
+    for (const b of patchBodies()) {
+      expect(b).not.toHaveProperty('time_current');
+      expect(b).not.toHaveProperty('description');
+    }
+    const server = await serverMeta();
+    expect(server.time_current === null || server.description === '').toBe(false);
+    await expect(engine.resolveMetaConflict('time_current', 'mine')).rejects.toThrow(/another kind than it takes, so it was not sent/);
+  });
+});

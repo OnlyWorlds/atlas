@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'world-setting-odd-kind-kept',
         title: 'A world setting of another kind no longer clears it online',
-        body: 'When a world file from another tool held its current time as "7", or a description as a number, the next sync sent it as empty and cleared the value on OnlyWorlds. Such a setting is now left as it is on both sides.',
+        body: 'When a world file from another tool held a setting in another kind than it takes, such as the current time as "7", a description as a number or a list of time names as one word, the next sync sent it as empty and cleared the value on OnlyWorlds. Sync now leaves such a setting out, so OnlyWorlds keeps its value; a change made there still comes back to the folder.',
         tags: ['sync', 'fix'],
       },
       {

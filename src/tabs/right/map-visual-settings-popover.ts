@@ -425,7 +425,7 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
         ? 'Nothing to flip on this map'
         : rounded === 0
           ? `Flipped ${parts.join(' and ')}. Press again to undo`
-          : `Flipped ${parts.join(' and ')}. ${rounded === 1 ? '1 position was' : `${rounded} positions were`} not a whole number and ${rounded === 1 ? 'is' : 'are'} now rounded, so pressing again will not bring ${rounded === 1 ? 'it' : 'them'} back exactly`);
+          : `Flipped ${parts.join(' and ')}. ${rounded === 1 ? '1 position was not a whole number and is' : `${rounded} positions were not whole numbers and are`} now rounded, so pressing again will not bring ${rounded === 1 ? 'it' : 'them'} back exactly`);
     } catch (err) {
       // No retry: the flip is its own inverse, so running it twice undoes it.
       console.error('[map-visual] flip failed:', err);
