@@ -57,7 +57,7 @@ for (const bulk of [false, true]) {
       expect(classifyFailure(ada)).toBe('wrong_kind');
       expect(r.failures).toHaveLength(2);
       expect((await folder.getElement(WREN))!.server_updated_at).toBeFalsy();
-      expect(describeFailures(r.failures)).toBe('1 element was not sent: a field that takes only a whole number holds something else (birth date 2.5), which OnlyWorlds would not keep as written. Change it to a whole number, such as 12, to let it sync. It stays on your disk. 1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else.');
+      expect(describeFailures(r.failures)).toBe('1 element was not sent: a field that takes only a whole number holds something else (birth date 2.5), which OnlyWorlds would not keep as written. Change it to a whole number, such as 12, to let it sync. It stays on your disk. 1 element waits for a new element it links to, which was not sent because a field that takes a whole number holds something else, there or in an element it links to.');
 
       // Made whole, both go on the next round, the link with them.
       await folder.updateElement(WREN, { birth_date: 2 } as never);
