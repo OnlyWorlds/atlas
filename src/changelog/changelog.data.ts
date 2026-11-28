@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.50',
+    date: '2026-11-28',
+    theme: 'Settings kept, and a flip that says what it rounded',
+    entries: [
+      {
+        id: 'world-setting-odd-kind-kept',
+        title: 'A world setting of another kind no longer clears it online',
+        body: 'When a world file from another tool held a setting in another kind than it takes, such as the current time as "7", a description as a number or a list of time names as one word, the next sync sent it as empty and cleared the value on OnlyWorlds. Sync now leaves such a setting out, so OnlyWorlds keeps its value; a change made there still comes back to the folder.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'flip-says-rounded',
+        title: 'Flip pins and zones says when a position was rounded',
+        body: 'A pin or zone point that was not at a whole number is rounded when the map flips, so pressing again brings it back to a whole number rather than where it was. The message now says how many were not whole, and the hint says it before you press.',
+        tags: ['maps', 'fix'],
+      },
+      {
+        id: 'waiting-element-words',
+        title: 'An element waiting on a held one says so plainly',
+        body: 'An element that links to a new one Atlas held back now reads: it links to a new element that was not sent, and syncs when that one does.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.125.49',
     date: '2026-11-28',
     theme: 'Whole numbers on the way out',
@@ -75,7 +100,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'timeline-date-box-whole',
         title: 'The timeline\'s date box refuses 2.5',
-        body: 'On a timeline with no calendar, typing 2.5 into a card\'s date box now says the field takes a whole number, as the element\'s own page does. It rounded to 3 without a word. Flip this map now writes whole positions too.',
+        body: 'On a timeline with no calendar, typing 2.5 into a card\'s date box now says the field takes a whole number, as the element\'s own page does. It rounded to 3 without a word. Flip pins and zones now writes whole positions too.',
         tags: ['charts', 'maps', 'fix'],
       },
     ],
